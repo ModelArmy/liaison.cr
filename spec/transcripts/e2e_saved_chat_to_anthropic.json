@@ -1,0 +1,57 @@
+{
+  "name": "e2e_saved_chat_to_anthropic",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "219",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Answer in one short sentence.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]}],\"reasoning_effort\":\"none\"}",
+        "body_digest": "6d16e7a5774fecb45d357afd9eded6c35222184f227e21fcf4557d4f3651333e"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:02 GMT",
+          "Content-Length": "337"
+        },
+        "body": "{\"id\":\"chatcmpl-226\",\"object\":\"chat.completion\",\"created\":1789250282,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Mount Everest is the tallest mountain on Earth.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":9,\"total_tokens\":41}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:02Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "Content-Length": "406",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"max_tokens\":4096,\"system\":\"Answer in one short sentence.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Mount Everest is the tallest mountain on Earth.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"And the second tallest?\"}]}],\"thinking\":{\"type\":\"disabled\"}}",
+        "body_digest": "1d959a9e7a7ffc3bb593b31ea916f325bfd7a82f583ec8cb5740d5b6c06a03d1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:02 GMT",
+          "Content-Length": "254"
+        },
+        "body": "{\"id\":\"msg_89c65ef6e758e22457b12d53\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"gemma4:26b-mxfp8\",\"content\":[{\"type\":\"text\",\"text\":\"K2 is the second tallest mountain on Earth.\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":56,\"output_tokens\":10}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:02Z"
+    }
+  ]
+}

@@ -197,6 +197,20 @@ What is left is the CLI half, and it is genuinely a CLI question now: whether
 `start`/`continue` declare tools at all, and what the executable would run.
 `SCOPE.md`'s remaining entries all predate the streaming work.
 
+**`spec/end_to_end/` is new, and it exists because the CLI is leaving.** The CLI
+specs were this shard's only full-stack coverage — and the only place a session
+was ever written to a disk and picked back up, which is the product claim. Three
+files now cover that at the library level: the handoff across a file, a streamed
+turn archived and resumed, and a `Toolbox` exchange accepted by a second
+protocol. All against local Ollama, all free to re-record.
+
+One thing they taught, which cost five red examples to learn: Ollama reasons on
+every endpoint and cannot mint an Anthropic thought signature, so any handoff
+into Anthropic carrying a reasoning block degrades and `Compensating` refuses
+it. The four handoff examples pass `Reasoning::Off`, because retention is a
+different axis from portability; the fifth asserts the loss deliberately, under
+both policies.
+
 **`SCOPE.md`'s `MUST FIX` is empty.** Interrupted-turn repair, the last entry
 in it, is built, and the argument that used to live there now lives in
 `docs/MPSH_SPECIFICATION.md` §3a — where it belongs, being a statement about

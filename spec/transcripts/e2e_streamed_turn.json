@@ -1,0 +1,31 @@
+{
+  "name": "e2e_streamed_turn",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "273",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Answer in one short sentence.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]}],\"reasoning_effort\":\"none\",\"stream\":true,\"stream_options\":{\"include_usage\":true}}",
+        "body_digest": "71247d6e7455aff3c228edd47392396bba6b083d57c753aee1f3eb38a2bf395d"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/event-stream",
+          "Date": "Sat, 12 Sep 2026 21:58:06 GMT",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "data: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Mount\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Everest\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" is\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" the\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" tallest\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" mountain\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" on\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\" Earth\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"chatcmpl-194\",\"object\":\"chat.completion.chunk\",\"created\":1789250286,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[],\"usage\":{\"prompt_tokens\":32,\"completion_tokens\":9,\"total_tokens\":41}}\n\ndata: [DONE]\n\n"
+      },
+      "recorded_at": "2026-09-12T21:58:06Z"
+    }
+  ]
+}

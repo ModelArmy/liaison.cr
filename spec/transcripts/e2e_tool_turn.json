@@ -1,0 +1,56 @@
+{
+  "name": "e2e_tool_turn",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "481",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Use the supplied tools when they apply.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}}],\"reasoning_effort\":\"none\"}",
+        "body_digest": "3d76c93cd8e96f0cb7fc3a57fc12c8fb066c60982efa9304bacb13208c5861c6"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:07 GMT",
+          "Content-Length": "433"
+        },
+        "body": "{\"id\":\"chatcmpl-516\",\"object\":\"chat.completion\",\"created\":1789250287,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_rkmvu264\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":92,\"completion_tokens\":14,\"total_tokens\":106}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:07Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "776",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Use the supplied tools when they apply.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"mc_1789250287444_0\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"city\\\":\\\"Paris\\\",\\\"temp_c\\\":18,\\\"conditions\\\":\\\"light rain\\\"}\",\"tool_call_id\":\"mc_1789250287444_0\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}}],\"reasoning_effort\":\"none\"}",
+        "body_digest": "2d56c04be956db26501032c827465c2edbd75f5261d23b3c751526f57fb6e001"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:07 GMT",
+          "Content-Length": "349"
+        },
+        "body": "{\"id\":\"chatcmpl-543\",\"object\":\"chat.completion\",\"created\":1789250287,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"The weather in Paris is currently 18°C with light rain.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":132,\"completion_tokens\":19,\"total_tokens\":151}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:07Z"
+    }
+  ]
+}

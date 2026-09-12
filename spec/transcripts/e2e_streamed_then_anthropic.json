@@ -1,0 +1,32 @@
+{
+  "name": "e2e_streamed_then_anthropic",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "Content-Length": "406",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"max_tokens\":4096,\"system\":\"Answer in one short sentence.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Mount Everest is the tallest mountain on Earth.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"And the second tallest?\"}]}],\"thinking\":{\"type\":\"disabled\"}}",
+        "body_digest": "1d959a9e7a7ffc3bb593b31ea916f325bfd7a82f583ec8cb5740d5b6c06a03d1"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:07 GMT",
+          "Content-Length": "254"
+        },
+        "body": "{\"id\":\"msg_dd3f975d5d25a278e3d14e8d\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"gemma4:26b-mxfp8\",\"content\":[{\"type\":\"text\",\"text\":\"K2 is the second tallest mountain on Earth.\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":56,\"output_tokens\":10}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:07Z"
+    }
+  ]
+}

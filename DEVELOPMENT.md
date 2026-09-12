@@ -613,6 +613,18 @@ capability, and to one that has it natively. Neither alone proves anything.
 and runs anywhere. The line is what a spec consumes, not what it is about —
 `layer_spec.cr` tests the live layer and needs no network, so it is conformance.
 
+`spec/end_to_end/` also needs transcripts, and is separate from `spec/live/`
+because of what it spans rather than what it consumes. A live spec exercises one
+protocol against one endpoint. An end-to-end spec drives a whole flow the README
+claims — a session answered, written to a file, reloaded and continued somewhere
+else — and is the only place a session touches a disk. Everything else holds one
+in memory, and `archive_spec.cr` round-trips through a `String`. All of it runs
+against a local Ollama, which serves three protocols on one deployment, so a
+cross-protocol handoff costs nothing and needs no key. What that cannot prove is
+in `docs/servers/OLLAMA.md`: this server accepts more than the endpoints it
+imitates, so those runs prove the round trip is consistent, not that a vendor
+would take it.
+
 Recording uses `wiretap`, a development-only dependency: the first run hits a
 real server and writes `spec/transcripts/<name>.json`, every run after replays
 from disk. Transcripts are committed. They are the evidence, and they are what

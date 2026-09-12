@@ -1,0 +1,57 @@
+{
+  "name": "e2e_saved_with_reasoning",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "193",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Answer in one short sentence.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]}]}",
+        "body_digest": "834487f5b506ee9bf0ed031191a5ef126275e9285988536b2dcd88ed1a6397ea"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:05 GMT",
+          "Content-Length": "868"
+        },
+        "body": "{\"id\":\"chatcmpl-863\",\"object\":\"chat.completion\",\"created\":1789250285,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Mount Everest is the tallest mountain on Earth.\",\"reasoning\":\"*   Question: \\\"What is the tallest mountain on Earth?\\\"\\n    *   Constraint: \\\"Answer in one short sentence.\\\"\\n\\n    *   Mount Everest is the tallest mountain on Earth (above sea level).\\n\\n    *   Option 1: Mount Everest is the tallest mountain on Earth. (Simple, direct)\\n    *   Option 2: Mount Everest is the highest mountain on Earth. (Synonymous)\\n    *   Option 3: The tallest mountain on Earth is Mount Everest. (Correct)\\n\\n    *   \\\"Mount Everest is the tallest mountain on Earth.\\\" fits all criteria.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":137,\"total_tokens\":167}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:05Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "Content-Length": "375",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"max_tokens\":4096,\"system\":\"Answer in one short sentence.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Mount Everest is the tallest mountain on Earth.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"And the second tallest?\"}]}]}",
+        "body_digest": "faedbb0b425d3b0383f4b36136c30407e24dde633fc359be41879d0b0da8884a"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Sat, 12 Sep 2026 21:58:06 GMT",
+          "Content-Length": "620"
+        },
+        "body": "{\"id\":\"msg_22cc53665edf49da8c42bd17\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"gemma4:26b-mxfp8\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"The user is asking for the second tallest mountain on Earth.\\nConstraint: Answer in one short sentence.\\n\\nFact check:\\n1st: Mount Everest\\n2nd: K2\\n\\nDrafting response:\\n- K2 is the second tallest mountain on Earth.\\n- The second tallest mountain is K2.\\n\\n\\\"K2 is the second tallest mountain on Earth.\\\" is a good, short sentence.\"},{\"type\":\"text\",\"text\":\"K2 is the second tallest mountain on Earth.\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":54,\"output_tokens\":97}}\n"
+      },
+      "recorded_at": "2026-09-12T21:58:06Z"
+    }
+  ]
+}
