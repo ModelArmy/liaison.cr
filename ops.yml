@@ -2,7 +2,9 @@ dependencies:
   brew:
     - crystal
   custom:
-    - shards
+    - shards check || shards install
+    - mkdir -p bin && cp lib/ameba/bin/ameba.cr bin
+    - crystal build -o bin/ameba bin/ameba.cr
 hooks:
   before:
     - mkdir -p bin/release bin/debug
@@ -16,11 +18,11 @@ actions:
     description: Build for development (debugging)
     aliases: [build, bd]
   jrun-debug:
-    command: bin/debug/elelem
+    command: bin/debug/liaison
     load_secrets: true
     aliases: [jrun, jrd]
   jrun-release:
-    command: bin/release/elelem
+    command: bin/release/liaison
     load_secrets: true
     aliases: [jrr]
   run:

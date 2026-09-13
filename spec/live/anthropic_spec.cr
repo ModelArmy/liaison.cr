@@ -19,12 +19,12 @@ require "../spec_helper"
 # out to need a different model.
 private MODEL = "claude-haiku-4-5"
 
-private def anthropic : Elelem::Server
-  Elelem::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
+private def anthropic : Liaison::Server
+  Liaison::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
 end
 
-private def client(policy : Elelem::Capability::Policy = Elelem::Capability::Policy::Compensating) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(anthropic, Elelem::ProtocolKind::Anthropic), policy)
+private def client(policy : Liaison::Capability::Policy = Liaison::Capability::Policy::Compensating) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(anthropic, Liaison::ProtocolKind::Anthropic), policy)
 end
 
 # What used to live here — a signature-less `thinking` block sent to this
@@ -54,8 +54,8 @@ describe "Anthropic" do
         session << M::Message.user("What is the tallest mountain on Earth?")
 
         first, first_report = client.send(session, MODEL,
-          options: Elelem::Options.new(
-            reasoning: Elelem::Reasoning::Effort::Low,
+          options: Liaison::Options.new(
+            reasoning: Liaison::Reasoning::Effort::Low,
             max_output_tokens: 1536))
         session << first
 

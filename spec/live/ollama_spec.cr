@@ -51,13 +51,13 @@ private REASONING_OFF_CHAT       = "ollama_reasoning_off_chat_completions"
 private REASONING_OFF_ANTHROPIC  = "ollama_reasoning_off_anthropic"
 private REASONING_RUNG_ANTHROPIC = "ollama_reasoning_rung_anthropic"
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def client(protocol : Elelem::ProtocolKind,
-                   policy : Elelem::Capability::Policy = Elelem::Capability::Policy::Compensating) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, protocol), policy)
+private def client(protocol : Liaison::ProtocolKind,
+                   policy : Liaison::Capability::Policy = Liaison::Capability::Policy::Compensating) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, protocol), policy)
 end
 
 private def asked : M::Session
@@ -72,19 +72,19 @@ end
 # stall and a 4,096-token turn that never reached an answer. A cap makes the
 # run bounded, re-recording cheap, and the reasoning of a verbose model
 # somebody else's problem.
-private CAP = Elelem::Options.new(max_output_tokens: 512)
+private CAP = Liaison::Options.new(max_output_tokens: 512)
 
 # Deliberately far too small to finish a sentence. Reproduces an interrupted
 # turn on demand, where previously we waited for a model to over-think.
-private TINY = Elelem::Options.new(max_output_tokens: 24)
+private TINY = Liaison::Options.new(max_output_tokens: 24)
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
 end
 
 private def tool_question : M::Session
@@ -100,7 +100,7 @@ describe "Ollama" do
   describe "a plain exchange" do
     it "completes over Chat Completions" do
       Wiretap.intercept(TEXT_CHAT) do
-        reply, report = client(Elelem::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
 
         reply.role.should eq M::Role::Assistant
         reply.content.select(M::TextBlock).should_not be_empty
@@ -110,7 +110,7 @@ describe "Ollama" do
 
     it "completes over the Responses API" do
       Wiretap.intercept(TEXT_RESPONSES) do
-        reply, report = client(Elelem::ProtocolKind::Responses).send(asked, MODEL, options: CAP)
+        reply, report = client(Liaison::ProtocolKind::Responses).send(asked, MODEL, options: CAP)
 
         reply.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
@@ -119,7 +119,7 @@ describe "Ollama" do
 
     it "completes over the Anthropic Messages API" do
       Wiretap.intercept(TEXT_ANTHROPIC) do
-        reply, report = client(Elelem::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
+        reply, report = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
 
         reply.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
@@ -132,7 +132,7 @@ describe "Ollama" do
     # that acquired a home from whoever answered would not be portable.
     it "records which deployment answered" do
       Wiretap.intercept(TEXT_CHAT) do
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
 
         provenance = reply.provenance.should_not be_nil
         provenance.model.should_not be_empty
@@ -141,8 +141,8 @@ describe "Ollama" do
 
     it "keeps usage out of the conversation" do
       Wiretap.intercept(TEXT_ANTHROPIC) do
-        reply, _ = client(Elelem::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
 
         reply.meta?(key, "usage").should_not be_nil
         reply.meta?(key, "stop_reason").should_not be_nil
@@ -163,7 +163,7 @@ describe "Ollama" do
     # fixtures.
     it "reads a thinking block from a live reply" do
       Wiretap.intercept(TEXT_ANTHROPIC) do
-        reply, _ = client(Elelem::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
+        reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
 
         reasoning = reply.content.select(M::ReasoningBlock)
         next if reasoning.empty? # a non-thinking model is not a failure
@@ -182,7 +182,7 @@ describe "Ollama" do
   describe "reasoning" do
     it "reads the bare `reasoning` field from Chat Completions" do
       Wiretap.intercept(TEXT_CHAT) do
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions).send(asked, MODEL, options: CAP)
 
         # Ollama spells this `reasoning`; vLLM and DeepSeek spell it
         # `reasoning_content`. Reading only the latter dropped the trace here
@@ -193,7 +193,7 @@ describe "Ollama" do
 
     it "reads a thinking block from the Anthropic endpoint" do
       Wiretap.intercept(TEXT_ANTHROPIC) do
-        reply, _ = client(Elelem::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
+        reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
 
         reply.content.select(M::ReasoningBlock).should_not be_empty
       end
@@ -201,8 +201,8 @@ describe "Ollama" do
 
     it "reads a reasoning item, with its opaque payload, from the Responses API" do
       Wiretap.intercept(TEXT_RESPONSES) do
-        reply, _ = client(Elelem::ProtocolKind::Responses).send(asked, MODEL, options: CAP)
-        key = Elelem::Protocol::Responses::METADATA_KEY
+        reply, _ = client(Liaison::ProtocolKind::Responses).send(asked, MODEL, options: CAP)
+        key = Liaison::Protocol::Responses::METADATA_KEY
 
         blocks = reply.content.select(M::ReasoningBlock)
         blocks.should_not be_empty
@@ -222,7 +222,7 @@ describe "Ollama" do
       Wiretap.intercept("ollama_handoff_chat_to_anthropic") do
         session = asked
 
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL)
         session << first
         session << M::Message.user("And the deepest ocean?")
 
@@ -232,7 +232,7 @@ describe "Ollama" do
         # deliberately: the loss is real (`Outcome::Degraded`, not `Refused`)
         # and this test is about the handoff completing, not about carrying
         # a foreign reasoning trace unscathed. See `spec/live/anthropic_spec.cr`.
-        second, report = client(Elelem::ProtocolKind::Anthropic, Elelem::Capability::Policy::Lenient)
+        second, report = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
           .send(session, MODEL)
         session << second
 
@@ -248,11 +248,11 @@ describe "Ollama" do
       Wiretap.intercept("ollama_handoff_anthropic_to_responses") do
         session = asked
 
-        first, _ = client(Elelem::ProtocolKind::Anthropic).send(session, MODEL)
+        first, _ = client(Liaison::ProtocolKind::Anthropic).send(session, MODEL)
         session << first
         session << M::Message.user("And the deepest ocean?")
 
-        second, report = client(Elelem::ProtocolKind::Responses).send(session, MODEL)
+        second, report = client(Liaison::ProtocolKind::Responses).send(session, MODEL)
 
         second.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
@@ -265,18 +265,18 @@ describe "Ollama" do
       Wiretap.intercept("ollama_handoff_all_three") do
         session = asked
 
-        chat, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL)
+        chat, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL)
         session << chat
         session << M::Message.user("And the deepest ocean?")
 
-        responses, _ = client(Elelem::ProtocolKind::Responses).send(session, MODEL)
+        responses, _ = client(Liaison::ProtocolKind::Responses).send(session, MODEL)
         session << responses
         session << M::Message.user("And the longest river?")
 
         # Same reason as the two-protocol handoff above: whichever leg fed
         # this session incidental reasoning with no replayable signature, the
         # Anthropic leg cannot carry it. Lenient, deliberately.
-        anthropic, report = client(Elelem::ProtocolKind::Anthropic, Elelem::Capability::Policy::Lenient)
+        anthropic, report = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
           .send(session, MODEL)
         session << anthropic
 
@@ -300,7 +300,7 @@ describe "Ollama" do
     it "calls a declared tool and accepts the result, over Chat Completions" do
       Wiretap.intercept("ollama_tools_chat_completions") do
         session = tool_question
-        turn = client(Elelem::ProtocolKind::ChatCompletions)
+        turn = client(Liaison::ProtocolKind::ChatCompletions)
 
         reply, _ = turn.send(session, MODEL, options: armed)
         session << reply
@@ -330,7 +330,7 @@ describe "Ollama" do
         # with no signature on every reply (docs/servers/OLLAMA.md) — so the
         # second call here has to replay one, and cannot. Lenient,
         # deliberately: the drop is real and recorded, not silent.
-        turn = client(Elelem::ProtocolKind::Anthropic, Elelem::Capability::Policy::Lenient)
+        turn = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
 
         reply, _ = turn.send(session, MODEL, options: armed)
         session << reply
@@ -356,7 +356,7 @@ describe "Ollama" do
       Wiretap.intercept("ollama_tools_handoff") do
         session = tool_question
 
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(session, MODEL, options: armed)
         session << reply
 
@@ -373,7 +373,7 @@ describe "Ollama" do
         # other handoffs above: the tool call and its result carry over
         # exactly (that is what this test proves), but Chat Completions'
         # incidental reasoning trace has no signature to carry over with it.
-        answer, report = client(Elelem::ProtocolKind::Anthropic, Elelem::Capability::Policy::Lenient)
+        answer, report = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
           .send(session, MODEL, options: armed)
 
         answer.content.select(M::TextBlock).should_not be_empty
@@ -402,10 +402,10 @@ describe "Ollama" do
   describe "reasoning controls" do
     it "switches thinking off over Chat Completions" do
       Wiretap.intercept(REASONING_OFF_CHAT) do
-        reply, report = client(Elelem::ProtocolKind::ChatCompletions).send(
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions).send(
           asked, MODEL,
-          options: Elelem::Options.new(max_output_tokens: 256,
-            reasoning: Elelem::Reasoning::Off.new))
+          options: Liaison::Options.new(max_output_tokens: 256,
+            reasoning: Liaison::Reasoning::Off.new))
 
         # The claim: asking for no thinking produced none. Ollama translates
         # this one, so a regression here is real rather than a dropped field.
@@ -422,10 +422,10 @@ describe "Ollama" do
     # themselves.
     it "switches thinking off over the Anthropic Messages API" do
       Wiretap.intercept(REASONING_OFF_ANTHROPIC) do
-        reply, report = client(Elelem::ProtocolKind::Anthropic).send(
+        reply, report = client(Liaison::ProtocolKind::Anthropic).send(
           asked, MODEL,
-          options: Elelem::Options.new(max_output_tokens: 256,
-            reasoning: Elelem::Reasoning::Off.new))
+          options: Liaison::Options.new(max_output_tokens: 256,
+            reasoning: Liaison::Reasoning::Off.new))
 
         reply.content.select(M::ReasoningBlock).should be_empty
         reply.content.select(M::TextBlock).should_not be_empty
@@ -442,10 +442,10 @@ describe "Ollama" do
     # anyway, so this asserts acceptance and nothing about obedience.
     it "has its rung accepted over the Anthropic Messages API" do
       Wiretap.intercept(REASONING_RUNG_ANTHROPIC) do
-        reply, report = client(Elelem::ProtocolKind::Anthropic).send(
+        reply, report = client(Liaison::ProtocolKind::Anthropic).send(
           asked, MODEL,
-          options: Elelem::Options.new(max_output_tokens: 256,
-            reasoning: Elelem::Reasoning::Effort::Low))
+          options: Liaison::Options.new(max_output_tokens: 256,
+            reasoning: Liaison::Reasoning::Effort::Low))
 
         reply.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
@@ -456,8 +456,8 @@ describe "Ollama" do
   describe "truncation" do
     it "reports a turn cut short by the cap" do
       Wiretap.intercept("ollama_truncated_anthropic") do
-        reply, _ = client(Elelem::ProtocolKind::Anthropic).send(asked, MODEL, options: TINY)
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: TINY)
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
 
         # The turn is honest about being incomplete: the stop reason says so,
         # and repair is the caller's business, not the exporter's.
@@ -481,8 +481,8 @@ describe "Ollama" do
     # would only test my guess at the shape.
     it "reports an unknown model as such" do
       Wiretap.intercept("ollama_model_not_found") do
-        expect_raises(Elelem::ModelNotFoundError) do
-          client(Elelem::ProtocolKind::ChatCompletions).send(asked, "no-such-model")
+        expect_raises(Liaison::ModelNotFoundError) do
+          client(Liaison::ProtocolKind::ChatCompletions).send(asked, "no-such-model")
         end
       end
     end

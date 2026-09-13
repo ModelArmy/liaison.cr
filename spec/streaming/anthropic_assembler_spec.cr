@@ -48,7 +48,7 @@ private def run(frames : Array(S::Sse::Frame)) : {P::Anthropic::Assembler, Array
   {subject, seen}
 end
 
-describe Elelem::Protocol::Anthropic::Assembler do
+describe Liaison::Protocol::Anthropic::Assembler do
   describe "text blocks" do
     it "accumulates deltas into one block" do
       subject, _ = run([

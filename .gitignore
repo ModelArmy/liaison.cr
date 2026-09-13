@@ -18,6 +18,6 @@ CLAUDE.md
 # Ignore all db-related files at root
 *.db*
 
-# Elelem configs / sessions
-/elelem.yaml
-/.elelem
+# Liaison configs / sessions
+/liaison.yaml
+/.liaison

@@ -15,8 +15,6 @@ jobs:
           - { os: ubuntu-latest, crystal: "1.20" }
           - { os: ubuntu-24.04-arm, crystal: "1.20" }
           - { os: macos-latest, crystal: "1.20" }
-          - { os: macos-15-intel, crystal: "1.20" }
-          - { os: windows-latest, crystal: "1.20" }
 
     runs-on: ${{ matrix.os }}
 
@@ -34,16 +32,39 @@ jobs:
         with:
           path: |
             lib
-            bin/ameba
+            bin/ameba*
           key: ${{ matrix.os }}-shards-${{ hashFiles('**/shard.lock') }}
-
-      # ---- Build debug release and check code quality on all platforms
 
       - name: Install shards
         run: shards check || shards install
 
-      - name: Run tests
-        run: crystal spec -Dtest
+      # ---- Run tests on all Unix platforms
+
+      - name: Setup debug environment (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        run: mkdir -p bin/debug
+
+      - name: Build Debug (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        run: SHARDS_BIN_PATH=bin/debug shards build --debug
+
+      - name: Run tests (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        run: crystal spec
+
+      # ---- Source lint and formatting check on Ubuntu / x86 only
+
+      - name: Check formatting (Linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: crystal tool format; git diff --exit-code src
+
+      - name: Build ameba  (Linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cp lib/ameba/bin/ameba.cr bin && crystal build -o bin/ameba bin/ameba.cr
+
+      - name: Run static code analysis (Linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: bin/ameba src/
 
       # ---- Build and run samples
 
@@ -58,13 +79,3 @@ jobs:
       # - name: Run test script runner
       #   if: ${{ runner.os != 'Windows' }}
       #   run: bin/release/test_runner
-
-      # ---- format and lint check on Linux only
-
-      - name: Check formatting (Linux)
-        if: ${{ runner.os == 'Linux' }}
-        run: crystal tool format; git diff --exit-code src
-
-      - name: Run static code analysis (Linux)
-        if: ${{ runner.os == 'Linux' }}
-        run: bin/ameba src/

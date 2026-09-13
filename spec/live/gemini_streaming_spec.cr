@@ -54,28 +54,28 @@ private STREAM_TOOLS    = "gemini_stream_tools"
 private STREAM_CAPPED   = "gemini_stream_capped"
 private STREAM_RESUMED  = "gemini_stream_resumed"
 
-private def endpoint : Elelem::Server
-  Elelem::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
+private def endpoint : Liaison::Server
+  Liaison::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
 end
 
-private def provider : Elelem::Provider
-  Elelem::Provider.for(endpoint, Elelem::ProtocolKind::Gemini)
+private def provider : Liaison::Provider
+  Liaison::Provider.for(endpoint, Liaison::ProtocolKind::Gemini)
 end
 
-private def streamed(retention : Elelem::Capability::ReasoningRetention = Elelem::Capability::ReasoningRetention::All) : Elelem::Client
-  Elelem::Client.new(provider, Elelem::Capability::Policy::Compensating, retention)
+private def streamed(retention : Liaison::Capability::ReasoningRetention = Liaison::Capability::ReasoningRetention::All) : Liaison::Client
+  Liaison::Client.new(provider, Liaison::Capability::Policy::Compensating, retention)
 end
 
-private def plain : Elelem::Options
-  Elelem::Options.new(max_output_tokens: 512)
+private def plain : Liaison::Options
+  Liaison::Options.new(max_output_tokens: 512)
 end
 
 # Thinking has to be *asked for* on this protocol, and asking is what makes the
 # thoughts visible rather than what makes them happen. Without a budget or a
 # level the mapper emits no `thinkingConfig`, so no `includeThoughts`, and
 # Gemini reasons anyway while returning neither the text nor the signature.
-private def thinking : Elelem::Options
-  Elelem::Options.new(max_output_tokens: 512, reasoning: Elelem::Reasoning::Effort::Medium)
+private def thinking : Liaison::Options
+  Liaison::Options.new(max_output_tokens: 512, reasoning: Liaison::Reasoning::Effort::Medium)
 end
 
 private def asked : M::Session
@@ -84,8 +84,8 @@ private def asked : M::Session
   session
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
@@ -93,9 +93,9 @@ end
 # requested in `thinking` above — without it there is no signature to check —
 # and because a signature rides on a function call, which makes this the
 # combination where losing one would actually cost something.
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512,
-    reasoning: Elelem::Reasoning::Effort::Medium)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512,
+    reasoning: Liaison::Reasoning::Effort::Medium)
 end
 
 private def tool_question : M::Session
@@ -105,7 +105,7 @@ private def tool_question : M::Session
 end
 
 private def gemini_meta(block, key : String)
-  block.meta?(Elelem::Protocol::Gemini::METADATA_KEY, key)
+  block.meta?(Liaison::Protocol::Gemini::METADATA_KEY, key)
 end
 
 describe "Gemini streaming" do
@@ -217,7 +217,7 @@ describe "Gemini streaming" do
       # the reply, so `None` must not silence the event stream.
       Wiretap.intercept(STREAM_THINKING) do
         seen = [] of S::Event
-        none = Elelem::Capability::ReasoningRetention::None
+        none = Liaison::Capability::ReasoningRetention::None
         streamed(none).send(asked, MODEL, options: thinking) { |event, _| seen << event }
 
         seen.select(S::ReasoningDelta).should_not be_empty
@@ -292,7 +292,7 @@ describe "Gemini streaming" do
       #
       # **Two things make this turn the one worth paying for.** The signature
       # rides on the `functionCall` part here, which is the shape Gemini 3
-      # requires and the shape `elelem` had nowhere to carry until recently.
+      # requires and the shape `liaison` had nowhere to carry until recently.
       # And `Resolver` checks for a missing signature ahead of `own?`, so a
       # call that lost one is reported `Degraded` and refused by the default
       # `Compensating` policy — which means a lost signature raises here rather
@@ -342,7 +342,7 @@ describe "Gemini streaming" do
       # stream — would raise and throw away a perfectly good short answer.
       Wiretap.intercept(STREAM_CAPPED) do
         reply, report = streamed.send(asked, MODEL,
-          options: Elelem::Options.new(max_output_tokens: 16)) { |_, _| }
+          options: Liaison::Options.new(max_output_tokens: 16)) { |_, _| }
 
         report.streamed?.should be_true
         gemini_meta(reply, "finishReason").should eq "MAX_TOKENS"

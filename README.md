@@ -1,4 +1,4 @@
-# elelem.cr
+# liaison.cr
 
 A zero-dependency Crystal shard for talking to LLMs, whose defining feature is
 a **portable session history**: start a conversation with one provider, resume
@@ -15,7 +15,7 @@ Every vendor stores a conversation in its own shape. Anthropic keeps signed
 Gemini pairs tool calls by position rather than by id. Move a conversation
 between them and something is always lost — usually quietly.
 
-`elelem` keeps the conversation in its own canonical form (MPSH) and translates
+`liaison` keeps the conversation in its own canonical form (MPSH) and translates
 at the edges. Translation is the interesting part, because it is not always
 lossless: the shard's job is to be **honest about what it costs**, not to
 pretend a handoff is free.
@@ -36,17 +36,17 @@ graph LR
 ## Quick start
 
 ```crystal
-require "elelem"
+require "liaison"
 
-alias M = Elelem::MPSH
+alias M = Liaison::MPSH
 
-ollama = Elelem::Server.new("ollama", "http://localhost:11434")
-provider = Elelem::Provider.for(ollama, Elelem::ProtocolKind::ChatCompletions)
+ollama = Liaison::Server.new("ollama", "http://localhost:11434")
+provider = Liaison::Provider.for(ollama, Liaison::ProtocolKind::ChatCompletions)
 
 session = M::Session.new
 session << M::Message.user("Name three things Vienna is known for.")
 
-reply, report = Elelem::Client.new(provider).send(session, "llama3.2")
+reply, report = Liaison::Client.new(provider).send(session, "llama3.2")
 session << reply
 
 puts reply.text
@@ -70,11 +70,11 @@ Later, somewhere else, against a different vendor and a different protocol:
 session = M::Archive.read(File.read("vienna.json"))
 session << M::Message.user("Now recommend a coffee house.")
 
-anthropic = Elelem::Server.new("anthropic", "https://api.anthropic.com",
+anthropic = Liaison::Server.new("anthropic", "https://api.anthropic.com",
   ENV["ANTHROPIC_API_KEY"])
-provider = Elelem::Provider.for(anthropic, Elelem::ProtocolKind::Anthropic)
+provider = Liaison::Provider.for(anthropic, Liaison::ProtocolKind::Anthropic)
 
-reply, report = Elelem::Client.new(provider).send(session, "claude-haiku-4-5")
+reply, report = Liaison::Client.new(provider).send(session, "claude-haiku-4-5")
 
 report.annotations.each { |note| puts note }   # what the handoff cost, if anything
 ```
@@ -89,9 +89,9 @@ caller that accumulates events into an answer has reimplemented the exporter,
 worse.
 
 ```crystal
-reply, report = Elelem::Client.new(provider).send(session, "llama3.2") do |event, turn|
+reply, report = Liaison::Client.new(provider).send(session, "llama3.2") do |event, turn|
   case event
-  when Elelem::Streaming::TextDelta then print event.text
+  when Liaison::Streaming::TextDelta then print event.text
   end
   turn.stop if enough?
 end
@@ -121,10 +121,10 @@ the text.
 of them and is used at both ends of a turn.
 
 ```crystal
-toolbox = Elelem::Toolbox.new([Weather.new, Clock.new] of Elelem::Function)
+toolbox = Liaison::Toolbox.new([Weather.new, Clock.new] of Liaison::Function)
 
 loop do
-  reply, _ = client.send(session, model, options: Elelem::Options.new(tools: toolbox.tools))
+  reply, _ = client.send(session, model, options: Liaison::Options.new(tools: toolbox.tools))
   session << reply
 
   results = toolbox.dispatch(reply)
@@ -153,7 +153,7 @@ Policy        |Worst outcome it will accept
 at all, so nothing is sent.
 
 ```crystal
-Elelem::Client.new(provider, Elelem::Capability::Policy::Strict)
+Liaison::Client.new(provider, Liaison::Capability::Policy::Strict)
 ```
 
 ## Supported protocols
@@ -168,33 +168,33 @@ Gemini          |Positional tool pairing, `thoughtSignature` on calls
 Azure OpenAI is supported as a *deployment* of the Chat Completions and
 Responses protocols, not as a protocol of its own.
 
-## The `elelem` command
+## The `liaison` command
 
 The shard ships a CLI, which is also the most direct demonstration of the
 handoff — start a session on one deployment, continue it on another.
 
 ```
-elelem start <deployment> <prompt...> [--id <session-id>] [--stream|--no-stream]
+liaison start <deployment> <prompt...> [--id <session-id>] [--stream|--no-stream]
                                        [--show-reasoning|--hide-reasoning]
-elelem continue <session-id> <prompt...> [--on <deployment>] [--stream|--no-stream]
+liaison continue <session-id> <prompt...> [--on <deployment>] [--stream|--no-stream]
                                          [--show-reasoning|--hide-reasoning]
-elelem list
-elelem show <session-id> [--snapshots] [--json]
-elelem prune <session-id> --keep <n>
-elelem delete <session-id>
+liaison list
+liaison show <session-id> [--snapshots] [--json]
+liaison prune <session-id> --keep <n>
+liaison delete <session-id>
 ```
 
 ```console
-$ elelem start ollama "Name three things Vienna is known for."
+$ liaison start ollama "Name three things Vienna is known for."
 Session: brisk-comet
 Vienna is known for its coffee houses, its classical music, and the Ringstrasse.
 
-$ elelem continue brisk-comet "Recommend one coffee house." --on anthropic
+$ liaison continue brisk-comet "Recommend one coffee house." --on anthropic
 Café Sperl, for the billiard tables and the lack of hurry.
 ```
 
 Streaming and reasoning display default off and can be set for good under
-`defaults:` in the config. Deployments are named in `elelem.yaml`; see
+`defaults:` in the config. Deployments are named in `liaison.yaml`; see
 [docs/CLI_DESIGN.md](./docs/CLI_DESIGN.md) for the format and for why it is
 shaped the way it is.
 
@@ -202,8 +202,8 @@ shaped the way it is.
 
 ```yaml
 dependencies:
-  elelem:
-    github: nogginly/elelem.cr
+  liaison:
+    github: ModelArmy/liaison.cr
 ```
 
 No runtime dependencies, and none planned. The only development dependencies
@@ -220,7 +220,7 @@ Document                                                  |Holds
 [docs/servers/](./docs/servers/)                          |One file per server, and what a green run there does *not* prove
 [docs/STREAMING_DESIGN.md](./docs/STREAMING_DESIGN.md)    |The streamed turn, and the two places its design was wrong      
 [docs/TOOL_EXECUTION.md](./docs/TOOL_EXECUTION.md)        |Caller-supplied tools, and what was decided about them          
-[docs/CLI_DESIGN.md](./docs/CLI_DESIGN.md)                |The `elelem` executable                                         
+[docs/CLI_DESIGN.md](./docs/CLI_DESIGN.md)                |The `liaison` executable                                         
 [SCOPE.md](./SCOPE.md)                                    |What is still outstanding                                       
 
 ## Contributions, by invitation!

@@ -70,7 +70,7 @@ nested content is `[text, image]` — renders as **two** wire messages:
 
 ```
 {"role": "tool", "tool_call_id": "call_a",
- "content": "Captured at 1280x720.\n[elelem: content returned separately in the following message]"}
+ "content": "Captured at 1280x720.\n[liaison: content returned separately in the following message]"}
 {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}]}
 ```
 

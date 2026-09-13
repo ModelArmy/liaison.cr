@@ -30,7 +30,7 @@ private def report : C::Report
   C::Report.new("spec")
 end
 
-describe Elelem::Capability::Carrier do
+describe Liaison::Capability::Carrier do
   describe ".flush" do
     it "yields the buffered parts, records the deferral, and empties the buffer" do
       pending = ["one", "two"]
@@ -224,7 +224,7 @@ describe Elelem::Capability::Carrier do
     # which is the whole reason it may never be localized.
     it "ignores text that only looks like the marker" do
       target = M::ToolResultBlock.new("call-1", [
-        M::TextBlock.new("[elelem: content returned separately]").as(M::Block),
+        M::TextBlock.new("[liaison: content returned separately]").as(M::Block),
       ])
 
       C::Carrier.marker_indices(target).should be_empty

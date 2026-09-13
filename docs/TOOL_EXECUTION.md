@@ -1,7 +1,7 @@
 # Tool execution
 
 How a caller supplies tools this shard can run, and what was decided along the
-way. The library half is built; what the `elelem` command does with a tool call
+way. The library half is built; what the `liaison` command does with a tool call
 is a separate question, still open, and lives in
 [CLI_DESIGN.md](./CLI_DESIGN.md).
 
@@ -18,7 +18,7 @@ produce an unsendable session, in every consumer.
 used at both ends of a turn.
 
 ```crystal
-toolbox = Elelem::Toolbox.new([Weather.new, Clock.new] of Elelem::Function)
+toolbox = Liaison::Toolbox.new([Weather.new, Clock.new] of Liaison::Function)
 
 loop do
   reply, _ = client.send(session, model, options: Options.new(tools: toolbox.tools))
@@ -73,7 +73,7 @@ flowchart TB
 It depends on `mpsh/` and on `Tool` in `options.cr`, and on nothing in the live
 layer — which is why a `Toolbox` can be built and tested without a `Client`, and
 why `spec/toolbox_spec.cr` needs no transcript. It is required last in
-`src/elelem.cr` because it is the only place this shard runs code it did not
+`src/liaison.cr` because it is the only place this shard runs code it did not
 write.
 
 ## What was decided, and why
@@ -219,7 +219,7 @@ produces. The `return nil unless repaired` guard is live, not defensive.
 
 ## What this does not answer
 
-Whether `elelem start` and `elelem continue` declare tools at all, and what the
+Whether `liaison start` and `liaison continue` declare tools at all, and what the
 executable would run if they did. Declaring and executing turned out to be one
 decision rather than two — see the *Tool execution* entry under
 [CLI_DESIGN.md](./CLI_DESIGN.md)'s *Deliberately deferred, not forgotten* — and

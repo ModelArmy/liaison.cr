@@ -9,14 +9,14 @@ require "../support/conformance"
 # `CallIdTable` design exists for, and the first time it has run without a
 # provider id to lean on.
 private def rt(session : M::Session, policy = C::Policy::Lenient)
-  mapper = Elelem::Protocol::Gemini::Mapper.new
+  mapper = Liaison::Protocol::Gemini::Mapper.new
   request, report = mapper.map(session, "gemini-test", policy)
-  exporter = Elelem::Protocol::Gemini::Exporter.new(mapper.calls)
+  exporter = Liaison::Protocol::Gemini::Exporter.new(mapper.calls)
   {exporter.export(request), report, request}
 end
 
 private def diverges(name : String, policy = C::Policy::Lenient)
-  session = Elelem::Fixtures.all[name]
+  session = Liaison::Fixtures.all[name]
   exported, report, request = rt(session, policy)
   {Conformance.compare(session, exported), report, request}
 end
@@ -85,11 +85,11 @@ describe "Gemini round trip" do
       json = request.to_json
       json.should contain(%("functionCall":{"name":"get_weather"))
       json.should_not contain("call_id")
-      json.should_not contain(Elelem::Fixtures::CALL_WEATHER)
+      json.should_not contain(Liaison::Fixtures::CALL_WEATHER)
     end
 
     it "reconstructs the pairing from name and ordering" do
-      session = Elelem::Fixtures.tool_call_text_result
+      session = Liaison::Fixtures.tool_call_text_result
       exported, _, _ = rt(session)
 
       call = exported.messages[1].content.first.as(M::ToolCallBlock)
@@ -146,20 +146,20 @@ describe "Gemini round trip" do
   # Gemini 3 model, so the two behaviours are pinned side by side rather than
   # one of them being assumed.
   describe "tool call signatures, keyed on the model" do
-    signed = Elelem::Capability::Catalog.narrow(
-      Elelem::Protocol::Gemini::PROFILE, "gemini-3.5-flash")
+    signed = Liaison::Capability::Catalog.narrow(
+      Liaison::Protocol::Gemini::PROFILE, "gemini-3.5-flash")
 
     it "requires a signature on Gemini 3 and not on the 2.5 series" do
       signed.tool_call_signature_required?.should be_true
 
-      unsigned = Elelem::Capability::Catalog.narrow(
-        Elelem::Protocol::Gemini::PROFILE, "gemini-2.5-flash")
+      unsigned = Liaison::Capability::Catalog.narrow(
+        Liaison::Protocol::Gemini::PROFILE, "gemini-2.5-flash")
       unsigned.tool_call_signature_required?.should be_false
     end
 
     it "degrades a tool call carrying no signature of this vendor's" do
-      session = Elelem::Fixtures.tool_call_text_result
-      mapper = Elelem::Protocol::Gemini::Mapper.new(signed)
+      session = Liaison::Fixtures.tool_call_text_result
+      mapper = Liaison::Protocol::Gemini::Mapper.new(signed)
       request, report = mapper.map(session, "gemini-3.5-flash", C::Policy::Lenient)
 
       report.annotations
@@ -171,17 +171,17 @@ describe "Gemini round trip" do
     end
 
     it "refuses rather than degrading under a strict policy" do
-      session = Elelem::Fixtures.tool_call_text_result
-      mapper = Elelem::Protocol::Gemini::Mapper.new(signed)
+      session = Liaison::Fixtures.tool_call_text_result
+      mapper = Liaison::Protocol::Gemini::Mapper.new(signed)
       expect_raises(C::RefusedError) { mapper.map(session, "gemini-3.5-flash", C::Policy::Strict) }
     end
 
     it "maps a signed call exactly, since it has something to replay" do
-      session = Elelem::Fixtures.tool_call_text_result
+      session = Liaison::Fixtures.tool_call_text_result
       call = session.messages[1].content.first.as(M::ToolCallBlock)
       call.put_meta("gemini", "thought_signature", "CtEHAdHtim9Cn1t7A0hSFtT8yTWM0")
 
-      mapper = Elelem::Protocol::Gemini::Mapper.new(signed)
+      mapper = Liaison::Protocol::Gemini::Mapper.new(signed)
       request, report = mapper.map(session, "gemini-3.5-flash", C::Policy::Lenient)
 
       report.annotations

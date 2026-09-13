@@ -13,7 +13,7 @@ require "../support/conformance"
 # permitted to lose any, because losing fidelity here silently corrupts
 # whatever `continue` resumes.
 describe "MPSH::Archive" do
-  Elelem::Fixtures.all.each do |name, session|
+  Liaison::Fixtures.all.each do |name, session|
     it "round-trips '#{name}' with zero divergence" do
       written = M::Archive.write(session)
       restored = M::Archive.read(written)
@@ -27,7 +27,7 @@ describe "MPSH::Archive" do
   # exercise mapping, not archiving) never populates them. Covered directly
   # here instead.
   it "round-trips annotations, which Conformance.compare does not check" do
-    session = Elelem::Fixtures.single_user_turn
+    session = Liaison::Fixtures.single_user_turn
     session.annotate(M::Annotation.new(M::Outcome::Degraded, "anthropic",
       "unsupported media type, text fallback used", 0, M::BlockKind::Image))
 
@@ -49,7 +49,7 @@ describe "MPSH::Archive" do
   # would still pass.
   {M::Ending::Truncated, M::Ending::Stopped, M::Ending::Interrupted}.each do |ending|
     it "round-trips a #{ending} ending, which Conformance.compare does not check" do
-      session = Elelem::Fixtures.single_user_turn
+      session = Liaison::Fixtures.single_user_turn
       reply = M::Message.assistant("As I was saying")
       reply.ending = ending
       session << reply
@@ -61,7 +61,7 @@ describe "MPSH::Archive" do
   end
 
   it "reads an archive written before endings existed as complete" do
-    session = Elelem::Fixtures.single_user_turn
+    session = Liaison::Fixtures.single_user_turn
     written = M::Archive.write(session)
 
     written.should_not contain(%("ending"))
@@ -69,7 +69,7 @@ describe "MPSH::Archive" do
   end
 
   it "rejects an unrecognised ending rather than assuming completeness" do
-    session = Elelem::Fixtures.single_user_turn
+    session = Liaison::Fixtures.single_user_turn
     session.messages.first.ending = M::Ending::Truncated
     written = M::Archive.write(session).sub(%("truncated"), %("abandoned"))
 

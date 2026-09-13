@@ -13,7 +13,7 @@ Document                    |Why
 `DEVELOPMENT.md`            |Layering, conventions, how an agent uses the shard, how to add a protocol      
 `docs/protocols/*.md`       |One per protocol: declared capabilities, limits, the bugs each produced        
 `docs/servers/*.md`         |One per server: what it serves, where it diverges, what a green run misses     
-`docs/CLI_DESIGN.md`        |The `elelem` executable: config, session storage, verb grammar, what's deferred
+`docs/CLI_DESIGN.md`        |The `liaison` executable: config, session storage, verb grammar, what's deferred
 `README.md`                 |The front door: what the shard is for, and the handoff in twenty lines         
 
 Where this file and `docs/MPSH_SPECIFICATION.md` disagree, the specification
@@ -53,7 +53,7 @@ optimistic default by *opposite* arguments, and neither generalises.
 unlike Anthropic this had no compatibility port to have already exercised the
 wire shape — first contact and the falsifying tests happened in the same pass.
 Found and fixed along the way: Gemini 3 requires a `thoughtSignature` on
-`functionCall` parts, which `elelem` had nowhere to carry, and
+`functionCall` parts, which `liaison` had nowhere to carry, and
 `gemini-3.1-pro-preview` actively rejects a zero thinking budget rather than
 silently ignoring it, both now handled
 (`spec/live/gemini_spec.cr`, `docs/protocols/GEMINI.md`). Confirmed and closed:
@@ -91,7 +91,7 @@ justification. Detail in `docs/servers/AZURE.md` and
 entry asked. The rule — buffer lifted content, flush before anything that is
 not a tool result, recognise the carrier again on the way back — lived in three
 mappers and three exporters, written differently each time and wrong once. It
-is now `Capability::Carrier` (`src/elelem/capability/carrier.cr`), generic over
+is now `Capability::Carrier` (`src/liaison/capability/carrier.cr`), generic over
 the wire part type so it cannot know what a protocol is, with the marker as one
 constant rather than three that had to stay byte-identical forever. A protocol
 keeps only the message shape it spells a carrier with, plus any precondition of
@@ -108,7 +108,7 @@ Placement is positional now, and `SCOPE.md` is one item shorter than it was
 rather than level.
 
 **Two things now exist beyond the live protocol layer itself.**
-`MPSH::Archive` (`src/elelem/mpsh/archive.cr`) round-trips a `Session` to
+`MPSH::Archive` (`src/liaison/mpsh/archive.cr`) round-trips a `Session` to
 JSON and back — the piece the whole portable-history pitch was missing,
 since nothing previously turned a `Session` into anything that could
 survive past one process. Tested against the full MPSH fixture set through
@@ -116,7 +116,7 @@ survive past one process. Tested against the full MPSH fixture set through
 — a stricter bar than any protocol gets, since this isn't a capability
 adaptation and has no matrix to excuse a difference.
 
-And `elelem` now ships as more than a library. Verbs: `start` (with `--id`),
+And `liaison` now ships as more than a library. Verbs: `start` (with `--id`),
 `continue`, `list`, `show` (`--snapshots`, `--json`). `continue` remembers
 which deployment last answered a session by reading it off the snapshot's own
 filename rather than a config default — `docs/CLI_DESIGN.md` records that a
@@ -124,7 +124,7 @@ filename rather than a config default — `docs/CLI_DESIGN.md` records that a
 because it answered "what does the config prefer" when what `continue` needs
 is "what was this conversation already having."
 
-`elelem.yaml` is two tables and a block. A **server** is a url plus the
+`liaison.yaml` is two tables and a block. A **server** is a url plus the
 protocol it speaks, a **deployment** names one model on one server, and
 **`defaults`** is how the CLI itself behaves — `streaming` and
 `show_reasoning`, both false, each pairing with a flag of the same name. That
@@ -150,7 +150,7 @@ and down repeatedly within one turn rather than retire it, which is why
 the streamed turn uses it, relabelled to name the tool being called.
 
 Live-tested in-process against a sandboxed config and session store, recorded
-against Ollama (`spec/elelem_cli/commands/`). `spec/support/cli_output.cr`
+against Ollama (`spec/liaison_cli/commands/`). `spec/support/cli_output.cr`
 keeps a spec run quiet.
 
 ## The live layer
@@ -175,8 +175,8 @@ text-only, and `Client#send`'s turn loop is caller-owned by design so the CLI
 has to decide what *it* does. It is also what finally gives `CLI_DESIGN.md`'s
 *Printed bytes precede repair* something to bite on — see below.
 
-**Tool execution's library half is built**: `Elelem::Function` is a declaration
-plus its handler, `Elelem::Toolbox` holds a collection and is used at both ends
+**Tool execution's library half is built**: `Liaison::Function` is a declaration
+plus its handler, `Liaison::Toolbox` holds a collection and is used at both ends
 of a turn — `#tools` out, `#dispatch` back, `nil` from `#dispatch` as the loop's
 exit condition. `docs/TOOL_EXECUTION.md` records the shape and the seven
 decisions behind it. Four are worth knowing before touching it: a tool result is
@@ -260,7 +260,7 @@ what `docs/CLI_DESIGN.md`'s *The durable announcement lands after repair, not
 after `finish`* rests on, and it had no test until now.
 
 Session pruning and deletion, which was the unblocked item here, is **built**:
-`elelem prune SESSID --keep N` and `elelem delete SESSID`, with the design
+`liaison prune SESSID --keep N` and `liaison delete SESSID`, with the design
 record in `docs/CLI_DESIGN.md`'s *Removing things*. Neither touches a network,
 so both are fully spec-covered without a recording.
 
@@ -291,7 +291,7 @@ Three things in it were checked rather than assumed:
   watching.
 
 **The streamed turn is now recorded end to end**
-(`spec/elelem_cli/commands/streaming_spec.cr`), against Ollama rather than a
+(`spec/liaison_cli/commands/streaming_spec.cr`), against Ollama rather than a
 vendor: everything above the assemblers is protocol-agnostic, and the four
 assemblers are already proved where it counts. `--stream` is what the specs
 use, because `Output.stream` is an `IO::Memory` and the tty floor declines
@@ -314,7 +314,7 @@ construction.
 **All four slices are done. Streaming is built for the library.** What
 exists now:
 
-- `Elelem::Streaming` — `Sse` framing shared by all four protocols, a closed
+- `Liaison::Streaming` — `Sse` framing shared by all four protocols, a closed
   five-variant `Event` union, `Turn` (the cooperative stop handle), and the
   abstract `Assembler`.
 - `Server#stream`, and `Protocol::StreamError` beside `MalformedResponseError`.
@@ -408,14 +408,14 @@ than a green run here to settle it. See `docs/protocols/ANTHROPIC.md`.
   or the protocol's own doc — before assuming a Restructured result is new
   information.
 - **A test's own sandboxing can break the thing it's testing around it.**
-  Two `elelem_cli` specs `Dir.cd`'d into a temp directory to sandbox
+  Two `liaison_cli` specs `Dir.cd`'d into a temp directory to sandbox
   `Sessions`/`Config`'s filesystem resolution, and silently broke Wiretap's
   own relative transcript path doing it — Wiretap resolves that path against
   the real process CWD too. Every spec passed, because the live call to
   Ollama still succeeded; the recordings just never landed anywhere real,
   and the sandbox's own cleanup deleted whatever had been written into it
   before anyone noticed. Fixed by giving `Sessions`/`Config` an explicit
-  env-var override (`$ELELEM_HOME`, `$ELELEM_CONFIG`) instead of moving the
+  env-var override (`$LIAISON_HOME`, `$LIAISON_CONFIG`) instead of moving the
   process's CWD at all: sandbox exactly what the code under test reads,
   never anything downstream of it that happens to read the same ambient
   state.

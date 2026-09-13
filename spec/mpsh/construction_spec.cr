@@ -13,7 +13,7 @@ require "../spec_helper"
 # `ToolResultBlock` itself. If that does not resolve, it fails here.
 describe "MPSH construction" do
   it "builds every fixture" do
-    Elelem::Fixtures.all.each do |name, session|
+    Liaison::Fixtures.all.each do |name, session|
       session.should be_a(M::Session)
       session.messages.each do |message|
         message.content.should be_a(Array(M::Block))
@@ -26,7 +26,7 @@ describe "MPSH construction" do
     # The compiler enforces this: adding a block kind without a branch here
     # is a compile error, which is the entire reason `Block` is a union
     # rather than a class hierarchy.
-    kinds = Elelem::Fixtures.all.values.flat_map(&.messages).flat_map(&.content).map do |block|
+    kinds = Liaison::Fixtures.all.values.flat_map(&.messages).flat_map(&.content).map do |block|
       case block
       in M::TextBlock       then M::BlockKind::Text
       in M::ImageBlock      then M::BlockKind::Image
@@ -46,7 +46,7 @@ describe "MPSH construction" do
 
   describe "nested tool results" do
     it "holds an interleaved block list" do
-      session = Elelem::Fixtures.tool_call_image_result
+      session = Liaison::Fixtures.tool_call_image_result
       result = session.messages[2].content.first.as(M::ToolResultBlock)
 
       result.content.size.should eq(2)
@@ -56,13 +56,13 @@ describe "MPSH construction" do
     end
 
     it "recognises a text-only result" do
-      session = Elelem::Fixtures.tool_call_text_result
+      session = Liaison::Fixtures.tool_call_text_result
       result = session.messages[2].content.first.as(M::ToolResultBlock)
       result.text_only?.should be_true
     end
 
     it "keeps exception distinct from is_error" do
-      session = Elelem::Fixtures.tool_result_error
+      session = Liaison::Fixtures.tool_result_error
       result = session.messages[2].content.first.as(M::ToolResultBlock)
       result.is_error?.should be_true
       result.exception.should eq("Net::TimeoutError")
@@ -71,7 +71,7 @@ describe "MPSH construction" do
 
   describe "payloads" do
     it "stores raw base64 with a separate media type, never a data URI" do
-      session = Elelem::Fixtures.text_and_image
+      session = Liaison::Fixtures.text_and_image
       image = session.messages[0].content[1].as(M::ImageBlock)
       payload = image.payload.as(M::InlinePayload)
 
@@ -81,7 +81,7 @@ describe "MPSH construction" do
     end
 
     it "supports a reference form" do
-      session = Elelem::Fixtures.reference_payload
+      session = Liaison::Fixtures.reference_payload
       document = session.messages[0].content[1].as(M::DocumentBlock)
       document.payload.inline?.should be_false
       document.payload.byte_size.should eq(4_096)
@@ -90,16 +90,16 @@ describe "MPSH construction" do
 
   describe "text_fallback" do
     it "separates degradable audio from refusable audio" do
-      Elelem::Fixtures.audio_with_transcript
+      Liaison::Fixtures.audio_with_transcript
         .messages[0].content[1].as(M::AudioBlock).text_fallback.should_not be_nil
-      Elelem::Fixtures.audio_without_transcript
+      Liaison::Fixtures.audio_without_transcript
         .messages[0].content[1].as(M::AudioBlock).text_fallback.should be_nil
     end
   end
 
   describe "provider metadata" do
     it "namespaces by provider on both blocks and messages" do
-      message = Elelem::Fixtures.foreign_provider_metadata.messages[1]
+      message = Liaison::Fixtures.foreign_provider_metadata.messages[1]
       message.meta?("anthropic", "stop_reason").should eq("end_turn")
       message.meta_for("openai").should be_nil
 
@@ -109,7 +109,7 @@ describe "MPSH construction" do
     end
 
     it "carries an opaque reasoning payload without exposing it canonically" do
-      block = Elelem::Fixtures.reasoning_with_provider_payload
+      block = Liaison::Fixtures.reasoning_with_provider_payload
         .messages[1].content.first.as(M::ReasoningBlock)
 
       block.redacted?.should be_true
@@ -120,20 +120,20 @@ describe "MPSH construction" do
 
   describe "server-executed tools" do
     it "flags both the call and its result" do
-      session = Elelem::Fixtures.server_executed_tool
+      session = Liaison::Fixtures.server_executed_tool
       session.messages[1].content.first.as(M::ToolCallBlock).server_executed?.should be_true
       session.messages[2].content.first.as(M::ToolResultBlock).server_executed?.should be_true
     end
 
     it "leaves client-executed tools unflagged" do
-      session = Elelem::Fixtures.tool_call_text_result
+      session = Liaison::Fixtures.tool_call_text_result
       session.messages[1].content.first.as(M::ToolCallBlock).server_executed?.should be_false
     end
   end
 
   describe "tool call arguments" do
     it "stores them structured rather than as a JSON string" do
-      call = Elelem::Fixtures.tool_call_text_result.messages[1].content.first.as(M::ToolCallBlock)
+      call = Liaison::Fixtures.tool_call_text_result.messages[1].content.first.as(M::ToolCallBlock)
       call.arguments.should be_a(M::Object)
       call.arguments["city"].should eq("Kyoto")
     end
@@ -141,9 +141,9 @@ describe "MPSH construction" do
 
   describe "refusal" do
     it "distinguishes a refusal with a reason from one without" do
-      Elelem::Fixtures.refusal_with_reason
+      Liaison::Fixtures.refusal_with_reason
         .messages[1].content.first.as(M::RefusalBlock).reason.should_not be_nil
-      Elelem::Fixtures.refusal_without_reason
+      Liaison::Fixtures.refusal_without_reason
         .messages[1].content.first.as(M::RefusalBlock).reason.should be_nil
     end
   end
@@ -151,14 +151,14 @@ end
 
 describe "turn segmentation" do
   it "treats a tool result as continuation, not a new turn" do
-    turns = M::Turns.segment(Elelem::Fixtures.tool_call_text_result.messages)
+    turns = M::Turns.segment(Liaison::Fixtures.tool_call_text_result.messages)
     turns.size.should eq(1)
     turns.first.size.should eq(4)
     turns.first.completed?.should be_false
   end
 
   it "opens a turn at each genuine user input" do
-    turns = M::Turns.segment(Elelem::Fixtures.reasoning_across_turns.messages)
+    turns = M::Turns.segment(Liaison::Fixtures.reasoning_across_turns.messages)
     turns.size.should eq(3)
     turns[0].completed?.should be_true
     turns[1].completed?.should be_true
@@ -166,12 +166,12 @@ describe "turn segmentation" do
   end
 
   it "never marks the open turn as completed" do
-    completed = M::Turns.completed_indices(Elelem::Fixtures.reasoning_mid_tool_call.messages)
+    completed = M::Turns.completed_indices(Liaison::Fixtures.reasoning_mid_tool_call.messages)
     completed.should be_empty
   end
 
   it "handles history that opens with an assistant message" do
-    turns = M::Turns.segment(Elelem::Fixtures.assistant_first.messages)
+    turns = M::Turns.segment(Liaison::Fixtures.assistant_first.messages)
     turns.first.first.should eq(0)
   end
 

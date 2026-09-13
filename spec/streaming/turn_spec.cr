@@ -10,7 +10,7 @@ require "../spec_helper"
 # objected to that would push callers into tracking state the handle already
 # has.
 
-describe Elelem::Streaming::Turn do
+describe Liaison::Streaming::Turn do
   it "starts unstopped" do
     S::Turn.new.stopped?.should be_false
   end

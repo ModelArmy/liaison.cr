@@ -1,4 +1,4 @@
-require "../../src/elelem"
+require "../../src/liaison"
 
 # Response bodies, one set per protocol.
 #
@@ -11,7 +11,7 @@ require "../../src/elelem"
 #
 # Payloads are trimmed — token counts made small, base64 made short, encrypted
 # blobs shortened — but no field is removed and no shape is flattened.
-module Elelem::ResponseFixtures
+module Liaison::ResponseFixtures
   extend self
 
   # ---- Chat Completions -------------------------------------------------

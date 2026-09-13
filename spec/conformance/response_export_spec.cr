@@ -9,26 +9,26 @@ require "../fixtures/response_fixtures"
 # mapper would agree with our own assumptions by construction.
 #
 # Offline throughout. Every body here is recorded, not fetched.
-private alias RF = Elelem::ResponseFixtures
+private alias RF = Liaison::ResponseFixtures
 
 private def chat_reply(body : String)
-  mapper = Elelem::Protocol::ChatCompletions::Mapper.new
-  Elelem::Protocol::ChatCompletions::Exporter.new(mapper.calls).export_reply(body)
+  mapper = Liaison::Protocol::ChatCompletions::Mapper.new
+  Liaison::Protocol::ChatCompletions::Exporter.new(mapper.calls).export_reply(body)
 end
 
 private def responses_reply(body : String)
-  mapper = Elelem::Protocol::Responses::Mapper.new
-  Elelem::Protocol::Responses::Exporter.new(mapper.calls).export_reply(body)
+  mapper = Liaison::Protocol::Responses::Mapper.new
+  Liaison::Protocol::Responses::Exporter.new(mapper.calls).export_reply(body)
 end
 
 private def anthropic_reply(body : String)
-  mapper = Elelem::Protocol::Anthropic::Mapper.new
-  Elelem::Protocol::Anthropic::Exporter.new(mapper.calls).export_reply(body)
+  mapper = Liaison::Protocol::Anthropic::Mapper.new
+  Liaison::Protocol::Anthropic::Exporter.new(mapper.calls).export_reply(body)
 end
 
 private def gemini_reply(body : String)
-  mapper = Elelem::Protocol::Gemini::Mapper.new
-  Elelem::Protocol::Gemini::Exporter.new(mapper.calls).export_reply(body)
+  mapper = Liaison::Protocol::Gemini::Mapper.new
+  Liaison::Protocol::Gemini::Exporter.new(mapper.calls).export_reply(body)
 end
 
 describe "response export" do
@@ -50,7 +50,7 @@ describe "response export" do
 
     it "keeps non-content facts out of the content" do
       reply = chat_reply(RF::CHAT_TEXT)
-      key = Elelem::Protocol::ChatCompletions::METADATA_KEY
+      key = Liaison::Protocol::ChatCompletions::METADATA_KEY
 
       reply.meta?(key, "finish_reason").should eq "stop"
       reply.meta?(key, "response_id").should_not be_nil
@@ -126,7 +126,7 @@ describe "response export" do
     # is a silent failure: the block survives, the trace does not.
     it "preserves the encrypted reasoning payload" do
       reply = responses_reply(RF::RESPONSES_REASONING_AND_CALL)
-      key = Elelem::Protocol::Responses::METADATA_KEY
+      key = Liaison::Protocol::Responses::METADATA_KEY
 
       block = reply.content[0].as(M::ReasoningBlock)
       block.meta?(key, "encrypted_content").should eq "gAAAAABn0zBxAbCdEf1234=="
@@ -162,7 +162,7 @@ describe "response export" do
 
     it "keeps the thinking signature, which must replay unmodified" do
       reply = anthropic_reply(RF::ANTHROPIC_THINKING)
-      key = Elelem::Protocol::Anthropic::METADATA_KEY
+      key = Liaison::Protocol::Anthropic::METADATA_KEY
 
       block = reply.content[0].as(M::ReasoningBlock)
       block.meta?(key, "signature").should_not be_nil
@@ -231,7 +231,7 @@ describe "response export" do
     # reads this key back when replaying the thought.
     it "keeps the thought signature under the key the mapper replays" do
       reply = gemini_reply(RF::GEMINI_THOUGHT)
-      key = Elelem::Protocol::Gemini::METADATA_KEY
+      key = Liaison::Protocol::Gemini::METADATA_KEY
 
       reply.content[0].as(M::ReasoningBlock).meta?(key, "thought_signature").should_not be_nil
     end
@@ -239,7 +239,7 @@ describe "response export" do
 
   describe "malformed bodies" do
     it "raises rather than returning an empty reply for non-JSON" do
-      expect_raises(Elelem::Protocol::MalformedResponseError) do
+      expect_raises(Liaison::Protocol::MalformedResponseError) do
         chat_reply("not json at all")
       end
     end
@@ -248,11 +248,11 @@ describe "response export" do
     # failure, and the one where returning an empty message would be worst:
     # the turn would look answered.
     it "raises when the protocol's own envelope is absent" do
-      expect_raises(Elelem::Protocol::MalformedResponseError) do
+      expect_raises(Liaison::Protocol::MalformedResponseError) do
         chat_reply(%({"error": {"message": "model not found", "type": "invalid_request"}}))
       end
 
-      expect_raises(Elelem::Protocol::MalformedResponseError) do
+      expect_raises(Liaison::Protocol::MalformedResponseError) do
         gemini_reply(%({"error": {"code": 429, "message": "quota exceeded"}}))
       end
     end

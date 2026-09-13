@@ -12,8 +12,8 @@ describe "MPSH::Repair" do
   args = M::Object{"city" => "Kyoto".as(M::Value)}
 
   cut_with_call = ->(ending : M::Ending) do
-    reply = M::Message.new(M::Role::Assistant, Elelem::Fixtures.blocks(
-      Elelem::Fixtures.text("Let me look that up."),
+    reply = M::Message.new(M::Role::Assistant, Liaison::Fixtures.blocks(
+      Liaison::Fixtures.text("Let me look that up."),
       M::ToolCallBlock.new("mc_repair_weather", "get_weather", args)
     ))
     reply.ending = ending
@@ -48,7 +48,7 @@ describe "MPSH::Repair" do
 
     it "reports nothing to keep when the cut turn was only calls" do
       reply = M::Message.new(M::Role::Assistant,
-        Elelem::Fixtures.blocks(M::ToolCallBlock.new("mc_repair_weather", "get_weather", args)))
+        Liaison::Fixtures.blocks(M::ToolCallBlock.new("mc_repair_weather", "get_weather", args)))
       reply.ending = M::Ending::Interrupted
 
       M::Repair.repaired(reply).should be_nil
@@ -82,18 +82,18 @@ describe "MPSH::Repair" do
 
   describe "the invariant" do
     it "holds for a session whose calls were all answered" do
-      M::Repair.sendable?(Elelem::Fixtures.tool_call_text_result).should be_true
+      M::Repair.sendable?(Liaison::Fixtures.tool_call_text_result).should be_true
     end
 
     it "fails for a session ending on an unanswered call" do
-      session = Elelem::Fixtures.single_user_turn
+      session = Liaison::Fixtures.single_user_turn
       session << cut_with_call.call(M::Ending::Interrupted)
 
       M::Repair.sendable?(session).should be_false
     end
 
     it "holds again once the session is repaired" do
-      session = Elelem::Fixtures.single_user_turn
+      session = Liaison::Fixtures.single_user_turn
       session << cut_with_call.call(M::Ending::Interrupted)
 
       M::Repair.repair!(session).should be_true
@@ -102,9 +102,9 @@ describe "MPSH::Repair" do
     end
 
     it "removes a turn repair emptied, so the session is immediately resendable" do
-      session = Elelem::Fixtures.single_user_turn
+      session = Liaison::Fixtures.single_user_turn
       reply = M::Message.new(M::Role::Assistant,
-        Elelem::Fixtures.blocks(M::ToolCallBlock.new("mc_repair_weather", "get_weather", args)))
+        Liaison::Fixtures.blocks(M::ToolCallBlock.new("mc_repair_weather", "get_weather", args)))
       reply.ending = M::Ending::Interrupted
       session << reply
 
@@ -116,9 +116,9 @@ describe "MPSH::Repair" do
     # An empty message is a fixture in its own right and divergent provider
     # handling of one is a real case. Repair removes only what it emptied.
     it "leaves a message that arrived empty where it is" do
-      session = Elelem::Fixtures.session(
-        Elelem::Fixtures.user(Elelem::Fixtures.text("Hello")),
-        Elelem::Fixtures.empty_user)
+      session = Liaison::Fixtures.session(
+        Liaison::Fixtures.user(Liaison::Fixtures.text("Hello")),
+        Liaison::Fixtures.empty_user)
 
       M::Repair.repair!(session).should be_false
       session.size.should eq(2)
@@ -128,7 +128,7 @@ describe "MPSH::Repair" do
   # The reload path, and the reason the ending is archived rather than kept on
   # a report: nothing about the report survives the process that made it.
   it "repairs a session that was archived mid-turn" do
-    session = Elelem::Fixtures.single_user_turn
+    session = Liaison::Fixtures.single_user_turn
     session << cut_with_call.call(M::Ending::Interrupted)
 
     restored = M::Archive.read(M::Archive.write(session))

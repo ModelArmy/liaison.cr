@@ -1,4 +1,4 @@
-# Disclosure for Elelem
+# Disclosure for Liaison
 
 ## AI Usage
 

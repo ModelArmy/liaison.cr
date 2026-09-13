@@ -41,14 +41,14 @@ private STREAM_TEXT    = "ollama_responses_stream_text"
 private STREAM_FRAMES  = "ollama_responses_stream_frames"
 private STREAM_STOPPED = "ollama_responses_stream_stopped"
 
-private CAP = Elelem::Options.new(max_output_tokens: 512)
+private CAP = Liaison::Options.new(max_output_tokens: 512)
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def responses : Elelem::Provider
-  Elelem::Provider.for(ollama, Elelem::ProtocolKind::Responses)
+private def responses : Liaison::Provider
+  Liaison::Provider.for(ollama, Liaison::ProtocolKind::Responses)
 end
 
 private def asked : M::Session
@@ -64,15 +64,15 @@ end
 # exchange one layer down. Same body as the client would send, but recorded
 # under its own name rather than shared: guaranteeing byte-identity across two
 # construction paths is exactly the sort of coupling that breaks silently.
-private def assembled : Elelem::Protocol::Responses::Assembler
+private def assembled : Liaison::Protocol::Responses::Assembler
   provider = responses
   exchange = provider.adapter.prepare_stream(asked, MODEL,
-    Elelem::Capability::Policy::Compensating,
-    Elelem::Capability::ReasoningRetention::All,
+    Liaison::Capability::Policy::Compensating,
+    Liaison::Capability::ReasoningRetention::All,
     provider.default_max_tokens,
     CAP).should_not be_nil
 
-  assembler = exchange.assembler.as(Elelem::Protocol::Responses::Assembler)
+  assembler = exchange.assembler.as(Liaison::Protocol::Responses::Assembler)
   server = provider.server
   server.stream(provider.adapter.path(MODEL),
     provider.adapter.headers(server.credential), exchange.body) do |frame|
@@ -92,7 +92,7 @@ describe "Ollama streaming over the Responses API" do
       # generations differ and that comparison would be testing the model's
       # determinism instead of ours.
       Wiretap.intercept(STREAM_TEXT) do
-        reply, report = Elelem::Client.new(responses).send(asked, MODEL, options: CAP) { |_, _| }
+        reply, report = Liaison::Client.new(responses).send(asked, MODEL, options: CAP) { |_, _| }
 
         reply.role.should eq M::Role::Assistant
         reply.content.select(M::TextBlock).should_not be_empty
@@ -104,7 +104,7 @@ describe "Ollama streaming over the Responses API" do
     it "reports the answer arriving" do
       Wiretap.intercept(STREAM_TEXT) do
         seen = [] of S::Event
-        reply, _ = Elelem::Client.new(responses).send(asked, MODEL, options: CAP) do |event, _|
+        reply, _ = Liaison::Client.new(responses).send(asked, MODEL, options: CAP) do |event, _|
           seen << event
         end
 
@@ -166,8 +166,8 @@ describe "Ollama streaming over the Responses API" do
     # -retention request above, which is the rule for sharing a name.
     it "reports reasoning even when the caller keeps none of it" do
       Wiretap.intercept(STREAM_TEXT) do
-        client = Elelem::Client.new(responses,
-          retention: Elelem::Capability::ReasoningRetention::None)
+        client = Liaison::Client.new(responses,
+          retention: Liaison::Capability::ReasoningRetention::None)
 
         seen = [] of S::Event
         reply, _ = client.send(asked, MODEL, options: CAP) { |event, _| seen << event }
@@ -197,7 +197,7 @@ describe "Ollama streaming over the Responses API" do
       # depending on what the mapping had to say, and neither is interesting.
       Wiretap.intercept(STREAM_STOPPED) do
         seen = 0
-        reply, report = Elelem::Client.new(responses).send(asked, MODEL, options: CAP) do |_, turn|
+        reply, report = Liaison::Client.new(responses).send(asked, MODEL, options: CAP) do |_, turn|
           seen += 1
           turn.stop
         end
@@ -208,7 +208,7 @@ describe "Ollama streaming over the Responses API" do
         # The load-bearing part: this came from the accumulation, not from a
         # terminal frame that never arrived. A stopped turn on the shortcut
         # assembler would have produced nothing at all.
-        key = Elelem::Protocol::Responses::METADATA_KEY
+        key = Liaison::Protocol::Responses::METADATA_KEY
         reply.meta?(key, "status").should eq "incomplete"
 
         # And canonically `Stopped`, not `Truncated` — which is the ordering

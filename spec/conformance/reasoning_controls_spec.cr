@@ -19,29 +19,29 @@ private def asked : M::Session
   session
 end
 
-private def adapter_for(protocol : Elelem::ProtocolKind) : Elelem::Adapter
+private def adapter_for(protocol : Liaison::ProtocolKind) : Liaison::Adapter
   case protocol
-  in Elelem::ProtocolKind::ChatCompletions then Elelem::ChatCompletionsAdapter.new
-  in Elelem::ProtocolKind::Responses       then Elelem::ResponsesAdapter.new
-  in Elelem::ProtocolKind::Anthropic       then Elelem::AnthropicAdapter.new
-  in Elelem::ProtocolKind::Gemini          then Elelem::GeminiAdapter.new
+  in Liaison::ProtocolKind::ChatCompletions then Liaison::ChatCompletionsAdapter.new
+  in Liaison::ProtocolKind::Responses       then Liaison::ResponsesAdapter.new
+  in Liaison::ProtocolKind::Anthropic       then Liaison::AnthropicAdapter.new
+  in Liaison::ProtocolKind::Gemini          then Liaison::GeminiAdapter.new
   end
 end
 
-private def exchange(protocol : Elelem::ProtocolKind, options : Elelem::Options,
+private def exchange(protocol : Liaison::ProtocolKind, options : Liaison::Options,
                      model : String = "test-model",
-                     policy : C::Policy = C::Policy::Lenient) : Elelem::Adapter::Exchange
+                     policy : C::Policy = C::Policy::Lenient) : Liaison::Adapter::Exchange
   adapter_for(protocol).prepare(asked, model, policy,
     C::ReasoningRetention::All, 4096, options)
 end
 
-private def body(protocol : Elelem::ProtocolKind, options : Elelem::Options,
+private def body(protocol : Liaison::ProtocolKind, options : Liaison::Options,
                  model : String = "test-model") : JSON::Any
   JSON.parse(exchange(protocol, options, model).body)
 end
 
-private def effort(level : Elelem::Reasoning::Effort) : Elelem::Options
-  Elelem::Options.new(reasoning: level)
+private def effort(level : Liaison::Reasoning::Effort) : Liaison::Options
+  Liaison::Options.new(reasoning: level)
 end
 
 # The loss recorded *for the reasoning control*, or `nil` where the control cost
@@ -57,19 +57,19 @@ end
 #
 # So the matrix itself is asserted against `ReasoningControl.resolve`, which
 # owns it, and this helper asserts what a caller would actually be told.
-private def control_loss(result : Elelem::Adapter::Exchange) : M::Outcome?
+private def control_loss(result : Liaison::Adapter::Exchange) : M::Outcome?
   result.report.annotations
     .select { |a| a.detail.starts_with?("reasoning control:") }
     .map(&.outcome)
     .max?
 end
 
-private def resolve(request : Elelem::Reasoning::Request, unit : C::ReasoningUnit) : M::Outcome
+private def resolve(request : Liaison::Reasoning::Request, unit : C::ReasoningUnit) : M::Outcome
   C::ReasoningControl.resolve(request, unit).last
 end
 
-private ALL = [Elelem::ProtocolKind::ChatCompletions, Elelem::ProtocolKind::Responses,
-               Elelem::ProtocolKind::Anthropic, Elelem::ProtocolKind::Gemini]
+private ALL = [Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses,
+               Liaison::ProtocolKind::Anthropic, Liaison::ProtocolKind::Gemini]
 
 describe "reasoning controls" do
   # The property that keeps every committed transcript valid. If this fails,
@@ -78,7 +78,7 @@ describe "reasoning controls" do
   describe "absence" do
     it "emits nothing at all when the caller asks for nothing" do
       ALL.each do |protocol|
-        request = body(protocol, Elelem::Options.new)
+        request = body(protocol, Liaison::Options.new)
 
         request["reasoning_effort"]?.should be_nil
         request["reasoning"]?.should be_nil
@@ -89,8 +89,8 @@ describe "reasoning controls" do
     end
 
     it "leaves a request with tools and a cap byte-identical to before" do
-      armed = Elelem::Options.new(
-        tools: [Elelem::Tool.new("get_weather", "Look up the weather")],
+      armed = Liaison::Options.new(
+        tools: [Liaison::Tool.new("get_weather", "Look up the weather")],
         max_output_tokens: 512)
 
       ALL.each do |protocol|
@@ -106,9 +106,9 @@ describe "reasoning controls" do
   # simply the wrong instrument for reading them.
   describe "the matrix" do
     it "classifies every pairing" do
-      low = Elelem::Reasoning::Effort::Low
-      budget = Elelem::Reasoning::Budget.new(3000)
-      off = Elelem::Reasoning::Off.new
+      low = Liaison::Reasoning::Effort::Low
+      budget = Liaison::Reasoning::Budget.new(3000)
+      off = Liaison::Reasoning::Off.new
 
       resolve(low, C::ReasoningUnit::Effort).should eq M::Outcome::Exact
       resolve(budget, C::ReasoningUnit::Effort).should eq M::Outcome::Degraded
@@ -129,41 +129,41 @@ describe "reasoning controls" do
     end
 
     it "drops the control where a protocol has none" do
-      C::ReasoningControl.resolve(Elelem::Reasoning::Effort::High, C::ReasoningUnit::None)
+      C::ReasoningControl.resolve(Liaison::Reasoning::Effort::High, C::ReasoningUnit::None)
         .first.should eq C::ReasoningControl::Rendering::Drop
     end
   end
 
   describe "a named rung" do
     it "spells the rung four ways" do
-      options = effort(Elelem::Reasoning::Effort::Medium)
+      options = effort(Liaison::Reasoning::Effort::Medium)
 
-      body(Elelem::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
+      body(Liaison::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
         .should eq "medium"
-      body(Elelem::ProtocolKind::Responses, options)["reasoning"]["effort"].as_s
+      body(Liaison::ProtocolKind::Responses, options)["reasoning"]["effort"].as_s
         .should eq "medium"
       # A rung on a current Claude model lands in `output_config`, not in
       # `thinking` — a separate parameter, because effort shapes the whole
       # response rather than only the thinking.
-      body(Elelem::ProtocolKind::Anthropic, options)["output_config"]["effort"].as_s
+      body(Liaison::ProtocolKind::Anthropic, options)["output_config"]["effort"].as_s
         .should eq "medium"
-      body(Elelem::ProtocolKind::Gemini, options)["generationConfig"]["thinkingConfig"]["thinkingLevel"]
+      body(Liaison::ProtocolKind::Gemini, options)["generationConfig"]["thinkingConfig"]["thinkingLevel"]
         .as_s.should eq "MEDIUM"
     end
 
     it "carries the two rungs above high on the protocols that spell them" do
-      options = effort(Elelem::Reasoning::Effort::XHigh)
+      options = effort(Liaison::Reasoning::Effort::XHigh)
 
-      body(Elelem::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
+      body(Liaison::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
         .should eq "xhigh"
-      body(Elelem::ProtocolKind::Anthropic, options)["output_config"]["effort"].as_s
+      body(Liaison::ProtocolKind::Anthropic, options)["output_config"]["effort"].as_s
         .should eq "xhigh"
     end
 
     # Gemini spells three rungs where the caller has five. Clamping is a loss
     # the caller did not ask for, so it is annotated rather than done quietly.
     it "clamps a rung Gemini cannot spell, and says so" do
-      result = exchange(Elelem::ProtocolKind::Gemini, effort(Elelem::Reasoning::Effort::Max))
+      result = exchange(Liaison::ProtocolKind::Gemini, effort(Liaison::Reasoning::Effort::Max))
 
       JSON.parse(result.body)["generationConfig"]["thinkingConfig"]["thinkingLevel"]
         .as_s.should eq "HIGH"
@@ -172,17 +172,17 @@ describe "reasoning controls" do
     end
 
     it "sends a rung on Anthropic without asking for a budget" do
-      request = body(Elelem::ProtocolKind::Anthropic, effort(Elelem::Reasoning::Effort::High))
+      request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High))
       request["thinking"]?.should be_nil
     end
 
     it "is Exact where the unit matches, and costs the caller nothing" do
-      resolve(Elelem::Reasoning::Effort::Low, C::ReasoningUnit::Effort)
+      resolve(Liaison::Reasoning::Effort::Low, C::ReasoningUnit::Effort)
         .should eq M::Outcome::Exact
 
       # Nothing was lost, so nothing is annotated.
       control_loss(
-        exchange(Elelem::ProtocolKind::ChatCompletions, effort(Elelem::Reasoning::Effort::Low)))
+        exchange(Liaison::ProtocolKind::ChatCompletions, effort(Liaison::Reasoning::Effort::Low)))
         .should be_nil
     end
   end
@@ -192,14 +192,14 @@ describe "reasoning controls" do
     # rung as a budget adopts an abstraction rather than inventing one:
     # Restructured, not Degraded.
     it "renders a rung as a budget on a budget-only model, and calls it Restructured" do
-      result = exchange(Elelem::ProtocolKind::Anthropic,
-        effort(Elelem::Reasoning::Effort::Low), "claude-sonnet-4-5")
+      result = exchange(Liaison::ProtocolKind::Anthropic,
+        effort(Liaison::Reasoning::Effort::Low), "claude-sonnet-4-5")
 
       request = JSON.parse(result.body)
       request["thinking"]["type"].as_s.should eq "enabled"
       request["thinking"]["budget_tokens"].as_i.should eq 1024
       request["output_config"]?.should be_nil
-      resolve(Elelem::Reasoning::Effort::Low, C::ReasoningUnit::Budget)
+      resolve(Liaison::Reasoning::Effort::Low, C::ReasoningUnit::Budget)
         .should eq M::Outcome::Restructured
       # Restructured is not damage, so the caller gets no annotation — only a
       # `worst` that has moved off Exact.
@@ -207,9 +207,9 @@ describe "reasoning controls" do
     end
 
     it "sends an exact budget where the caller names one" do
-      request = body(Elelem::ProtocolKind::Anthropic,
-        Elelem::Options.new(max_output_tokens: 8192,
-          reasoning: Elelem::Reasoning::Budget.new(2048)),
+      request = body(Liaison::ProtocolKind::Anthropic,
+        Liaison::Options.new(max_output_tokens: 8192,
+          reasoning: Liaison::Reasoning::Budget.new(2048)),
         "claude-sonnet-4-5")
 
       request["thinking"]["budget_tokens"].as_i.should eq 2048
@@ -218,8 +218,8 @@ describe "reasoning controls" do
     # Nobody publishes budget -> rung, so the ladder is ours and the loss is
     # real: a number cannot be recovered from a name.
     it "buckets a budget to a rung where the unit is a rung, and calls it Degraded" do
-      result = exchange(Elelem::ProtocolKind::ChatCompletions,
-        Elelem::Options.new(reasoning: Elelem::Reasoning::Budget.new(3000)))
+      result = exchange(Liaison::ProtocolKind::ChatCompletions,
+        Liaison::Options.new(reasoning: Liaison::Reasoning::Budget.new(3000)))
 
       JSON.parse(result.body)["reasoning_effort"].as_s.should eq "medium"
       control_loss(result).should eq M::Outcome::Degraded
@@ -227,9 +227,9 @@ describe "reasoning controls" do
 
     # The budget must be at least 1,024 and strictly below `max_tokens`.
     it "clamps a budget under the caller's output cap" do
-      request = body(Elelem::ProtocolKind::Anthropic,
-        Elelem::Options.new(max_output_tokens: 4000,
-          reasoning: Elelem::Reasoning::Effort::Max),
+      request = body(Liaison::ProtocolKind::Anthropic,
+        Liaison::Options.new(max_output_tokens: 4000,
+          reasoning: Liaison::Reasoning::Effort::Max),
         "claude-sonnet-4-5")
 
       request["thinking"]["budget_tokens"].as_i.should eq 3999
@@ -240,9 +240,9 @@ describe "reasoning controls" do
     # reason, and quietly spending past it is the silent behaviour this whole
     # model exists to prevent.
     it "drops the control rather than raising the cap, and records it" do
-      result = exchange(Elelem::ProtocolKind::Anthropic,
-        Elelem::Options.new(max_output_tokens: 512,
-          reasoning: Elelem::Reasoning::Effort::High),
+      result = exchange(Liaison::ProtocolKind::Anthropic,
+        Liaison::Options.new(max_output_tokens: 512,
+          reasoning: Liaison::Reasoning::Effort::High),
         "claude-sonnet-4-5")
 
       request = JSON.parse(result.body)
@@ -252,7 +252,7 @@ describe "reasoning controls" do
     end
 
     it "asks Gemini for dynamic thinking rather than inventing a ceiling" do
-      body(Elelem::ProtocolKind::Gemini, effort(Elelem::Reasoning::Effort::Max),
+      body(Liaison::ProtocolKind::Gemini, effort(Liaison::Reasoning::Effort::Max),
         "gemini-2.5-flash")["generationConfig"]["thinkingConfig"]["thinkingBudget"]
         .as_i.should eq -1
     end
@@ -260,26 +260,26 @@ describe "reasoning controls" do
 
   describe "off" do
     it "asks for no thinking in each protocol's own spelling" do
-      options = Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new)
+      options = Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new)
 
-      body(Elelem::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
+      body(Liaison::ProtocolKind::ChatCompletions, options)["reasoning_effort"].as_s
         .should eq "none"
-      body(Elelem::ProtocolKind::Responses, options)["reasoning"]["effort"].as_s
+      body(Liaison::ProtocolKind::Responses, options)["reasoning"]["effort"].as_s
         .should eq "none"
-      body(Elelem::ProtocolKind::Anthropic, options)["thinking"]["type"].as_s
+      body(Liaison::ProtocolKind::Anthropic, options)["thinking"]["type"].as_s
         .should eq "disabled"
-      body(Elelem::ProtocolKind::Gemini, options)["generationConfig"]["thinkingConfig"]["thinkingBudget"]
+      body(Liaison::ProtocolKind::Gemini, options)["generationConfig"]["thinkingConfig"]["thinkingBudget"]
         .as_i.should eq 0
     end
 
     it "is Exact everywhere, being a request every protocol can make" do
       [C::ReasoningUnit::Effort, C::ReasoningUnit::Budget].each do |unit|
-        resolve(Elelem::Reasoning::Off.new, unit).should eq M::Outcome::Exact
+        resolve(Liaison::Reasoning::Off.new, unit).should eq M::Outcome::Exact
       end
 
       ALL.each do |protocol|
         control_loss(
-          exchange(protocol, Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new)))
+          exchange(protocol, Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new)))
           .should be_nil
       end
     end
@@ -290,10 +290,10 @@ describe "reasoning controls" do
   # catalog has to pass to belong here.
   describe "the model catalog" do
     it "declares the ambiguous protocols ambiguous, and the others not" do
-      Elelem::Protocol::Anthropic::PROFILE.reasoning_unit.either?.should be_true
-      Elelem::Protocol::Gemini::PROFILE.reasoning_unit.either?.should be_true
-      Elelem::Protocol::ChatCompletions::PROFILE.reasoning_unit.effort?.should be_true
-      Elelem::Protocol::Responses::PROFILE.reasoning_unit.effort?.should be_true
+      Liaison::Protocol::Anthropic::PROFILE.reasoning_unit.either?.should be_true
+      Liaison::Protocol::Gemini::PROFILE.reasoning_unit.either?.should be_true
+      Liaison::Protocol::ChatCompletions::PROFILE.reasoning_unit.effort?.should be_true
+      Liaison::Protocol::Responses::PROFILE.reasoning_unit.effort?.should be_true
     end
 
     it "narrows a legacy model to a budget" do
@@ -307,7 +307,7 @@ describe "reasoning controls" do
     it "has no opinion about a model it does not know" do
       C::Catalog.reasoning_unit?("some-model-released-next-year").should be_nil
 
-      profile = C::Catalog.narrow(Elelem::Protocol::Anthropic::PROFILE, "whatever-4.9")
+      profile = C::Catalog.narrow(Liaison::Protocol::Anthropic::PROFILE, "whatever-4.9")
       profile.reasoning_unit.effort?.should be_true
     end
 
@@ -319,7 +319,7 @@ describe "reasoning controls" do
     end
 
     it "leaves an unambiguous protocol alone" do
-      profile = C::Catalog.narrow(Elelem::Protocol::ChatCompletions::PROFILE,
+      profile = C::Catalog.narrow(Liaison::Protocol::ChatCompletions::PROFILE,
         "claude-sonnet-4-5")
       profile.reasoning_unit.effort?.should be_true
     end
@@ -328,15 +328,15 @@ describe "reasoning controls" do
   describe "narrowing" do
     it "refuses to widen" do
       expect_raises(ArgumentError) do
-        Elelem::Protocol::ChatCompletions::PROFILE
+        Liaison::Protocol::ChatCompletions::PROFILE
           .with_reasoning_unit(C::ReasoningUnit::Budget)
       end
     end
 
     it "refuses an override the protocol never spelled" do
       expect_raises(ArgumentError) do
-        Elelem::Provider.for(Elelem::Server.new("ollama", "http://localhost:11434"),
-          Elelem::ProtocolKind::ChatCompletions,
+        Liaison::Provider.for(Liaison::Server.new("ollama", "http://localhost:11434"),
+          Liaison::ProtocolKind::ChatCompletions,
           reasoning_unit: C::ReasoningUnit::Budget)
       end
     end
@@ -344,12 +344,12 @@ describe "reasoning controls" do
     # The deployment whose model name says nothing about the model — Azure's
     # case, and the reason the override exists at all.
     it "lets an explicit unit overrule the catalog" do
-      adapter = Elelem::AnthropicAdapter.new(nil, C::ReasoningUnit::Budget)
+      adapter = Liaison::AnthropicAdapter.new(nil, C::ReasoningUnit::Budget)
       adapter.narrowed("some-deployment-name").reasoning_unit.budget?.should be_true
     end
 
     it "keeps the metadata-key narrowing it already did" do
-      adapter = Elelem::AnthropicAdapter.new("ollama")
+      adapter = Liaison::AnthropicAdapter.new("ollama")
       profile = adapter.narrowed("test-model")
 
       profile.metadata_key.should eq "ollama"
@@ -364,8 +364,8 @@ describe "reasoning controls" do
   describe "policy" do
     it "refuses under strict where the request loses what was asked for" do
       expect_raises(C::RefusedError) do
-        exchange(Elelem::ProtocolKind::ChatCompletions,
-          Elelem::Options.new(reasoning: Elelem::Reasoning::Budget.new(3000)),
+        exchange(Liaison::ProtocolKind::ChatCompletions,
+          Liaison::Options.new(reasoning: Liaison::Reasoning::Budget.new(3000)),
           policy: C::Policy::Strict)
       end
     end
@@ -373,7 +373,7 @@ describe "reasoning controls" do
     it "permits a rung rendered as a budget under strict, being Restructured" do
       # The assertion is that this does not raise: Strict permits Restructured,
       # and a rung rendered as a budget is exactly that.
-      result = exchange(Elelem::ProtocolKind::Anthropic, effort(Elelem::Reasoning::Effort::Low),
+      result = exchange(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::Low),
         "claude-sonnet-4-5", policy: C::Policy::Strict)
 
       JSON.parse(result.body)["thinking"]["budget_tokens"].as_i.should eq 1024
@@ -384,15 +384,15 @@ describe "reasoning controls" do
   # model was asked to think must describe the same conversation.
   describe "separation from history" do
     it "does not alter the conversation" do
-      plain = body(Elelem::ProtocolKind::ChatCompletions, Elelem::Options.new)
-      thinking = body(Elelem::ProtocolKind::ChatCompletions,
-        effort(Elelem::Reasoning::Effort::High))
+      plain = body(Liaison::ProtocolKind::ChatCompletions, Liaison::Options.new)
+      thinking = body(Liaison::ProtocolKind::ChatCompletions,
+        effort(Liaison::Reasoning::Effort::High))
 
       thinking["messages"].to_json.should eq plain["messages"].to_json
     end
 
     it "refuses a budget of zero or less, which means Off rather than a budget" do
-      expect_raises(ArgumentError) { Elelem::Reasoning::Budget.new(0) }
+      expect_raises(ArgumentError) { Liaison::Reasoning::Budget.new(0) }
     end
   end
 end

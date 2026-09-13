@@ -1,4 +1,4 @@
-require "../../src/elelem_cli/output"
+require "../../src/liaison_cli/output"
 
 # Redirects everything the CLI prints into memory for the duration of the
 # block, and returns it as `{stdout, stderr}`.
@@ -20,16 +20,16 @@ require "../../src/elelem_cli/output"
 # later spec in the run down with it.
 def captured(&) : {String, String}
   printed, warned = IO::Memory.new, IO::Memory.new
-  original_stream = Elelem::Cli::Output.stream
-  original_error = Elelem::Cli::Output.error_stream
+  original_stream = Liaison::Cli::Output.stream
+  original_error = Liaison::Cli::Output.error_stream
 
-  Elelem::Cli::Output.stream = printed
-  Elelem::Cli::Output.error_stream = warned
+  Liaison::Cli::Output.stream = printed
+  Liaison::Cli::Output.error_stream = warned
   begin
     yield
   ensure
-    Elelem::Cli::Output.stream = original_stream
-    Elelem::Cli::Output.error_stream = original_error
+    Liaison::Cli::Output.stream = original_stream
+    Liaison::Cli::Output.error_stream = original_error
   end
 
   {printed.to_s, warned.to_s}

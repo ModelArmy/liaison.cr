@@ -31,14 +31,14 @@ private MODEL = "gemma4:26b-mxfp8"
 private STREAM_TEXT  = "ollama_chat_stream_text"
 private STREAM_TOOLS = "ollama_chat_stream_tools"
 
-private CAP = Elelem::Options.new(max_output_tokens: 512)
+private CAP = Liaison::Options.new(max_output_tokens: 512)
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def chat : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, Elelem::ProtocolKind::ChatCompletions))
+private def chat : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, Liaison::ProtocolKind::ChatCompletions))
 end
 
 private def asked : M::Session
@@ -47,13 +47,13 @@ private def asked : M::Session
   session
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
 end
 
 private def tool_question : M::Session
@@ -63,7 +63,7 @@ private def tool_question : M::Session
 end
 
 private def chat_meta(reply, key : String)
-  reply.meta?(Elelem::Protocol::ChatCompletions::METADATA_KEY, key)
+  reply.meta?(Liaison::Protocol::ChatCompletions::METADATA_KEY, key)
 end
 
 describe "Ollama streaming over the Chat Completions API" do

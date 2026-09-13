@@ -53,7 +53,7 @@ private def message(subject : P::ChatCompletions::Assembler) : P::ChatCompletion
   choice.message
 end
 
-describe Elelem::Protocol::ChatCompletions::Assembler do
+describe Liaison::Protocol::ChatCompletions::Assembler do
   describe "content" do
     it "accumulates fragments into one message" do
       subject, _ = run([said("Mount "), said("Everest"), said(".", finish: "stop")])
