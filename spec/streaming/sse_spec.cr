@@ -20,7 +20,7 @@ private def frames(raw : String) : Array(S::Sse::Frame)
   collected
 end
 
-describe Elelem::Streaming::Sse do
+describe Liaison::Streaming::Sse do
   describe ".each_frame" do
     it "reads a lone data frame" do
       read = frames("data: hello\n\n")

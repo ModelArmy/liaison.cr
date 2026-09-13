@@ -38,7 +38,7 @@ private def run(frames : Array(S::Sse::Frame)) : {P::Responses::Assembler, Array
   {subject, seen}
 end
 
-describe Elelem::Protocol::Responses::Assembler do
+describe Liaison::Protocol::Responses::Assembler do
   describe "events" do
     it "reports text fragments as they arrive" do
       _, seen = run([

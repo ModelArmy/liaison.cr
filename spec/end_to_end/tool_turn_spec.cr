@@ -23,7 +23,7 @@ private TOOL_TURN    = "e2e_tool_turn"
 private TOOL_HANDOFF = "e2e_tool_turn_handoff"
 
 private class Weather
-  include Elelem::Function
+  include Liaison::Function
 
   def name : String
     "get_weather"
@@ -43,8 +43,8 @@ private class Weather
   end
 end
 
-private def toolbox : Elelem::Toolbox
-  Elelem::Toolbox.new([Weather.new] of Elelem::Function)
+private def toolbox : Liaison::Toolbox
+  Liaison::Toolbox.new([Weather.new] of Liaison::Function)
 end
 
 # Tools declared, reasoning off. The second half matters for the handoff
@@ -53,16 +53,16 @@ end
 # on the way into an Anthropic request. What is under test here is the call and
 # its result surviving, so the reasoning is switched off rather than asserted
 # around. `handoff_spec.cr` covers the loss itself.
-private def armed(box : Elelem::Toolbox) : Elelem::Options
-  Elelem::Options.new(tools: box.tools, reasoning: Elelem::Reasoning::Off.new)
+private def armed(box : Liaison::Toolbox) : Liaison::Options
+  Liaison::Options.new(tools: box.tools, reasoning: Liaison::Reasoning::Off.new)
 end
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def client(protocol : Elelem::ProtocolKind) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, protocol))
+private def client(protocol : Liaison::ProtocolKind) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, protocol))
 end
 
 private def asked : M::Session
@@ -81,7 +81,7 @@ describe "a turn that uses a Toolbox" do
       box = toolbox
       session = asked
 
-      first, report = client(Elelem::ProtocolKind::ChatCompletions)
+      first, report = client(Liaison::ProtocolKind::ChatCompletions)
         .send(session, MODEL, options: armed(box))
       report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
       session << first
@@ -95,7 +95,7 @@ describe "a turn that uses a Toolbox" do
       results.content.select(M::ToolResultBlock).first.call_id.should eq calls.first.call_id
       session << results
 
-      second, _ = client(Elelem::ProtocolKind::ChatCompletions)
+      second, _ = client(Liaison::ProtocolKind::ChatCompletions)
         .send(session, MODEL, options: armed(box))
       session << second
 
@@ -115,7 +115,7 @@ describe "a turn that uses a Toolbox" do
         box = toolbox
         session = asked
 
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(session, MODEL, options: armed(box))
         session << first
         session << box.dispatch(first).should_not be_nil
@@ -140,7 +140,7 @@ describe "a turn that uses a Toolbox" do
         box = toolbox
         session = asked
 
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(session, MODEL, options: armed(box))
         session << first
         session << box.dispatch(first).should_not be_nil
@@ -148,7 +148,7 @@ describe "a turn that uses a Toolbox" do
         resumed = SavedSession.round_trip(session, path)
 
         Wiretap.intercept(TOOL_HANDOFF) do
-          reply, report = client(Elelem::ProtocolKind::Anthropic)
+          reply, report = client(Liaison::ProtocolKind::Anthropic)
             .send(resumed, MODEL, options: armed(box))
 
           report.annotations.map(&.outcome).should_not contain M::Outcome::Refused

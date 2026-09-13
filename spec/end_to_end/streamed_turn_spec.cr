@@ -19,20 +19,20 @@ private MODEL = "gemma4:26b-mxfp8"
 private STREAMED = "e2e_streamed_turn"
 private BUFFERED = "e2e_buffered_turn"
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def client(protocol : Elelem::ProtocolKind) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, protocol))
+private def client(protocol : Liaison::ProtocolKind) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, protocol))
 end
 
 # Reasoning off throughout. Ollama reasons on every endpoint and cannot mint an
 # Anthropic thought signature, so the last example here would fail on reasoning
 # retention rather than on anything about streaming. `handoff_spec.cr` asserts
 # that loss deliberately, where it is the subject.
-private def plain : Elelem::Options
-  Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new)
+private def plain : Liaison::Options
+  Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new)
 end
 
 private def asked : M::Session
@@ -49,9 +49,9 @@ describe "a streamed turn" do
     # questioned.
     Wiretap.intercept(STREAMED) do
       streamed = [] of String
-      reply, report = client(Elelem::ProtocolKind::ChatCompletions)
+      reply, report = client(Liaison::ProtocolKind::ChatCompletions)
         .send(asked, MODEL, options: plain) do |event, _|
-          streamed << event.text if event.is_a?(Elelem::Streaming::TextDelta)
+          streamed << event.text if event.is_a?(Liaison::Streaming::TextDelta)
         end
 
       report.streamed?.should be_true
@@ -66,10 +66,10 @@ describe "a streamed turn" do
     # ending, same block kinds in the same order. Comparing the text would be
     # asserting something about the model rather than about us.
     Wiretap.intercept(STREAMED) do
-      streamed, _ = client(Elelem::ProtocolKind::ChatCompletions).send(asked, MODEL, options: plain) { |_, _| }
+      streamed, _ = client(Liaison::ProtocolKind::ChatCompletions).send(asked, MODEL, options: plain) { |_, _| }
 
       Wiretap.intercept(BUFFERED) do
-        buffered, report = client(Elelem::ProtocolKind::ChatCompletions).send(asked, MODEL, options: plain)
+        buffered, report = client(Liaison::ProtocolKind::ChatCompletions).send(asked, MODEL, options: plain)
 
         report.streamed?.should be_false
         streamed.role.should eq buffered.role
@@ -87,7 +87,7 @@ describe "a streamed turn" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(STREAMED) do
         session = asked
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain) { |_, _| }
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain) { |_, _| }
         session << reply
 
         reloaded = SavedSession.round_trip(session, path).messages.last
@@ -106,14 +106,14 @@ describe "a streamed turn" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(STREAMED) do
         session = asked
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain) { |_, _| }
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain) { |_, _| }
         session << reply
 
         resumed = SavedSession.round_trip(session, path)
         resumed << M::Message.user("And the second tallest?")
 
         Wiretap.intercept("e2e_streamed_then_anthropic") do
-          second, report = client(Elelem::ProtocolKind::Anthropic).send(resumed, MODEL, options: plain)
+          second, report = client(Liaison::ProtocolKind::Anthropic).send(resumed, MODEL, options: plain)
 
           second.content.select(M::TextBlock).should_not be_empty
           report.annotations.map(&.outcome).should_not contain M::Outcome::Refused

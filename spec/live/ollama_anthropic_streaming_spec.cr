@@ -26,14 +26,14 @@ private MODEL = "gemma4:26b-mxfp8"
 private STREAM_TEXT  = "ollama_anthropic_stream_text"
 private STREAM_TOOLS = "ollama_anthropic_stream_tools"
 
-private CAP = Elelem::Options.new(max_output_tokens: 512)
+private CAP = Liaison::Options.new(max_output_tokens: 512)
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def messages : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, Elelem::ProtocolKind::Anthropic))
+private def messages : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, Liaison::ProtocolKind::Anthropic))
 end
 
 private def asked : M::Session
@@ -42,13 +42,13 @@ private def asked : M::Session
   session
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
 end
 
 private def tool_question : M::Session
@@ -101,7 +101,7 @@ describe "Ollama streaming over the Anthropic Messages API" do
       Wiretap.intercept(STREAM_TEXT) do
         reply, _ = messages.send(asked, MODEL, options: CAP) { |_, _| }
 
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
         reply.meta?(key, "stop_reason").should_not be_nil
       end
     end
@@ -190,7 +190,7 @@ describe "Ollama streaming over the Anthropic Messages API" do
 
         # No stop reason, because `message_delta` never arrived — which is how
         # a stopped turn stays distinguishable from a finished one downstream.
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
         reply.meta?(key, "stop_reason").should be_nil
         reply.ending.should eq M::Ending::Stopped
       end

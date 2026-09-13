@@ -12,14 +12,14 @@ require "../support/conformance"
 # in the body — so passing here means the mapper works, not that the abstraction
 # does. That test is the checkpoint.
 private def rt(session : M::Session, policy = C::Policy::Lenient)
-  mapper = Elelem::Protocol::Responses::Mapper.new
+  mapper = Liaison::Protocol::Responses::Mapper.new
   request, report = mapper.map(session, "test-model", policy)
-  exporter = Elelem::Protocol::Responses::Exporter.new(mapper.calls)
+  exporter = Liaison::Protocol::Responses::Exporter.new(mapper.calls)
   {exporter.export(request), report, request}
 end
 
 private def diverges(name : String, policy = C::Policy::Lenient)
-  session = Elelem::Fixtures.all[name]
+  session = Liaison::Fixtures.all[name]
   exported, report, request = rt(session, policy)
   {Conformance.compare(session, exported), report, request}
 end
@@ -86,9 +86,9 @@ describe "Responses API round trip" do
       types = request.input.map(&.class.name.split("::").last)
       types.should eq(%w[MessageItem FunctionCallItem FunctionCallOutputItem MessageItem MessageItem])
 
-      request.input[2].as(Elelem::Protocol::Responses::Wire::FunctionCallOutputItem)
+      request.input[2].as(Liaison::Protocol::Responses::Wire::FunctionCallOutputItem)
         .output.should contain("returned separately")
-      request.input[3].as(Elelem::Protocol::Responses::Wire::MessageItem)
+      request.input[3].as(Liaison::Protocol::Responses::Wire::MessageItem)
         .synthetic?.should be_true
     end
 

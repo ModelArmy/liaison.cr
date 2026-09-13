@@ -5,7 +5,7 @@ require "./spec_helper"
 # holding a tool call must also hold that call's result. Most of the file is
 # that one property, approached from each way it can be broken.
 private class Weather
-  include Elelem::Function
+  include Liaison::Function
 
   def name : String
     "get_weather"
@@ -26,7 +26,7 @@ private class Weather
 end
 
 private class Chart
-  include Elelem::Function
+  include Liaison::Function
 
   def name : String
     "draw_chart"
@@ -49,7 +49,7 @@ private class Chart
 end
 
 private class Broken
-  include Elelem::Function
+  include Liaison::Function
 
   def name : String
     "report_failure"
@@ -64,12 +64,12 @@ private class Broken
   end
 
   def call(arguments : M::Object) : Array(M::Block)
-    raise Elelem::Function::Failure.new("the upstream service is down")
+    raise Liaison::Function::Failure.new("the upstream service is down")
   end
 end
 
 private class Exploding
-  include Elelem::Function
+  include Liaison::Function
 
   def name : String
     "raise_anything"
@@ -88,8 +88,8 @@ private class Exploding
   end
 end
 
-private def toolbox : Elelem::Toolbox
-  Elelem::Toolbox.new([Weather.new, Chart.new, Broken.new, Exploding.new] of Elelem::Function)
+private def toolbox : Liaison::Toolbox
+  Liaison::Toolbox.new([Weather.new, Chart.new, Broken.new, Exploding.new] of Liaison::Function)
 end
 
 private def calling(*names : String, server_executed : Bool = false) : M::Message
@@ -108,7 +108,7 @@ private def conversation(reply : M::Message) : M::Session
   session
 end
 
-describe Elelem::Toolbox do
+describe Liaison::Toolbox do
   describe "#tools" do
     it "declares every function it holds, in order" do
       declared = toolbox.tools
@@ -124,7 +124,7 @@ describe Elelem::Toolbox do
       # to start, and the ambiguity is visible at construction rather than at
       # the moment a model happens to call the contested name.
       expect_raises(ArgumentError, /duplicate tool name/) do
-        Elelem::Toolbox.new([Weather.new, Weather.new] of Elelem::Function)
+        Liaison::Toolbox.new([Weather.new, Weather.new] of Liaison::Function)
       end
     end
   end

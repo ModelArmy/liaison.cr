@@ -32,18 +32,18 @@ require "../spec_helper"
 # arguments arrived whole is refused by the assembler and never reaches the
 # reply at all. Same cut, same intent, two different messages — and identical
 # sessions afterwards, which is the property that actually has to hold.
-private def anthropic : Elelem::Client
-  server = Elelem::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
-  Elelem::Client.new(Elelem::Provider.for(server, Elelem::ProtocolKind::Anthropic))
+private def anthropic : Liaison::Client
+  server = Liaison::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
+  Liaison::Client.new(Liaison::Provider.for(server, Liaison::ProtocolKind::Anthropic))
 end
 
-private def ollama : Elelem::Client
-  server = Elelem::Server.new("ollama", "http://localhost:11434", nil)
-  Elelem::Client.new(Elelem::Provider.for(server, Elelem::ProtocolKind::ChatCompletions))
+private def ollama : Liaison::Client
+  server = Liaison::Server.new("ollama", "http://localhost:11434", nil)
+  Liaison::Client.new(Liaison::Provider.for(server, Liaison::ProtocolKind::ChatCompletions))
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
@@ -53,13 +53,13 @@ private def tool_question : M::Session
   session
 end
 
-private def anthropic_armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool],
-    reasoning: Elelem::Reasoning::Effort::Low, max_output_tokens: 1536)
+private def anthropic_armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool],
+    reasoning: Liaison::Reasoning::Effort::Low, max_output_tokens: 1536)
 end
 
-private def chat_armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512)
+private def chat_armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
 end
 
 describe "a stream that ends without its terminal frame" do

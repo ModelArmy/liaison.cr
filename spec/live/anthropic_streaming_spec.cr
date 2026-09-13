@@ -32,18 +32,18 @@ private STREAM_THINKING = "anthropic_stream_thinking"
 private STREAM_TOOLS    = "anthropic_stream_tools"
 private STREAM_RESUMED  = "anthropic_stream_resumed"
 
-private def endpoint : Elelem::Server
-  Elelem::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
+private def endpoint : Liaison::Server
+  Liaison::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
 end
 
-private def messages : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(endpoint, Elelem::ProtocolKind::Anthropic))
+private def messages : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(endpoint, Liaison::ProtocolKind::Anthropic))
 end
 
 # Thinking must be asked for, and `max_output_tokens` must exceed the budget it
 # implies or the request is rejected before a frame is sent.
-private def thinking : Elelem::Options
-  Elelem::Options.new(reasoning: Elelem::Reasoning::Effort::Low, max_output_tokens: 1536)
+private def thinking : Liaison::Options
+  Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Low, max_output_tokens: 1536)
 end
 
 private def asked : M::Session
@@ -52,14 +52,14 @@ private def asked : M::Session
   session
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool],
-    reasoning: Elelem::Reasoning::Effort::Low, max_output_tokens: 1536)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool],
+    reasoning: Liaison::Reasoning::Effort::Low, max_output_tokens: 1536)
 end
 
 private def tool_question : M::Session
@@ -69,7 +69,7 @@ private def tool_question : M::Session
 end
 
 private def signatures(reply) : Array(String)
-  key = Elelem::Protocol::Anthropic::METADATA_KEY
+  key = Liaison::Protocol::Anthropic::METADATA_KEY
   reply.content.select(M::ReasoningBlock)
     .compact_map { |block| block.meta?(key, "signature").try(&.as(String)) }
 end
@@ -130,7 +130,7 @@ describe "Anthropic streaming" do
       Wiretap.intercept(STREAM_THINKING) do
         reply, _ = messages.send(asked, MODEL, options: thinking) { |_, _| }
 
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
         usage = reply.meta?(key, "usage").should_not be_nil
         usage.as(M::Object).has_key?("input_tokens").should be_true
         usage.as(M::Object).has_key?("output_tokens").should be_true
@@ -189,7 +189,7 @@ describe "Anthropic streaming" do
       Wiretap.intercept(STREAM_TOOLS) do
         reply, _ = messages.send(tool_question, MODEL, options: armed) { |_, _| }
 
-        key = Elelem::Protocol::Anthropic::METADATA_KEY
+        key = Liaison::Protocol::Anthropic::METADATA_KEY
         reply.meta?(key, "stop_reason").should eq "tool_use"
       end
     end

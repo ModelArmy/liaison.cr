@@ -39,7 +39,7 @@ private def parts(subject : P::Gemini::Assembler) : Array(P::Gemini::Wire::Part)
   candidate.content.parts
 end
 
-describe Elelem::Protocol::Gemini::Assembler do
+describe Liaison::Protocol::Gemini::Assembler do
   describe "merging text" do
     it "concatenates fragments into one part" do
       # The behaviour the Responses assembler explicitly refuses, and which is

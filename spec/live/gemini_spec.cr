@@ -11,7 +11,7 @@ require "../spec_helper"
 #
 # **Model.** `gemini-3.5-flash` for everything except one test. This started
 # as a two-model file — a 2.5-series control alongside it, to isolate what's
-# specific to Gemini 3 from what's a general elelem bug. Both
+# specific to Gemini 3 from what's a general liaison bug. Both
 # `gemini-2.5-flash-lite` and `gemini-2.5-flash` came back 404 with a message
 # pointing at successively newer replacements (`gemini-3.5-flash-lite`, then
 # `gemini-3.6-flash`) — the whole 2.5 generation looks retired for newer API
@@ -27,21 +27,21 @@ require "../spec_helper"
 private MODEL_35  = "gemini-3.5-flash"
 private MODEL_PRO = "gemini-3.1-pro-preview"
 
-private def gemini : Elelem::Server
-  Elelem::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
+private def gemini : Liaison::Server
+  Liaison::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
 end
 
-private def client(policy : Elelem::Capability::Policy = Elelem::Capability::Policy::Compensating) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(gemini, Elelem::ProtocolKind::Gemini), policy)
+private def client(policy : Liaison::Capability::Policy = Liaison::Capability::Policy::Compensating) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(gemini, Liaison::ProtocolKind::Gemini), policy)
 end
 
-private def weather_tool : Elelem::Tool
-  Elelem::Tool.new("get_weather", "Look up the current weather in a city",
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-private def armed : Elelem::Options
-  Elelem::Options.new(tools: [weather_tool], max_output_tokens: 512)
+private def armed : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
 end
 
 private def tool_question : M::Session
@@ -62,7 +62,7 @@ describe "Gemini" do
         session << M::Message.user("What is the tallest mountain on Earth?")
 
         reply, report = client.send(session, MODEL_35,
-          options: Elelem::Options.new(max_output_tokens: 256))
+          options: Liaison::Options.new(max_output_tokens: 256))
 
         reply.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
@@ -70,7 +70,7 @@ describe "Gemini" do
     end
   end
 
-  # The core risk this file exists to test. `elelem` writes no `id` on either
+  # The core risk this file exists to test. `liaison` writes no `id` on either
   # `functionCall` or `functionResponse` — the entire ordinal-pairing design
   # (`Mapper`'s own comment, `translation.cr`) assumes the field does not
   # exist, which was true for the 2.5 series this protocol was built against.
@@ -79,7 +79,7 @@ describe "Gemini" do
   # first run of this test 400'd exactly that way, which is what motivated the
   # signature-capture plumbing now in `export.cr` and `mapper.cr`. This run is
   # the one that proves the plumbing alone was sufficient — no `Resolver`-level
-  # check needed for elelem's own same-protocol round trip, only (potentially)
+  # check needed for liaison's own same-protocol round trip, only (potentially)
   # for a tool call handed to this protocol from elsewhere, which remains open
   # in `SCOPE.md`.
   describe "a tool call, paired without an identifier" do
@@ -105,7 +105,7 @@ describe "Gemini" do
   end
 
   # The other half of the signature story, and the half `SCOPE.md` carried as
-  # "not yet reproduced live". Above proves elelem's own same-protocol round
+  # "not yet reproduced live". Above proves liaison's own same-protocol round
   # trip replays a signature correctly. This proves what happens when there is
   # no signature to replay because the call was minted somewhere else — the
   # handoff this shard exists to perform, and the one shape the plumbing alone
@@ -138,7 +138,7 @@ describe "Gemini" do
 
         session << M::Message.user("Given that, what should I wear?")
 
-        reply, report = client(Elelem::Capability::Policy::Lenient)
+        reply, report = client(Liaison::Capability::Policy::Lenient)
           .send(session, MODEL_35, options: armed)
 
         # The check fired, and named the block kind it fired on.
@@ -165,7 +165,7 @@ describe "Gemini" do
         session << M::Message.user("What is 12 times 14?")
 
         reply, _ = client.send(session, MODEL_35,
-          options: Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new, max_output_tokens: 256))
+          options: Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new, max_output_tokens: 256))
 
         usage = reply.meta?("gemini", "usage").as?(M::Object)
         thoughts = usage.try(&.["thoughtsTokenCount"]?)
@@ -192,8 +192,8 @@ describe "Gemini" do
         session = M::Session.new("Answer in one short sentence.")
         session << M::Message.user("What is 12 times 14?")
 
-        reply, report = client(Elelem::Capability::Policy::Lenient).send(session, MODEL_PRO,
-          options: Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new, max_output_tokens: 512))
+        reply, report = client(Liaison::Capability::Policy::Lenient).send(session, MODEL_PRO,
+          options: Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new, max_output_tokens: 512))
 
         report.annotations.map(&.outcome).should contain(M::Outcome::Degraded)
 
@@ -233,7 +233,7 @@ describe "Gemini" do
         session << M::Message.user("And the deepest ocean trench?")
 
         reply, report = client.send(session, MODEL_35,
-          options: Elelem::Options.new(max_output_tokens: 256))
+          options: Liaison::Options.new(max_output_tokens: 256))
 
         reply.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)

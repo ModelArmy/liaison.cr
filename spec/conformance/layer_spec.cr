@@ -13,14 +13,14 @@ require "../fixtures/response_fixtures"
 # both produce a green live run. The divergence is only observable here, in
 # the mapper, which is why these are offline by necessity rather than by
 # convenience.
-private alias RF = Elelem::ResponseFixtures
+private alias RF = Liaison::ResponseFixtures
 
 private def signed_session : M::Session
   session = M::Session.new("You are terse.")
   session << M::Message.user("What is the tallest mountain?")
 
-  anthropic = Elelem::Protocol::Anthropic::Mapper.new
-  session << Elelem::Protocol::Anthropic::Exporter.new(anthropic.calls)
+  anthropic = Liaison::Protocol::Anthropic::Mapper.new
+  session << Liaison::Protocol::Anthropic::Exporter.new(anthropic.calls)
     .export_reply(RF::ANTHROPIC_THINKING)
   session << M::Message.user("And the deepest ocean?")
   session
@@ -44,8 +44,8 @@ describe "the live layer" do
     # inherits its authenticity. No flag; the default falls out of comparing
     # names.
     it "treats a vendor's own server as authentic" do
-      server = Elelem::Server.new("anthropic", "https://api.anthropic.com")
-      provider = Elelem::Provider.for(server, Elelem::ProtocolKind::Anthropic)
+      server = Liaison::Server.new("anthropic", "https://api.anthropic.com")
+      provider = Liaison::Provider.for(server, Liaison::ProtocolKind::Anthropic)
 
       provider.profile.metadata_key.should eq "anthropic"
     end
@@ -53,8 +53,8 @@ describe "the live layer" do
     # The case this exists for. Ollama serving an Anthropic-compatible endpoint
     # is not Anthropic: a signature minted by Claude means nothing to it.
     it "narrows a compatibility endpoint away from the protocol's vendor" do
-      server = Elelem::Server.new("ollama", "http://localhost:11434")
-      provider = Elelem::Provider.for(server, Elelem::ProtocolKind::Anthropic)
+      server = Liaison::Server.new("ollama", "http://localhost:11434")
+      provider = Liaison::Provider.for(server, Liaison::ProtocolKind::Anthropic)
 
       provider.profile.metadata_key.should eq "ollama"
       # Narrowing touches only the vendor axis. The protocol is unchanged.
@@ -76,9 +76,9 @@ describe "the live layer" do
     # that cannot travel, not the turn that contains it.
     it "drops a foreign reasoning block it cannot replay, keeping the rest of the turn" do
       session = signed_session
-      ollama = Elelem::Provider.for(
-        Elelem::Server.new("ollama", "http://localhost:11434"),
-        Elelem::ProtocolKind::Anthropic)
+      ollama = Liaison::Provider.for(
+        Liaison::Server.new("ollama", "http://localhost:11434"),
+        Liaison::ProtocolKind::Anthropic)
 
       exchange = ollama.adapter.prepare(session, "llama3.2",
         C::Policy::Lenient, C::ReasoningRetention::All, 1024)
@@ -94,9 +94,9 @@ describe "the live layer" do
 
     it "replays the signature to the vendor's own endpoint" do
       session = signed_session
-      anthropic = Elelem::Provider.for(
-        Elelem::Server.new("anthropic", "https://api.anthropic.com"),
-        Elelem::ProtocolKind::Anthropic)
+      anthropic = Liaison::Provider.for(
+        Liaison::Server.new("anthropic", "https://api.anthropic.com"),
+        Liaison::ProtocolKind::Anthropic)
 
       exchange = anthropic.adapter.prepare(session, "claude-sonnet-4-6",
         C::Policy::Lenient, C::ReasoningRetention::All, 1024)
@@ -109,9 +109,9 @@ describe "the live layer" do
     # Overriding is for gateways that pass opaque data through untouched. It is
     # a claim about someone else's infrastructure, hence deliberate.
     it "lets a gateway claim the upstream vendor explicitly" do
-      gateway = Elelem::Provider.for(
-        Elelem::Server.new("openrouter", "https://openrouter.ai"),
-        Elelem::ProtocolKind::Anthropic, vendor: "anthropic")
+      gateway = Liaison::Provider.for(
+        Liaison::Server.new("openrouter", "https://openrouter.ai"),
+        Liaison::ProtocolKind::Anthropic, vendor: "anthropic")
 
       gateway.profile.metadata_key.should eq "anthropic"
 
@@ -125,9 +125,9 @@ describe "the live layer" do
     # profile beyond what the protocol declares. A misconfigured provider can
     # only ever degrade — never fabricate a capability the wire lacks.
     it "cannot widen a protocol beyond what it declares" do
-      chat = Elelem::Provider.for(
-        Elelem::Server.new("ollama", "http://localhost:11434"),
-        Elelem::ProtocolKind::ChatCompletions, vendor: "anthropic")
+      chat = Liaison::Provider.for(
+        Liaison::Server.new("ollama", "http://localhost:11434"),
+        Liaison::ProtocolKind::ChatCompletions, vendor: "anthropic")
 
       # Claiming Anthropic's vendor over Chat Completions does not grant
       # Anthropic's capabilities.
@@ -139,29 +139,29 @@ describe "the live layer" do
 
   describe "paths" do
     it "posts to each protocol's endpoint" do
-      Elelem::ChatCompletionsAdapter.new.path("llama3.2").should eq "/v1/chat/completions"
-      Elelem::ResponsesAdapter.new.path("gpt-4.1").should eq "/v1/responses"
-      Elelem::AnthropicAdapter.new.path("claude-sonnet-4-6").should eq "/v1/messages"
+      Liaison::ChatCompletionsAdapter.new.path("llama3.2").should eq "/v1/chat/completions"
+      Liaison::ResponsesAdapter.new.path("gpt-4.1").should eq "/v1/responses"
+      Liaison::AnthropicAdapter.new.path("claude-sonnet-4-6").should eq "/v1/messages"
     end
 
     # Gemini is the only protocol that puts the model in the path rather than
     # the body, which is the whole reason `path` takes a model at all.
     it "puts the model in the path for Gemini" do
-      Elelem::GeminiAdapter.new.path("gemini-2.0-flash")
+      Liaison::GeminiAdapter.new.path("gemini-2.0-flash")
         .should eq "/v1beta/models/gemini-2.0-flash:generateContent"
     end
 
     it "escapes a model name that would otherwise break the path" do
-      Elelem::GeminiAdapter.new.path("models/weird name")
+      Liaison::GeminiAdapter.new.path("models/weird name")
         .should contain "weird%20name"
     end
   end
 
   describe "headers" do
     it "sends a bearer token on the OpenAI protocols" do
-      Elelem::ChatCompletionsAdapter.new.headers("sk-test")["authorization"]
+      Liaison::ChatCompletionsAdapter.new.headers("sk-test")["authorization"]
         .should eq "Bearer sk-test"
-      Elelem::ResponsesAdapter.new.headers("sk-test")["authorization"]
+      Liaison::ResponsesAdapter.new.headers("sk-test")["authorization"]
         .should eq "Bearer sk-test"
     end
 
@@ -169,45 +169,45 @@ describe "the live layer" do
     # and the version is pinned because a bump can change response shapes the
     # readers are written against.
     it "sends the api key and the pinned version on Anthropic" do
-      headers = Elelem::AnthropicAdapter.new.headers("sk-ant-test")
+      headers = Liaison::AnthropicAdapter.new.headers("sk-ant-test")
 
       headers["x-api-key"].should eq "sk-ant-test"
-      headers["anthropic-version"].should eq Elelem::Protocol::Anthropic::API_VERSION
+      headers["anthropic-version"].should eq Liaison::Protocol::Anthropic::API_VERSION
     end
 
     # Header rather than the `?key=` query parameter: a credential in a URL
     # ends up in logs and proxy traces.
     it "keeps the Gemini key out of the URL" do
-      Elelem::GeminiAdapter.new.headers("goog-test")["x-goog-api-key"]
+      Liaison::GeminiAdapter.new.headers("goog-test")["x-goog-api-key"]
         .should eq "goog-test"
     end
 
     # Ollama needs no credential, and a missing one must not become the string
     # "Bearer ".
     it "omits auth entirely when there is no credential" do
-      Elelem::ChatCompletionsAdapter.new.headers(nil)["authorization"]?.should be_nil
-      Elelem::AnthropicAdapter.new.headers(nil)["x-api-key"]?.should be_nil
-      Elelem::GeminiAdapter.new.headers(nil)["x-goog-api-key"]?.should be_nil
+      Liaison::ChatCompletionsAdapter.new.headers(nil)["authorization"]?.should be_nil
+      Liaison::AnthropicAdapter.new.headers(nil)["x-api-key"]?.should be_nil
+      Liaison::GeminiAdapter.new.headers(nil)["x-goog-api-key"]?.should be_nil
     end
 
     it "always declares JSON" do
-      [Elelem::ChatCompletionsAdapter.new, Elelem::ResponsesAdapter.new,
-       Elelem::AnthropicAdapter.new, Elelem::GeminiAdapter.new].each do |adapter|
+      [Liaison::ChatCompletionsAdapter.new, Liaison::ResponsesAdapter.new,
+       Liaison::AnthropicAdapter.new, Liaison::GeminiAdapter.new].each do |adapter|
         adapter.headers(nil)["content-type"].should eq "application/json"
       end
     end
   end
 
   describe "error classification" do
-    server = Elelem::Server.new("ollama", "http://localhost:11434")
+    server = Liaison::Server.new("ollama", "http://localhost:11434")
 
     it "distinguishes the failures a caller would act on differently" do
-      server.error_for(401).should be_a Elelem::AuthError
-      server.error_for(403).should be_a Elelem::AuthError
-      server.error_for(404).should be_a Elelem::ModelNotFoundError
-      server.error_for(429).should be_a Elelem::RateLimitedError
-      server.error_for(503).should be_a Elelem::OverloadedError
-      server.error_for(400).should be_a Elelem::TransportError
+      server.error_for(401).should be_a Liaison::AuthError
+      server.error_for(403).should be_a Liaison::AuthError
+      server.error_for(404).should be_a Liaison::ModelNotFoundError
+      server.error_for(429).should be_a Liaison::RateLimitedError
+      server.error_for(503).should be_a Liaison::OverloadedError
+      server.error_for(400).should be_a Liaison::TransportError
     end
 
     # Retry logic does not exist yet. When it does, this is the question it
@@ -228,18 +228,18 @@ describe "the live layer" do
     it "surfaces the provider's message from the error body" do
       body = %({"error": {"message": "model 'nope' not found", "type": "invalid_request"}})
 
-      Elelem::ChatCompletionsAdapter.new.error_detail(body)
+      Liaison::ChatCompletionsAdapter.new.error_detail(body)
         .should eq "model 'nope' not found"
-      Elelem::AnthropicAdapter.new.error_detail(body)
+      Liaison::AnthropicAdapter.new.error_detail(body)
         .should eq "model 'nope' not found"
-      Elelem::GeminiAdapter.new.error_detail(body)
+      Liaison::GeminiAdapter.new.error_detail(body)
         .should eq "model 'nope' not found"
     end
 
     # A compatibility layer returning a plausible status with an implausible
     # body must not turn into a parse crash on top of the original failure.
     it "gives up quietly on an error body it cannot read" do
-      adapter = Elelem::ChatCompletionsAdapter.new
+      adapter = Liaison::ChatCompletionsAdapter.new
 
       adapter.error_detail("<html>502 Bad Gateway</html>").should be_nil
       adapter.error_detail("").should be_nil
@@ -253,9 +253,9 @@ describe "the live layer" do
     # between the second and third — and so everything except the middle step
     # is testable with no network.
     it "reads a recorded reply through a prepared exchange" do
-      provider = Elelem::Provider.for(
-        Elelem::Server.new("ollama", "http://localhost:11434"),
-        Elelem::ProtocolKind::ChatCompletions)
+      provider = Liaison::Provider.for(
+        Liaison::Server.new("ollama", "http://localhost:11434"),
+        Liaison::ProtocolKind::ChatCompletions)
 
       session = M::Session.new("You are terse.")
       session << M::Message.user("What is the tallest mountain?")
@@ -279,9 +279,9 @@ describe "the live layer" do
     # mapper's own table, so a call minted on the way out is recognised on the
     # way back with nothing for a caller to remember.
     it "pairs the exporter with the mapper that built the request" do
-      provider = Elelem::Provider.for(
-        Elelem::Server.new("ollama", "http://localhost:11434"),
-        Elelem::ProtocolKind::ChatCompletions)
+      provider = Liaison::Provider.for(
+        Liaison::Server.new("ollama", "http://localhost:11434"),
+        Liaison::ProtocolKind::ChatCompletions)
 
       session = M::Session.new("You are terse.")
       session << M::Message.user("Weather in Paris and Bogota?")
@@ -298,16 +298,16 @@ describe "the live layer" do
 
   describe "provider defaults" do
     it "carries a per-provider max_tokens" do
-      provider = Elelem::Provider.for(
-        Elelem::Server.new("anthropic", "https://api.anthropic.com"),
-        Elelem::ProtocolKind::Anthropic, default_max_tokens: 2048)
+      provider = Liaison::Provider.for(
+        Liaison::Server.new("anthropic", "https://api.anthropic.com"),
+        Liaison::ProtocolKind::Anthropic, default_max_tokens: 2048)
 
       provider.default_max_tokens.should eq 2048
     end
 
     # A deployment fact most of the time, a request fact occasionally.
     it "lets a call override the provider default" do
-      adapter = Elelem::AnthropicAdapter.new("anthropic")
+      adapter = Liaison::AnthropicAdapter.new("anthropic")
       session = M::Session.new
       session << M::Message.user("Hello")
 

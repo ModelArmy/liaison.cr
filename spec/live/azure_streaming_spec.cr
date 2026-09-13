@@ -28,16 +28,16 @@ private API_VERSION = "2025-04-01-preview"
 private STREAM_CHAT      = "azure_chat_completions_stream"
 private STREAM_RESPONSES = "azure_responses_stream"
 
-private def azure : Elelem::Server
-  Elelem::Server.new("azure", ENDPOINT, ENV["AZURE_OPENAI_API_KEY"]?)
+private def azure : Liaison::Server
+  Liaison::Server.new("azure", ENDPOINT, ENV["AZURE_OPENAI_API_KEY"]?)
 end
 
-private def client(protocol : Elelem::ProtocolKind) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for_azure(azure, protocol, API_VERSION,
-    max_tokens_field: protocol.chat_completions? ? Elelem::Protocol::ChatCompletions::Wire::MaxTokensField::MaxCompletionTokens : nil))
+private def client(protocol : Liaison::ProtocolKind) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for_azure(azure, protocol, API_VERSION,
+    max_tokens_field: protocol.chat_completions? ? Liaison::Protocol::ChatCompletions::Wire::MaxTokensField::MaxCompletionTokens : nil))
 end
 
-private CAP = Elelem::Options.new(max_output_tokens: 256)
+private CAP = Liaison::Options.new(max_output_tokens: 256)
 
 private def asked : M::Session
   session = M::Session.new("You are terse.")
@@ -52,7 +52,7 @@ describe "Azure OpenAI streaming" do
       # the symptom would be a raise or a truncated reply rather than anything
       # subtle — so an ordinary reply arriving is the assertion.
       Wiretap.intercept(STREAM_CHAT) do
-        reply, report = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
         reply.content.select(M::TextBlock).should_not be_empty
@@ -66,10 +66,10 @@ describe "Azure OpenAI streaming" do
       # A token count that is present and plausible is the evidence they were
       # told apart; a filter chunk read as usage would yield nil or nonsense.
       Wiretap.intercept(STREAM_CHAT) do
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
-        key = Elelem::Protocol::ChatCompletions::METADATA_KEY
+        key = Liaison::Protocol::ChatCompletions::METADATA_KEY
         usage = reply.meta?(key, "usage").should_not be_nil
         usage.as(M::Object).has_key?("total_tokens").should be_true
       end
@@ -77,10 +77,10 @@ describe "Azure OpenAI streaming" do
 
     it "terminates properly" do
       Wiretap.intercept(STREAM_CHAT) do
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
-        key = Elelem::Protocol::ChatCompletions::METADATA_KEY
+        key = Liaison::Protocol::ChatCompletions::METADATA_KEY
         reply.meta?(key, "finish_reason").should_not be_nil
       end
     end
@@ -88,7 +88,7 @@ describe "Azure OpenAI streaming" do
     it "folds many fragments into one text block" do
       Wiretap.intercept(STREAM_CHAT) do
         seen = [] of S::Event
-        reply, _ = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |event, _| seen << event }
 
         deltas = seen.select(S::TextDelta)
@@ -105,7 +105,7 @@ describe "Azure OpenAI streaming" do
       # path — there is no `stream_path` override here — so a wrong URL would
       # surface as a transport error.
       Wiretap.intercept(STREAM_RESPONSES) do
-        reply, report = client(Elelem::ProtocolKind::Responses)
+        reply, report = client(Liaison::ProtocolKind::Responses)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
         reply.content.select(M::TextBlock).should_not be_empty
@@ -121,7 +121,7 @@ describe "Azure OpenAI streaming" do
       # difference in this line rather than in prose.
       Wiretap.intercept(STREAM_RESPONSES) do
         seen = [] of S::Event
-        reply, _ = client(Elelem::ProtocolKind::Responses)
+        reply, _ = client(Liaison::ProtocolKind::Responses)
           .send(asked, DEPLOYMENT, options: CAP) { |event, _| seen << event }
 
         seen.select(S::TextDelta).should_not be_empty

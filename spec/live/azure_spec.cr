@@ -36,16 +36,16 @@ private ENDPOINT    = "https://oxaro-alpha.openai.azure.com"
 private DEPLOYMENT  = "gpt5.4mini"
 private API_VERSION = "2025-04-01-preview"
 
-private def azure : Elelem::Server
-  Elelem::Server.new("azure", ENDPOINT, ENV["AZURE_OPENAI_API_KEY"]?)
+private def azure : Liaison::Server
+  Liaison::Server.new("azure", ENDPOINT, ENV["AZURE_OPENAI_API_KEY"]?)
 end
 
-private def client(protocol : Elelem::ProtocolKind) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for_azure(azure, protocol, API_VERSION,
-    max_tokens_field: protocol.chat_completions? ? Elelem::Protocol::ChatCompletions::Wire::MaxTokensField::MaxCompletionTokens : nil))
+private def client(protocol : Liaison::ProtocolKind) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for_azure(azure, protocol, API_VERSION,
+    max_tokens_field: protocol.chat_completions? ? Liaison::Protocol::ChatCompletions::Wire::MaxTokensField::MaxCompletionTokens : nil))
 end
 
-private CAP = Elelem::Options.new(max_output_tokens: 64)
+private CAP = Liaison::Options.new(max_output_tokens: 64)
 
 describe "Azure OpenAI" do
   describe "Chat Completions" do
@@ -54,7 +54,7 @@ describe "Azure OpenAI" do
         session = M::Session.new("You are terse.")
         session << M::Message.user("Say hello in one short sentence.")
 
-        reply, report = client(Elelem::ProtocolKind::ChatCompletions)
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions)
           .send(session, DEPLOYMENT, options: CAP)
 
         reply.content.should_not be_empty
@@ -76,7 +76,7 @@ describe "Azure OpenAI" do
         session = M::Session.new("You are terse.")
         session << M::Message.user("Say hello in one short sentence.")
 
-        reply, report = client(Elelem::ProtocolKind::Responses)
+        reply, report = client(Liaison::ProtocolKind::Responses)
           .send(session, DEPLOYMENT, options: CAP)
 
         reply.content.should_not be_empty

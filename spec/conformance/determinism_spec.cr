@@ -25,21 +25,21 @@ require "../spec_helper"
 # direct tension with caching: it rewrites the prefix the moment a turn closes,
 # invalidating both this cache and the provider's.
 private def map_chat(session : M::Session)
-  Elelem::Protocol::ChatCompletions::Mapper.new.map(session, "test-model", C::Policy::Lenient)[0].to_json
+  Liaison::Protocol::ChatCompletions::Mapper.new.map(session, "test-model", C::Policy::Lenient)[0].to_json
 end
 
 private def map_responses(session : M::Session)
-  Elelem::Protocol::Responses::Mapper.new.map(session, "test-model", C::Policy::Lenient)[0].to_json
+  Liaison::Protocol::Responses::Mapper.new.map(session, "test-model", C::Policy::Lenient)[0].to_json
 end
 
 # Fixtures that map without refusing under a lenient policy.
-DETERMINISTIC_FIXTURES = Elelem::Fixtures.all.keys - %w[reference_payload]
+DETERMINISTIC_FIXTURES = Liaison::Fixtures.all.keys - %w[reference_payload]
 
 describe "mapping determinism" do
   describe "Chat Completions" do
     DETERMINISTIC_FIXTURES.each do |name|
       it "maps #{name} to identical bytes twice" do
-        session = Elelem::Fixtures.all[name]
+        session = Liaison::Fixtures.all[name]
         map_chat(session).should eq(map_chat(session))
       end
     end
@@ -48,7 +48,7 @@ describe "mapping determinism" do
   describe "Responses" do
     DETERMINISTIC_FIXTURES.each do |name|
       it "maps #{name} to identical bytes twice" do
-        session = Elelem::Fixtures.all[name]
+        session = Liaison::Fixtures.all[name]
         map_responses(session).should eq(map_responses(session))
       end
     end
@@ -58,7 +58,7 @@ describe "mapping determinism" do
   # Without this, every turn invalidates the provider's prompt cache.
   describe "prefix stability" do
     it "leaves the mapped prefix untouched when a turn is appended" do
-      base = Elelem::Fixtures.multi_turn_alternating
+      base = Liaison::Fixtures.multi_turn_alternating
       extended = base.fork
       extended << M::Message.user("And Portugal?")
 
@@ -71,7 +71,7 @@ describe "mapping determinism" do
     end
 
     it "holds for the Responses API too" do
-      base = Elelem::Fixtures.multi_turn_alternating
+      base = Liaison::Fixtures.multi_turn_alternating
       extended = base.fork
       extended << M::Message.user("And Portugal?")
 

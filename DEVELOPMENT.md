@@ -1,4 +1,4 @@
-# Development of Elelem
+# Development of Liaison
 
 For contributors, human and AI. It covers **how the shard is built and how to
 extend it** — the layering, the conventions, the invariants a change must not
@@ -126,7 +126,7 @@ flowchart TB
 ```
 
 ```
-src/elelem/
+src/liaison/
   mpsh/         canonical types — knows nothing of HTTP or any provider
   capability/   outcomes, profiles, policy — depends on mpsh, never the reverse
   protocol/     one directory per protocol:

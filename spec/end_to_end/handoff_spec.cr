@@ -24,13 +24,13 @@ private SAVED_CHAT_TO_ANTHROPIC = "e2e_saved_chat_to_anthropic"
 private SAVED_THREE_PROTOCOLS   = "e2e_saved_three_protocols"
 private SAVED_WITH_REASONING    = "e2e_saved_with_reasoning"
 
-private def ollama : Elelem::Server
-  Elelem::Server.new("ollama", "http://localhost:11434")
+private def ollama : Liaison::Server
+  Liaison::Server.new("ollama", "http://localhost:11434")
 end
 
-private def client(protocol : Elelem::ProtocolKind,
-                   policy : Elelem::Capability::Policy = Elelem::Capability::Policy::Compensating) : Elelem::Client
-  Elelem::Client.new(Elelem::Provider.for(ollama, protocol), policy)
+private def client(protocol : Liaison::ProtocolKind,
+                   policy : Liaison::Capability::Policy = Liaison::Capability::Policy::Compensating) : Liaison::Client
+  Liaison::Client.new(Liaison::Provider.for(ollama, protocol), policy)
 end
 
 # Reasoning off, on every leg that hands off.
@@ -42,8 +42,8 @@ end
 # file, and a handoff spec that tripped over it would be testing two things and
 # failing for the wrong one. The lossy case gets its own example at the end,
 # where it is the subject rather than the weather.
-private def plain : Elelem::Options
-  Elelem::Options.new(reasoning: Elelem::Reasoning::Off.new)
+private def plain : Liaison::Options
+  Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new)
 end
 
 private def opened : M::Session
@@ -57,7 +57,7 @@ describe "a session that survives a file" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(SAVED_CHAT_TO_ANTHROPIC) do
         session = opened
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
         session << first
 
         # The hop. Everything after this reads from disk, and the in-memory
@@ -67,7 +67,7 @@ describe "a session that survives a file" do
         resumed.system_prompt.should eq "Answer in one short sentence."
 
         resumed << M::Message.user("And the second tallest?")
-        second, report = client(Elelem::ProtocolKind::Anthropic).send(resumed, MODEL, options: plain)
+        second, report = client(Liaison::ProtocolKind::Anthropic).send(resumed, MODEL, options: plain)
 
         second.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
@@ -84,7 +84,7 @@ describe "a session that survives a file" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(SAVED_CHAT_TO_ANTHROPIC) do
         session = opened
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
         session << first
 
         reloaded = SavedSession.round_trip(session, path).messages.last
@@ -106,9 +106,9 @@ describe "a session that survives a file" do
       Wiretap.intercept(SAVED_THREE_PROTOCOLS) do
         session = opened
 
-        [Elelem::ProtocolKind::ChatCompletions,
-         Elelem::ProtocolKind::Responses,
-         Elelem::ProtocolKind::Anthropic].each_with_index do |protocol, index|
+        [Liaison::ProtocolKind::ChatCompletions,
+         Liaison::ProtocolKind::Responses,
+         Liaison::ProtocolKind::Anthropic].each_with_index do |protocol, index|
           session << M::Message.user("Name another one.") if index > 0
 
           reply, report = client(protocol).send(session, MODEL, options: plain)
@@ -133,7 +133,7 @@ describe "a session that survives a file" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(SAVED_CHAT_TO_ANTHROPIC) do
         session = opened
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL, options: plain)
         session << first
 
         reloaded = SavedSession.round_trip(session, path)
@@ -143,8 +143,8 @@ describe "a session that survives a file" do
         naive << M::Message.new(M::Role::Assistant,
           [M::TextBlock.new(reloaded.messages.last.text).as(M::Block)])
 
-        theirs, _ = Elelem::Protocol::Anthropic::Mapper.new.map(reloaded, MODEL)
-        ours, _ = Elelem::Protocol::Anthropic::Mapper.new.map(naive, MODEL)
+        theirs, _ = Liaison::Protocol::Anthropic::Mapper.new.map(reloaded, MODEL)
+        ours, _ = Liaison::Protocol::Anthropic::Mapper.new.map(naive, MODEL)
 
         theirs.to_json.should eq ours.to_json
       end
@@ -163,7 +163,7 @@ describe "a session that survives a file" do
     SavedSession.in_a_file do |path|
       Wiretap.intercept(SAVED_WITH_REASONING) do
         session = opened
-        first, _ = client(Elelem::ProtocolKind::ChatCompletions).send(session, MODEL)
+        first, _ = client(Liaison::ProtocolKind::ChatCompletions).send(session, MODEL)
         first.content.select(M::ReasoningBlock).should_not be_empty
         session << first
 
@@ -171,12 +171,12 @@ describe "a session that survives a file" do
         resumed.messages.last.content.select(M::ReasoningBlock).should_not be_empty
         resumed << M::Message.user("And the second tallest?")
 
-        strict = client(Elelem::ProtocolKind::Anthropic)
-        expect_raises(Elelem::Capability::RefusedError) do
+        strict = client(Liaison::ProtocolKind::Anthropic)
+        expect_raises(Liaison::Capability::RefusedError) do
           strict.send(resumed, MODEL)
         end
 
-        lenient = client(Elelem::ProtocolKind::Anthropic, Elelem::Capability::Policy::Lenient)
+        lenient = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
         _, report = lenient.send(resumed, MODEL)
         report.annotations.map(&.outcome).should contain M::Outcome::Degraded
       end

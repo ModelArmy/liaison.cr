@@ -1,11 +1,11 @@
 # CLI Design
 
-**Status**: `src/elelem_cli/` and `src/elelem_cli.cr` now exist — `start`,
+**Status**: `src/liaison_cli/` and `src/liaison_cli.cr` now exist — `start`,
 `continue`, `list` and `show` are built. What follows is still the record of
 *why*, kept current rather than archived, so a decision made once in
 conversation doesn't get silently re-made differently later.
 
-**Scope**: The `elelem` executable — config resolution, deployment naming,
+**Scope**: The `liaison` executable — config resolution, deployment naming,
 session storage, and the verb grammar. Does not cover the `Archive` format
 itself (`session.cr`'s own comment, `DEVELOPMENT.md` rule 2) or the session
 tree/branching work `MPSH_SPECIFICATION.md` explicitly defers.
@@ -17,24 +17,24 @@ tree/branching work `MPSH_SPECIFICATION.md` explicitly defers.
 A non-interactive, single-shot CLI: one invocation, one call to a provider,
 one saved result. Not a REPL, not an agent framework, not a place for the
 deferred session-tree/scatter-gather work to land — if that ever wants a
-sentence-like grammar, it's a different, later tool built *on* `elelem`, not
+sentence-like grammar, it's a different, later tool built *on* `liaison`, not
 a reason to complicate this one now.
 
 ## Ships inside this shard, not a separate project
 
-`elelem` is both a library and a first-party CLI. `shard.yml` gains an
+`liaison` is both a library and a first-party CLI. `shard.yml` gains an
 `executables:` entry; no new `dependencies:` entry, because both pieces the
 CLI needs — YAML parsing, argument parsing — are already in Crystal's
 stdlib. The zero-runtime-dependency posture stays true of what
-`require "elelem"` pulls in.
+`require "liaison"` pulls in.
 
 ```
-src/elelem/             # the library — unchanged by any of this
+src/liaison/             # the library — unchanged by any of this
   mpsh/archive.cr          # a library concern: Session ↔ JSON,
                            # independent of the CLI existing at all
-src/elelem.cr
+src/liaison.cr
 
-src/elelem_cli/         # CLI-only: config, session-folder naming, commands
+src/liaison_cli/         # CLI-only: config, session-folder naming, commands
   config.cr
   sessions.cr
   query.cr
@@ -42,18 +42,18 @@ src/elelem_cli/         # CLI-only: config, session-folder naming, commands
   commands/
     start.cr
     continue.cr
-src/elelem_cli.cr        # thin entrypoint: verb dispatch, error handling, done
+src/liaison_cli.cr        # thin entrypoint: verb dispatch, error handling, done
 
 examples/                # small, standalone, one file each, no CLI machinery
 ```
 
-Reasoning: someone who `require`s `elelem` to build their own thing should
+Reasoning: someone who `require`s `liaison` to build their own thing should
 never transitively get config-file parsing or session-folder conventions
-they didn't ask for. `elelem_cli/` as a sibling directory to `elelem/` —
+they didn't ask for. `liaison_cli/` as a sibling directory to `liaison/` —
 rather than nested inside it — makes that boundary a fact about the
-filesystem, not just a convention within a shared tree: `require "elelem"`
-touches zero files under `elelem_cli/`, provably, not just by agreement.
-Everything under `elelem_cli/` still lives in the `Elelem::Cli` namespace,
+filesystem, not just a convention within a shared tree: `require "liaison"`
+touches zero files under `liaison_cli/`, provably, not just by agreement.
+Everything under `liaison_cli/` still lives in the `Liaison::Cli` namespace,
 though — this isn't a second product, it's the same one wearing a different
 front door, and the module name says so even though the directory doesn't
 have to.
@@ -61,13 +61,13 @@ have to.
 ## Verbs: `start`, `continue`
 
 ```
-elelem start anthropic "What color is the sky on Mars?"    → SESSID
-elelem continue SESSID "Why is that?"
-elelem continue SESSID "Why is that?" --on azure-mini
+liaison start anthropic "What color is the sky on Mars?"    → SESSID
+liaison continue SESSID "Why is that?"
+liaison continue SESSID "Why is that?" --on azure-mini
 ```
 
 Considered and rejected: `ask` (with `--continue` as a flag), and a
-SQL-like "everything after `elelem` is one query" grammar.
+SQL-like "everything after `liaison` is one query" grammar.
 
 - **`start`/`continue` over `ask`/`--continue`.** Continuing is a first-class
   operation on a conversation, not a modifier on asking — it deserves its own
@@ -77,7 +77,7 @@ SQL-like "everything after `elelem` is one query" grammar.
   tool uses anywhere else.
 - **Verb-first over a sentence grammar.** SQL's "read the whole thing as one
   query" earns its complexity because SQL queries are genuinely
-  compositional — joins, subqueries, an open-ended space. `elelem`'s
+  compositional — joins, subqueries, an open-ended space. `liaison`'s
   operations are a small, fixed, enumerable set. A sentence grammar needs a
   real parser and fights shell tab-completion and scripting for no benefit
   this tool actually has. `git`, `docker`, `kubectl` all converged on
@@ -86,14 +86,14 @@ SQL-like "everything after `elelem` is one query" grammar.
   continue *on* is genuinely optional and orthogonal — continuing itself is
   not.
 
-Both verbs are thin wrappers over one shared operation — `Elelem::Cli::Query.run`,
-in `elelem_cli/query.cr` — which resolves a `Provider`, appends the prompt,
+Both verbs are thin wrappers over one shared operation — `Liaison::Cli::Query.run`,
+in `liaison_cli/query.cr` — which resolves a `Provider`, appends the prompt,
 calls `Client#send`, hands back the reply and report.
 
-## Config: `elelem.yaml`
+## Config: `liaison.yaml`
 
-Search order: `$ELELEM_CONFIG` if set — the literal path, no search — else
-`$CWD/elelem.yaml`, then `$HOME/elelem.yaml`. Explicit beats implicit: an
+Search order: `$LIAISON_CONFIG` if set — the literal path, no search — else
+`$CWD/liaison.yaml`, then `$HOME/liaison.yaml`. Explicit beats implicit: an
 env var naming the file directly always wins over guessing from what
 happens to exist.
 
@@ -165,7 +165,7 @@ a section like this turns into a junk drawer, and a key spelled differently
 from its flag is a translation table someone has to keep in step with `--help`.
 
 Both default to false, which is what the CLI did before the block existed. An
-`elelem.yaml` written before this keeps meaning exactly what it meant.
+`liaison.yaml` written before this keeps meaning exactly what it meant.
 
 Precedence — flag, then this block, then a terminal test — is in *Streaming*
 below, along with the one asymmetry in it worth arguing about.
@@ -207,7 +207,7 @@ deliberately do not go in it. The line is between **hard protocol facts** and
 Wrong ⇒     |400, request fails |Answers are merely worse          
 Authority   |The vendor's API   |A model card, read by the operator
 Disagreement|Not reasonable     |Perfectly reasonable              
-Lives in    |Code               |`elelem.yaml`                     
+Lives in    |Code               |`liaison.yaml`                     
 
 Facts that break requests are ours to get right. Preferences someone read off
 a model card are theirs to state — and stating them in config means adding a
@@ -256,10 +256,10 @@ remove.
 
 ### Naming a session: `--id`
 
-`elelem start <deployment> <prompt...> [--id <session-id>]`. Absent, a name is
+`liaison start <deployment> <prompt...> [--id <session-id>]`. Absent, a name is
 generated as before.
 
-For anyone driving `elelem` from a script, who would rather the session be
+For anyone driving `liaison` from a script, who would rather the session be
 called `nightly-summary` than have to capture whatever two words came out. It
 is also the honest answer to running out of generated names: 31 adjectives by
 30 nouns is 930, comfortable to around 500 stored sessions and deteriorating
@@ -283,7 +283,7 @@ Letters, digits, dot, dash and underscore, starting with a letter or digit, 64
 characters at most, and no `..`.
 
 `continue SESSID` and `show SESSID` have always taken an id straight from
-argv, and `path_for` joined it unchecked — so `elelem show ../../somewhere`
+argv, and `path_for` joined it unchecked — so `liaison show ../../somewhere`
 walked out of the sessions folder. `--id` makes that a write path too, which
 is what prompted the fix, but the hole predates it.
 
@@ -299,10 +299,10 @@ predicate, having first shipped without it and fallen over a `.DS_Store`.
 
 ## Session storage
 
-`$ELELEM_HOME` if set, else `$CWD/.elelem` if it exists, else `$HOME/.elelem`.
+`$LIAISON_HOME` if set, else `$CWD/.liaison` if it exists, else `$HOME/.liaison`.
 Promoted to first once `Config` needed the same escape hatch for
-`$ELELEM_CONFIG` — an explicit path someone actually pulled up should not
-lose to whatever `.elelem` a real invocation happened to leave sitting in
+`$LIAISON_CONFIG` — an explicit path someone actually pulled up should not
+lose to whatever `.liaison` a real invocation happened to leave sitting in
 `$CWD` or `$HOME`, and that's exactly what only checking `$CWD` first could
 not offer. A `sessions/` subfolder, one folder per session.
 
@@ -324,7 +324,7 @@ Filenames carry the deployment name, not just a timestamp —
 `<unix_ms>-<deployment>.json`. This is what makes `continue SESSID "..."`
 work with no flag at all: it reuses whichever deployment last answered
 *this* session, read straight off the last snapshot's filename. There is no
-`default_deployment` in `elelem.yaml` for this to fall back to, on purpose —
+`default_deployment` in `liaison.yaml` for this to fall back to, on purpose —
 an earlier version of this design had one, and it was wrong in a way that
 only showed up with two configured deployments in play: it answered "what do
 I usually want," a fact about the config, when what `continue` actually
@@ -374,12 +374,12 @@ design exists to avoid.
 ## Verbs: `list`, `show`, `prune`, `delete`
 
 ```
-elelem list                                → one line per session
-elelem show SESSID                         → the transcript
-elelem show SESSID --snapshots             → the append-only turn history
-elelem show SESSID --json                  → the stored archive, verbatim
-elelem prune SESSID --keep N               → trim to the newest N snapshots
-elelem delete SESSID                       → remove the session outright
+liaison list                                → one line per session
+liaison show SESSID                         → the transcript
+liaison show SESSID --snapshots             → the append-only turn history
+liaison show SESSID --json                  → the stored archive, verbatim
+liaison prune SESSID --keep N               → trim to the newest N snapshots
+liaison delete SESSID                       → remove the session outright
 ```
 
 Four verbs that touch no network, which makes them the only commands here
@@ -483,7 +483,7 @@ run in a terminal is one — so silencing `Output` alone would have left the
 spinner ticking over the transcripts. `start`/`continue` therefore hand
 `Progress` the `Output.error_stream` rather than `STDERR` directly.
 
-The one thing still writing to the real streams is `src/elelem_cli.cr`, the
+The one thing still writing to the real streams is `src/liaison_cli.cr`, the
 executable's own usage and error reporting. That is the process boundary, no
 spec invokes it, and routing it through `Output` would buy nothing.
 
@@ -499,7 +499,7 @@ spinner alone says the process is alive, `23s` says whether the model is slow
 or the endpoint is hanging, which is the question actually being asked.
 
 **On stderr, and only when stderr is a terminal.** The stdout rule above
-exists so `elelem start ollama "..." > answer.txt` works, and a spinner on
+exists so `liaison start ollama "..." > answer.txt` works, and a spinner on
 stdout would corrupt that file. Redirected stderr is a log or a CI transcript,
 where a few hundred carriage returns are worse than no indicator, so
 `STDERR.tty?` gates the whole thing to a no-op.
@@ -510,7 +510,7 @@ The natural design is for the library to emit progress events and the CLI to
 render them — correct *when there are events*, which is to say once streaming
 lands. Today there is one thing to report and its source is a clock, not the
 server. A queue would build half of streaming's architecture against a library
-with no seam to feed it, delivering none of streaming's benefit. `Elelem::Client`
+with no seam to feed it, delivering none of streaming's benefit. `Liaison::Client`
 is untouched by this and stays headless.
 
 ### What streaming will want from it
@@ -539,7 +539,7 @@ returns. Recorded so it is not rediscovered as a bug.
 ## Deliberately deferred, not forgotten
 
 - **Tool execution.** `Client#send`'s turn loop, including tool dispatch, is
-  caller-owned by design (`client.cr`'s own doc comment). Whether `elelem
+  caller-owned by design (`client.cr`'s own doc comment). Whether `liaison
   start`/`continue` take tool declarations at all in v1, or ship text-only
   first, is still open — leaning text-only first.
 
@@ -555,7 +555,7 @@ returns. Recorded so it is not rediscovered as a bug.
 
   What the terminal prints while a call is in flight is settled ahead of this,
   in *Printed bytes precede repair* above. The library half is now built —
-  `Elelem::Function` and `Elelem::Toolbox`, see
+  `Liaison::Function` and `Liaison::Toolbox`, see
   [TOOL_EXECUTION.md](./TOOL_EXECUTION.md) — so what remains is genuinely a CLI
   question: whether the executable declares anything, and what it would run.
   `Toolbox#dispatch` already reads the repaired reply, so the ordering rule
@@ -581,7 +581,7 @@ meant.
 `STDERR.tty?` because it *writes* to stderr; deltas write to stdout, so the
 analogous rule is the same question asked of the other stream. Copying the
 expression rather than the rule would stream into a file under
-`elelem start ollama "…" > answer.txt 2>&1`, where stderr is a terminal and
+`liaison start ollama "…" > answer.txt 2>&1`, where stderr is a terminal and
 stdout is not.
 
 **`--stream` and `--no-stream` override both, and win.** Not decoration: it is
@@ -605,7 +605,7 @@ config:
   layout: elk
 ---
 flowchart TD
-    A["elelem start / continue"] --> B{{"--stream or --no-stream?"}}
+    A["liaison start / continue"] --> B{{"--stream or --no-stream?"}}
     B -- "--stream" --> S["Stream"]
     B -- "--no-stream" --> O["One body"]
     B -- neither --> C{{"defaults.streaming"}}
@@ -649,7 +649,7 @@ not find it.** Repair removes tool calls and keeps text; `Output.reply` prints
 `Message#text`, which is text blocks only. So the one thing repair takes away
 is the one thing stdout has never shown, and a streamed run and its saved
 session agree exactly. That agreement is now asserted rather than described —
-`spec/elelem_cli/commands/streaming_spec.cr` compares streamed stdout to the
+`spec/liaison_cli/commands/streaming_spec.cr` compares streamed stdout to the
 saved reply's text for equality — which is what turns this section from an
 argument into a constraint.
 
@@ -673,7 +673,7 @@ stderr: printed lines|No      |Yes, if durable
 
 `Progress#stop` erases its line. A spinner is a light on a dashboard, not an
 entry in a logbook, and the scenario this rule warns about — *scroll back
-tomorrow and the screen disagrees with `elelem show`* — needs bytes that are
+tomorrow and the screen disagrees with `liaison show`* — needs bytes that are
 still there tomorrow. So the label version of that prediction cannot produce
 the failure the prediction describes.
 

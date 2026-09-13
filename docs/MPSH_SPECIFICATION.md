@@ -90,7 +90,7 @@ which tools happened to be on offer that afternoon, would have acquired a
 provider's assumptions and a moment's context. Portability is the thing this
 format refuses to give up, so those stay outside it.
 
-The practical consequence: `Elelem::Options` was built past the edge of this
+The practical consequence: `Liaison::Options` was built past the edge of this
 specification rather than against it, and correctly so. Reasoning controls in
 particular drove a new `Capability::Profile` field and the first model catalog
 without any of it entering a session. If a future concern is genuinely a

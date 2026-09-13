@@ -1,4 +1,4 @@
-require "../../src/elelem"
+require "../../src/liaison"
 
 # The conformance fixture set from `docs/MPSH_SPECIFICATION.md` §9.
 #
@@ -9,10 +9,10 @@ require "../../src/elelem"
 #
 # Everything here is structural: no API key, no model, no network, no HTTP
 # object constructed.
-module Elelem::Fixtures
+module Liaison::Fixtures
   extend self
 
-  alias M = Elelem::MPSH
+  alias M = Liaison::MPSH
 
   PNG  = "image/png"
   WEBP = "image/webp"

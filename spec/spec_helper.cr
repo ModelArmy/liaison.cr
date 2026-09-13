@@ -1,6 +1,6 @@
 require "spec"
 require "wiretap"
-require "../src/elelem"
+require "../src/liaison"
 require "./fixtures/mpsh_fixtures"
 
 # Live specs record once against a real server and replay from disk thereafter.
@@ -70,18 +70,18 @@ Spec.after_suite { Wiretap.verify! unless ENV["RECORD"]? }
 # Shorthands shared by every spec file. Declared once here rather than in each
 # file, since specs reopen the same namespace and a repeated `alias` is a
 # redefinition error.
-alias M = Elelem::MPSH
-alias C = Elelem::Capability
-alias S = Elelem::Streaming
-alias P = Elelem::Protocol
+alias M = Liaison::MPSH
+alias C = Liaison::Capability
+alias S = Liaison::Streaming
+alias P = Liaison::Protocol
 
 module SpecHelpers
   extend self
 
-  CHAT      = Elelem::Protocol::ChatCompletions::PROFILE
-  RESPONSES = Elelem::Protocol::Responses::PROFILE
-  CLAUDE    = Elelem::Protocol::Anthropic::PROFILE
-  GEMINI    = Elelem::Protocol::Gemini::PROFILE
+  CHAT      = Liaison::Protocol::ChatCompletions::PROFILE
+  RESPONSES = Liaison::Protocol::Responses::PROFILE
+  CLAUDE    = Liaison::Protocol::Anthropic::PROFILE
+  GEMINI    = Liaison::Protocol::Gemini::PROFILE
 
   ALL_PROFILES = [CHAT, RESPONSES, CLAUDE, GEMINI]
 

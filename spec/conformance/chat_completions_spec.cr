@@ -8,14 +8,14 @@ require "../support/conformance"
 # for them. A failure is one of three things, and naming which is mandatory:
 # mapping bug, wrong matrix, or a genuine gap in MPSH.
 private def round_trip(session : M::Session, policy = C::Policy::Lenient)
-  mapper = Elelem::Protocol::ChatCompletions::Mapper.new
+  mapper = Liaison::Protocol::ChatCompletions::Mapper.new
   request, report = mapper.map(session, "test-model", policy)
-  exporter = Elelem::Protocol::ChatCompletions::Exporter.new(mapper.calls)
+  exporter = Liaison::Protocol::ChatCompletions::Exporter.new(mapper.calls)
   {exporter.export(request), report, request}
 end
 
 private def divergences(name : String, policy = C::Policy::Lenient)
-  session = Elelem::Fixtures.all[name]
+  session = Liaison::Fixtures.all[name]
   exported, report, request = round_trip(session, policy)
   {Conformance.compare(session, exported), report, request}
 end
@@ -66,12 +66,12 @@ describe "Chat Completions round trip" do
 
       carrier = request.messages[3]
       carrier.synthetic?.should be_true
-      carrier.content.as(Array(Elelem::Protocol::ChatCompletions::Wire::Part))
+      carrier.content.as(Array(Liaison::Protocol::ChatCompletions::Wire::Part))
         .size.should eq(1)
     end
 
     it "leaves no synthetic message in the exported session" do
-      session = Elelem::Fixtures.tool_call_image_result
+      session = Liaison::Fixtures.tool_call_image_result
       exported, _, _ = round_trip(session)
 
       exported.messages.size.should eq(session.messages.size)

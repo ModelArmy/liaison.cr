@@ -120,7 +120,7 @@ under pressure would go worst.
 
 **This shard is a library that ships a CLI to prove itself, not a tool with a
 library attached.** The order follows: everything below lands, is specced and
-is stable before `elelem start` learns the word `stream`. A CLI built against
+is stable before `liaison start` learns the word `stream`. A CLI built against
 a seam still moving would have to be rebuilt, and — worse — would start
 answering design questions that belong to the library by whichever way the
 CLI happened to be written.

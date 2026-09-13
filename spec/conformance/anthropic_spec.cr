@@ -12,14 +12,14 @@ require "../support/conformance"
 # Unexecuted against a live model, deliberately: keys gate execution, not
 # mapping.
 private def rt(session : M::Session, policy = C::Policy::Lenient)
-  mapper = Elelem::Protocol::Anthropic::Mapper.new
+  mapper = Liaison::Protocol::Anthropic::Mapper.new
   request, report = mapper.map(session, "test-model", policy)
-  exporter = Elelem::Protocol::Anthropic::Exporter.new(mapper.calls)
+  exporter = Liaison::Protocol::Anthropic::Exporter.new(mapper.calls)
   {exporter.export(request), report, request}
 end
 
 private def diverges(name : String, policy = C::Policy::Lenient)
-  session = Elelem::Fixtures.all[name]
+  session = Liaison::Fixtures.all[name]
   exported, report, request = rt(session, policy)
   {Conformance.compare(session, exported), report, request}
 end
@@ -61,9 +61,9 @@ describe "Anthropic round trip" do
 
       request.messages.size.should eq(4)
       result = request.messages[2].content.first
-        .as(Elelem::Protocol::Anthropic::Wire::ToolResultBlock)
+        .as(Liaison::Protocol::Anthropic::Wire::ToolResultBlock)
       result.content.size.should eq(2)
-      result.content[1].should be_a(Elelem::Protocol::Anthropic::Wire::ImageBlock)
+      result.content[1].should be_a(Liaison::Protocol::Anthropic::Wire::ImageBlock)
       request.to_json.should_not contain("returned separately")
     end
 
@@ -91,7 +91,7 @@ describe "Anthropic round trip" do
     end
 
     it "discards its own placeholder on export" do
-      session = Elelem::Fixtures.assistant_first
+      session = Liaison::Fixtures.assistant_first
       exported, _, _ = rt(session)
       exported.messages.size.should eq(session.messages.size)
       exported.messages.first.role.should eq(M::Role::Assistant)
@@ -104,7 +104,7 @@ describe "Anthropic round trip" do
 
     it "always sends max_tokens" do
       _, _, request = diverges("single_user_turn")
-      request.max_tokens.should eq(Elelem::Protocol::Anthropic::DEFAULT_MAX_TOKENS)
+      request.max_tokens.should eq(Liaison::Protocol::Anthropic::DEFAULT_MAX_TOKENS)
       request.to_json.should contain(%("max_tokens":))
     end
 
@@ -162,7 +162,7 @@ describe "Anthropic round trip" do
   # degrades on every other protocol.
   describe "server-executed tools" do
     it "keeps the server_executed flag across a round trip" do
-      session = Elelem::Fixtures.server_executed_tool
+      session = Liaison::Fixtures.server_executed_tool
       exported, _, _ = rt(session)
 
       exported.messages[1].content.first.as(M::ToolCallBlock).server_executed?.should be_true
@@ -177,7 +177,7 @@ describe "Anthropic round trip" do
     end
 
     it "preserves the tool-specific result type, which is not derivable" do
-      session = Elelem::Fixtures.server_executed_tool
+      session = Liaison::Fixtures.server_executed_tool
       exported, _, _ = rt(session)
       exported.messages[2].content.first
         .meta?("anthropic", "result_type").should eq("web_search_tool_result")
@@ -223,7 +223,7 @@ describe "Anthropic round trip" do
     # replays it, because the client no longer sends the request that
     # produced it. See `spec/live/anthropic_spec.cr`.
     it "refuses a signature-less thinking block under the default policy" do
-      session = Elelem::Fixtures.reasoning_with_text
+      session = Liaison::Fixtures.reasoning_with_text
 
       expect_raises(C::RefusedError, /thinking/) do
         rt(session, C::Policy::Compensating)

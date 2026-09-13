@@ -1,24 +1,26 @@
-name: elelem
-version: 0.1.0
+name: liaison
+version: 0.2.0
 license: MPL2
 
 crystal: ">= 1.19, < 2.0"
 
 description: >
-  More details soon, though saying the name out loud gives you a clue.
+  Liaison is a Crystal shard for applications that talk to LLMs, anchored
+  by a portable session history that can be used to start a conversation
+  with one provider and continue it with another.
 
 authors:
   - nogginly@icloud.com
 
 targets:
-  elelem:
-    main: src/elelem_cli.cr
+  liaison:
+    main: src/liaison_cli.cr
 
 development_dependencies:
   ameba:
     github: crystal-ameba/ameba
-  # Records live HTTP once, replays offline forever. Development-only, so the
-  # shard's runtime dependency count stays nil.
+    version: ">= 1.7.0"
   wiretap:
+    # Records live HTTP once, replays offline forever.
     github: nogginly/wiretap.cr
     version: ">= 0.4.1"
