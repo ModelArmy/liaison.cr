@@ -64,7 +64,7 @@ jobs:
 
       - name: Run static code analysis (Linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: bin/ameba src/
+        run: bin/ameba src/ samples/
 
       # ---- Build and run samples
 
