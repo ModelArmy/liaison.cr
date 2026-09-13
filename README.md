@@ -181,6 +181,21 @@ turns a conversation into something that survives past one process. Everything
 else — where sessions live, what a deployment is called, what the terminal
 prints — belongs to the application.
 
+Two runnable samples, both against a local Ollama and both thin enough to read
+in a sitting:
+
+File                                            |Shows                                              
+------------------------------------------------|---------------------------------------------------
+[examples/handoff.cr](./examples/handoff.cr)    |Answer on one protocol, save, resume on another    
+[examples/tool_loop.cr](./examples/tool_loop.cr)|A `Function` the model calls, and the caller's loop
+
+```console
+$ crystal run examples/handoff.cr
+```
+
+They are documentation, not coverage: `spec/end_to_end/` tests the same two
+paths and more, which is what keeps these short enough to stay honest.
+
 ## Installation
 
 ```yaml
