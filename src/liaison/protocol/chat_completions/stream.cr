@@ -75,16 +75,7 @@ module Liaison::Protocol::ChatCompletions
       return unless payload
       raise mid_stream(payload) if payload["error"]?
 
-      @id = payload["id"]?.try(&.as_s?) || @id
-      @model = payload["model"]?.try(&.as_s?) || @model
-      Wire::Usage.parse(payload["usage"]?).try { |value| @usage = value }
-
-      choice = payload["choices"]?.try(&.as_a?).try(&.first?)
-      return unless choice
-
-      choice["finish_reason"]?.try(&.as_s?).try { |value| @finish_reason = value }
-
-      delta = choice["delta"]?
+      delta = absorb_metadata(payload)
       return unless delta
 
       @role = delta["role"]?.try(&.as_s?) || @role
@@ -131,6 +122,26 @@ module Liaison::Protocol::ChatCompletions
         @finish_reason)
 
       Wire::Response.new([choice], id: @id, model: @model, usage: @usage)
+    end
+
+    # Folds a chunk's per-stream metadata into the assembler and returns the
+    # delta left to absorb, or `nil` when the chunk carried no choice.
+    #
+    # Extracted from `absorb` to keep it under the complexity limit, and this
+    # part rather than any other because none of it yields. `absorb`'s three
+    # delta branches each emit an event, and a `yield` cannot cross into a
+    # helper — so moving one of those would mean threading the block through
+    # and reopening the question `accumulate` below already settled.
+    private def absorb_metadata(payload : JSON::Any) : JSON::Any?
+      @id = payload["id"]?.try(&.as_s?) || @id
+      @model = payload["model"]?.try(&.as_s?) || @model
+      Wire::Usage.parse(payload["usage"]?).try { |value| @usage = value }
+
+      choice = payload["choices"]?.try(&.as_a?).try(&.first?)
+      return unless choice
+
+      choice["finish_reason"]?.try(&.as_s?).try { |value| @finish_reason = value }
+      choice["delta"]?
     end
 
     # Folds one tool-call fragment into the call at its index, returning the
