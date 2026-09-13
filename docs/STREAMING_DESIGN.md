@@ -1,8 +1,7 @@
 # Streaming Design
 
-**Status**: built, for the library. All four assemblers exist, each with
-offline and live specs. What remains is the CLI half, recorded in
-`docs/CLI_DESIGN.md` and deliberately held until the library was finished.
+**Status**: built. All four assemblers exist, each with offline and live specs,
+and interrupted-turn repair is built on top of them.
 
 This document was written before the code, so the reasoning below is the
 reasoning that produced it rather than a tidy-up afterwards — including the two
@@ -118,12 +117,13 @@ under pressure would go worst.
 
 ## Building it: the library first, one protocol at a time
 
-**This shard is a library that ships a CLI to prove itself, not a tool with a
-library attached.** The order follows: everything below lands, is specced and
-is stable before `liaison start` learns the word `stream`. A CLI built against
-a seam still moving would have to be rebuilt, and — worse — would start
+**The library lands first, and nothing consuming it is built against a seam
+still moving.** The order follows: everything below is written, specced and
+stable before anything above it learns the word `stream`. A consumer built
+against a moving seam would have to be rebuilt, and — worse — would start
 answering design questions that belong to the library by whichever way the
-CLI happened to be written.
+consumer happened to be written. That mattered concretely at the time: the
+shard's own CLI was the consumer, and it waited.
 
 **Vertical slices, not a horizontal sweep.** The seam is not built once and the
 four assemblers bolted on afterwards; each protocol is taken end to end and
@@ -363,7 +363,8 @@ has already decided it.
 `Capability::Retention.plan` is called in exactly four places, all of them
 inside `Mapper#map`. No exporter takes a retention argument. So under
 `retention: None` today, a reply's `ReasoningBlock` is exported into the
-`MPSH::Message`, handed to the caller, and — in the CLI — written to disk.
+`MPSH::Message` and handed to the caller, whatever the caller then does with
+it.
 Retention drops reasoning only on the way *out*, on the following turn. Its own
 doc comment says as much: a playback preference, not a capability.
 
@@ -378,28 +379,51 @@ under-reporting it is a lie.
 **The leak worry is real and belongs to a different control.** "I set
 retention to `None` and reasoning still appeared in my terminal" is a
 legitimate complaint, and the fix is a display default in whatever is doing the
-displaying — not a suppression rule in the library. See the CLI half below.
+displaying — not a suppression rule in the library.
 
 **A third control does not exist, and retention is not it.** Retention governs
 neither display nor storage: a reasoning block reaches the session and the
 archive under every retention setting. Recorded in `SCOPE.md` so the next
 reader does not assume otherwise.
 
-### The CLI streams when stdout is a terminal — yes, and it waits
+### Events are not an account of a cut turn; the repaired reply is
 
-**CLI, and it constrains nothing in the library.** Settled early because it was
-cheap, deferred to after the library because it is downstream of every piece of
-it. The full record is in `docs/CLI_DESIGN.md`; the decision in three lines:
-stream when **stdout** — not stderr — is a terminal, with an explicit
-`--stream`/`--no-stream` that wins, and transport following rendering rather
-than running ahead of it.
+**Library, and it constrains every consumer.** A streamed turn produces two
+things a caller can act on — the events as they arrive, and the reply once
+`finish` has run — and on a **cut** turn those two disagree with the session
+that ends up on disk. Anything reading the first while storing the second will
+be wrong, so the disagreement is stated here rather than left to be found.
 
-The one argument worth repeating here, because it is about this design rather
-than the CLI's: **printed bytes precede repair.** Interrupted-turn repair
-operates on the message and may drop content from it; it cannot un-print. The
-tty rule confines that irreversibility to the case where a person is watching
-and can see what happened, and guarantees that a redirected run — which is what
-a script consumes — always receives the repaired reply.
+Three facts compose into it:
+
+1. **Events cannot be retracted.** An event handed to a caller has already been
+   acted on — printed, logged, counted. Repair operates on the assembled
+   message afterwards and may remove content; it cannot un-emit.
+2. **Repair drops *every* tool call on a cut turn**, including calls that
+   arrived whole, because a complete-looking set may be half a parallel plan.
+   See `MPSH_SPECIFICATION.md` §3a.
+3. **The assemblers disagree about what survives to `finish` at all.** Chat
+   Completions materialises no calls on a cut, having no per-call end signal.
+   Anthropic keeps any `content_block_stop`-closed `tool_use`; Responses keeps
+   every `response.output_item.done`.
+
+So a stream cut after one finished call and mid-second yields a reply carrying
+a real `ToolCallBlock` on two protocols and none on the third — **and repair
+removes it on all three.** A consumer that treats a `ToolCallStarted` event, or
+an unrepaired reply, as a statement about what happened will therefore claim a
+call the session does not hold, *and claim it differently depending on which
+vendor answered*.
+
+**The property, stated so it can be applied:** the repaired message is the only
+authoritative account of a cut turn. Events are presentation. A consumer that
+needs the two to agree must read the repaired message, and `Toolbox#dispatch`
+repairs its own argument for exactly this reason
+([TOOL_EXECUTION.md](./TOOL_EXECUTION.md)).
+
+This is also why a consumer choosing whether to stream should weigh more than
+whether streaming looks nicer. Streaming buys a non-interactive run nothing it
+can use, while costing it a failure class it does not otherwise have: the
+stream that ends without its terminal frame exists only when you stream.
 
 ### The event block takes `|event, turn|` from the first slice — yes
 

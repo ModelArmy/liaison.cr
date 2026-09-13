@@ -3,10 +3,10 @@ require "../support/saved_session"
 
 # A streamed turn, through the archive and out the other side.
 #
-# **What the CLI's version proved that this does not.** `Display`'s precedence,
-# `Progress` drawing only on a tty, and `Output.reply` suppressed on
-# `report.streamed?` are all facts about a terminal, and they belong wherever
-# the terminal does. What is left is the library's own claim, which is the one
+# **What the CLI's version proved, before it left this repo, that this does
+# not.** Flag-versus-config precedence, a spinner drawing only on a tty, and a
+# printed reply suppressed on `report.streamed?` are all facts about a
+# terminal, and they belong wherever the terminal does. What is left is the library's own claim, which is the one
 # worth keeping here: a streamed reply is the same `MPSH::Message` as an
 # unstreamed one, and stays the same after a trip through a file.
 #
@@ -81,7 +81,7 @@ describe "a streamed turn" do
   end
 
   it "survives being archived and reloaded" do
-    # The half of the CLI's streamed spec that was never about the CLI: a
+    # The half of the departed CLI's streamed spec that was never about it: a
     # streamed reply is written and read back like any other, and a session
     # resumed tomorrow cannot tell how yesterday's answer arrived.
     SavedSession.in_a_file do |path|

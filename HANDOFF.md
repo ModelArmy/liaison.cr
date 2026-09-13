@@ -13,7 +13,6 @@ Document                    |Why
 `DEVELOPMENT.md`            |Layering, conventions, how an agent uses the shard, how to add a protocol      
 `docs/protocols/*.md`       |One per protocol: declared capabilities, limits, the bugs each produced        
 `docs/servers/*.md`         |One per server: what it serves, where it diverges, what a green run misses     
-`docs/CLI_DESIGN.md`        |The `liaison` executable: config, session storage, verb grammar, what's deferred
 `README.md`                 |The front door: what the shard is for, and the handoff in twenty lines         
 
 Where this file and `docs/MPSH_SPECIFICATION.md` disagree, the specification
@@ -116,42 +115,25 @@ survive past one process. Tested against the full MPSH fixture set through
 — a stricter bar than any protocol gets, since this isn't a capability
 adaptation and has no matrix to excuse a difference.
 
-And `liaison` now ships as more than a library. Verbs: `start` (with `--id`),
-`continue`, `list`, `show` (`--snapshots`, `--json`). `continue` remembers
-which deployment last answered a session by reading it off the snapshot's own
-filename rather than a config default — `docs/CLI_DESIGN.md` records that a
-`default_deployment` key was tried first and rejected, not merely skipped,
-because it answered "what does the config prefer" when what `continue` needs
-is "what was this conversation already having."
+**The CLI has left this repository.** It was built here — verbs, config file,
+session storage, a spinner, a streamed turn — as the most direct demonstration
+of the handoff, and it moved out to its own project when its next feature, tool
+execution over a sandboxed filesystem, needed a runtime dependency this shard
+deliberately does not have. Nothing here depends on it and nothing here should
+name it: applications depend on `liaison`, not the reverse.
 
-`liaison.yaml` is two tables and a block. A **server** is a url plus the
-protocol it speaks, a **deployment** names one model on one server, and
-**`defaults`** is how the CLI itself behaves — `streaming` and
-`show_reasoning`, both false, each pairing with a flag of the same name. That
-pairing is the rule the block is held to: a key with no flag behind it is how a
-section like this becomes a junk drawer.
+What that cost and what it did not: the CLI specs were this shard's only
+full-stack coverage, and the only place a session was ever written to a disk and
+picked back up — which is the product claim. `spec/end_to_end/` was written
+first, to hold exactly that, and stayed. See *Next*.
 
-The CLI applies `MPSH::Repair` in two places. On append, in `Query`, the
-snapshot gets the repaired message and the screen gets what actually arrived.
-On load, in `continue`, because a snapshot may have been written by a build
-predating repair or by something else entirely — the format being portable is
-the point — and it says so on stderr rather than quietly rewriting a file
-someone may be reasoning about. Deployments may also
-carry `reasoning` and `reasoning_retention`, which settled the question
-`Capability::Retention` had parked — those are soft preferences read off a
-model card, not hard protocol facts, so they live in config rather than in
-`Catalog`, and adding a model needs no release.
-
-`Progress` shows a spinner and elapsed seconds while a request is in flight,
-on stderr and only when stderr is a terminal. It is a fiber and a clock, not
-an event queue. Its own doc comment predicted that streaming would put it up
-and down repeatedly within one turn rather than retire it, which is why
-`#start`/`#stop` are public and `#label` is mutable — and that is exactly how
-the streamed turn uses it, relabelled to name the tool being called.
-
-Live-tested in-process against a sandboxed config and session store, recorded
-against Ollama (`spec/liaison_cli/commands/`). `spec/support/cli_output.cr`
-keeps a spec run quiet.
+Two decisions the CLI settled are still live here because they were never really
+the CLI's. `Capability::Retention`'s parked question — whether a model catalog
+should exist for reasoning preferences — is answered no, because those are soft
+preferences read off a model card rather than hard protocol facts, so they
+belong in an application's configuration where adding a model needs no release
+of this shard. And the display question retention does *not* answer is the
+consumer's: `SCOPE.md`'s *Retention governs replay, not display and not storage*.
 
 ## The live layer
 
@@ -167,16 +149,13 @@ honours *less* than its protocol allows, never more.
 
 ## Next
 
-**Next is tool execution**, the last entry on `docs/CLI_DESIGN.md`'s
-*Deliberately deferred, not forgotten* and the only one left. It is genuinely
-open rather than merely unbuilt: whether `start`/`continue` take tool
-declarations in v1 or ship text-only first is unanswered, the doc leans
-text-only, and `Client#send`'s turn loop is caller-owned by design so the CLI
-has to decide what *it* does. It is also what finally gives `CLI_DESIGN.md`'s
-*Printed bytes precede repair* something to bite on — see below.
+**Tool execution's library half is built, and the library half is all this
+shard owes.** What an application declares and what it runs is its question, not
+this one's — `docs/TOOL_EXECUTION.md`'s *What this does not answer* says so, and
+says the one thing worth knowing before answering it: declaring and executing
+are one decision, not two.
 
-**Tool execution's library half is built**: `Liaison::Function` is a declaration
-plus its handler, `Liaison::Toolbox` holds a collection and is used at both ends
+`Liaison::Function` is a declaration plus its handler, `Liaison::Toolbox` holds a collection and is used at both ends
 of a turn — `#tools` out, `#dispatch` back, `nil` from `#dispatch` as the loop's
 exit condition. `docs/TOOL_EXECUTION.md` records the shape and the seven
 decisions behind it. Four are worth knowing before touching it: a tool result is
@@ -184,8 +163,9 @@ decisions behind it. Four are worth knowing before touching it: a tool result is
 already is one; arguments arrive as a parsed `MPSH::Object` and `MPSH::Value` is
 a real union, not a `JSON::Any`; tools stay in `Options` and never in `Session`,
 because a `Function` is Crystal code and a portable archive cannot express one;
-and `#dispatch` repairs its own argument, so the ordering rule from
-`CLI_DESIGN.md` cannot be got wrong by a caller who has not read it.
+and `#dispatch` repairs its own argument, so `docs/STREAMING_DESIGN.md`'s
+*Events are not an account of a cut turn* cannot be got wrong by a caller who
+has not read it.
 
 One asymmetry inside it is easy to get backwards. `ToolResultBlock#is_error` is
 carried by the mappers; `#exception` is written by `Archive` and read back, and
@@ -193,12 +173,10 @@ nowhere else. So a tool that *reports* failure sets only `is_error`, and a tool
 that raises unexpectedly must set both — otherwise it crashes and the model is
 never told.
 
-What is left is the CLI half, and it is genuinely a CLI question now: whether
-`start`/`continue` declare tools at all, and what the executable would run.
 `SCOPE.md`'s remaining entries all predate the streaming work.
 
-**`spec/end_to_end/` is new, and it exists because the CLI is leaving.** The CLI
-specs were this shard's only full-stack coverage — and the only place a session
+**`spec/end_to_end/` exists because the CLI left.** Those specs were this
+shard's only full-stack coverage — and the only place a session
 was ever written to a disk and picked back up, which is the product claim. Three
 files now cover that at the library level: the handoff across a file, a streamed
 turn archived and resumed, and a `Toolbox` exchange accepted by a second
@@ -256,53 +234,8 @@ The pair also earns its keep beyond the field it covers. Cut at the same point
 into the reply because `content_block_stop` vouched for it, and Chat
 Completions refuses it because nothing did, even though its arguments parse.
 Two different messages, identical sessions after `Repair`. That divergence is
-what `docs/CLI_DESIGN.md`'s *The durable announcement lands after repair, not
-after `finish`* rests on, and it had no test until now.
-
-Session pruning and deletion, which was the unblocked item here, is **built**:
-`liaison prune SESSID --keep N` and `liaison delete SESSID`, with the design
-record in `docs/CLI_DESIGN.md`'s *Removing things*. Neither touches a network,
-so both are fully spec-covered without a recording.
-
-**The CLI half of streaming is built.** `Display` resolves what the terminal
-does, `Query` runs the streamed turn, `Output` prints it. Precedence is flag,
-then `defaults.streaming`, then a tty test on **stdout** — with the tty test a
-floor that configuration does not lift, and `--stream` the one thing that goes
-through it. Reasoning goes to stderr in grey behind `defaults.show_reasoning`
-and `--show-reasoning`, off by default.
-
-Three things in it were checked rather than assumed:
-
-- **Whether a reply was streamed is read off `report.streamed?`, never off the
-  request.** A protocol with no streaming seam falls back to one body inside
-  `Client#send` having printed nothing, so asking the request would print
-  nothing at all on exactly those providers.
-- **`Progress` had a latent bug this was the first code to reach.** Its stop
-  channels were built once in `initialize`, invisible while `while_waiting` was
-  the only door; put the indicator up a second time and the new fiber found a
-  closed channel and drew nothing, silently. Channels are made per `start` now.
-- **`CLI_DESIGN.md`'s *Printed bytes precede repair* guards a hazard that does
-  not exist yet.** Repair removes tool calls; `Output.reply` prints text blocks
-  only; so a streamed run and its saved session currently agree exactly and
-  anyone looking for the discrepancy will not find it. It arrives with tool
-  execution, when the terminal starts narrating calls as they materialise. The
-  rule is stated there as a property — *the terminal is the only surface
-  permitted to disagree with the archive* — rather than as a guess about who is
-  watching.
-
-**The streamed turn is now recorded end to end**
-(`spec/liaison_cli/commands/streaming_spec.cr`), against Ollama rather than a
-vendor: everything above the assemblers is protocol-agnostic, and the four
-assemblers are already proved where it counts. `--stream` is what the specs
-use, because `Output.stream` is an `IO::Memory` and the tty floor declines
-otherwise — which that file also asserts, for free, by replaying
-`start_spec.cr`'s own transcript.
-
-One example there is load-bearing beyond its own turn: streamed stdout is
-asserted **equal** to the saved reply's text. That is the property above stated
-as an assertion for the first time. It is trivially true today and stops being
-trivial the moment a tool call is narrated — at which point it is what goes red
-if the narration lands on stdout instead of stderr.
+what `docs/STREAMING_DESIGN.md`'s *Events are not an account of a cut turn*
+rests on, and it had no test until now.
 
 Streaming was built **one protocol at a time** — read
 `docs/STREAMING_DESIGN.md` before touching it. The short version: frames
@@ -362,8 +295,8 @@ be set by the layer that knows; and every assembler already refuses to emit a
 tool call it cannot vouch for, so "drop the calls, keep any text" was already
 true for a cut stream in all four protocols before repair existed.
 
-Both halves of streaming are now built, library and CLI. Tool execution is what
-sits behind them, and is no longer blocked by anything.
+Streaming is built. Tool execution's library half sits behind it, and is no
+longer blocked by anything.
 
 **How the rule was arrived at matters more than the rule.** It was rewritten
 twice under contact — first from "keep the terminal frame", then from
@@ -408,15 +341,15 @@ than a green run here to settle it. See `docs/protocols/ANTHROPIC.md`.
   or the protocol's own doc — before assuming a Restructured result is new
   information.
 - **A test's own sandboxing can break the thing it's testing around it.**
-  Two `liaison_cli` specs `Dir.cd`'d into a temp directory to sandbox
-  `Sessions`/`Config`'s filesystem resolution, and silently broke Wiretap's
+  Two of the departed CLI's specs `Dir.cd`'d into a temp directory to sandbox
+  their own filesystem resolution, and silently broke Wiretap's
   own relative transcript path doing it — Wiretap resolves that path against
   the real process CWD too. Every spec passed, because the live call to
   Ollama still succeeded; the recordings just never landed anywhere real,
   and the sandbox's own cleanup deleted whatever had been written into it
-  before anyone noticed. Fixed by giving `Sessions`/`Config` an explicit
-  env-var override (`$LIAISON_HOME`, `$LIAISON_CONFIG`) instead of moving the
-  process's CWD at all: sandbox exactly what the code under test reads,
+  before anyone noticed. Fixed by giving the code under test an explicit
+  env-var override instead of moving the process's CWD at all: sandbox exactly
+  what the code under test reads,
   never anything downstream of it that happens to read the same ambient
   state.
 - **A guard at the right seam still needs a non-raising twin.** Session id

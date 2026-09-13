@@ -19,7 +19,7 @@ Document                                        |Changes                     |Ho
 `docs/MPSH_SPECIFICATION.md` and companions     |Rarely; a change is an event|Why MPSH is shaped this way                              
 `DEVELOPMENT.md` (this file)                    |Slowly                      |Layering, conventions, invariants, how to add a protocol 
 `docs/protocols/<name>.md`                      |Per mapper                  |One protocol's declaration, gotchas, compensations       
-`docs/CLI_DESIGN.md`, `docs/STREAMING_DESIGN.md`|Per feature                 |Why one subsystem is shaped this way, decided before code
+`docs/STREAMING_DESIGN.md` and companions       |Per feature                 |Why one subsystem is shaped this way, decided before code
 `HANDOFF.md`                                    |When a phase completes      |Where the work stands, what is next, how to work here    
 `SCOPE.md`                                      |Fast; shrinks               |What is outstanding                                      
 

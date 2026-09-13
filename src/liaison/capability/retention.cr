@@ -32,8 +32,9 @@ module Liaison::Capability
   # once a turn closes. Everything else in this shard is keyed on protocol,
   # which left an open question: should a model catalog exist for this?
   #
-  # **Settled: no.** It is operator configuration, stated per deployment in
-  # the CLI's `liaison.yaml`, not a table in this library. The line is between
+  # **Settled: no.** It is operator configuration, stated per deployment by
+  # whatever is doing the deploying, not a table in this library. The line is
+  # between
   # hard protocol facts and soft quality preferences. `Capability::Catalog`
   # holds the former — get `SIGNED_TOOL_CALLS` wrong and the request 400s, and
   # the vendor is the authority. This is the latter: get it wrong and the
@@ -41,7 +42,9 @@ module Liaison::Capability
   # contract, and two people running the same model may reasonably disagree.
   #
   # Which is why this enum stays a plain caller-supplied preference and gains
-  # no lookup of its own. See `Liaison::Cli::Deployment`.
+  # no lookup of its own: an application that lets an operator name models can
+  # read it off a config file and add a model without waiting on a release
+  # here.
   module Retention
     extend self
 

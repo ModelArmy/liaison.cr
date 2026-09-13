@@ -41,9 +41,8 @@ module Liaison::Streaming
   # the turn.
   #
   # Whether a person *sees* this is a display decision belonging to whatever is
-  # doing the displaying. The CLI answers it with `--show-reasoning`,
-  # defaulting off. See `SCOPE.md`'s *Retention governs replay, not display and
-  # not storage*.
+  # doing the displaying, and the sane default there is off. See `SCOPE.md`'s
+  # *Retention governs replay, not display and not storage*.
   struct ReasoningDelta
     getter text : String
 

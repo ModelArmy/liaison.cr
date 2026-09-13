@@ -3,8 +3,8 @@ require "file_utils"
 # A session written to a file and read back from it.
 #
 # `MPSH::Archive` is the real thing here, not a stand-in — the helper only owns
-# the tempfile and the cleanup, which is all `Liaison::Cli::Sessions` owns too
-# once its id minting, folder layout and snapshot pruning are set aside. So a
+# the tempfile and the cleanup. Everything an application's session store adds
+# on top of that is its own concern: id minting, folder layout, pruning. So a
 # spec using this is testing the archive rather than a second implementation of
 # it written by the same hand.
 module SavedSession

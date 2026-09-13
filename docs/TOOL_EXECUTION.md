@@ -1,9 +1,9 @@
 # Tool execution
 
 How a caller supplies tools this shard can run, and what was decided along the
-way. The library half is built; what the `liaison` command does with a tool call
-is a separate question, still open, and lives in
-[CLI_DESIGN.md](./CLI_DESIGN.md).
+way. What an *application* does with a tool call — whether it declares tools at
+all, and what it would run — is a separate question and not this shard's to
+answer.
 
 ## The gap this closes
 
@@ -141,9 +141,9 @@ a dispatch that blew up.
 
 Two pulls conflict here and both are real. Every tool failing in one shape is
 what stops a model learning a different error dialect per tool. But no single
-shape survives contact with every tool. This is the cheap answer, kept until the
-CLI has real tools to be opinionated about — recorded as a tension rather than a
-settled question, so whoever revisits it knows it was seen.
+shape survives contact with every tool. This is the cheap answer, kept until a
+caller has real tools to be opinionated about — recorded as a tension rather
+than a settled question, so whoever revisits it knows it was seen.
 
 **`is_error` and `exception` are not interchangeable**, and the asymmetry is
 sharper than `block.cr`'s comment suggests. `is_error` is carried by the
@@ -203,10 +203,13 @@ surfaces as one conversation seeing another's data.
    not hold, and a call whose tool raised. Skipping either leaves a dangling
    call and an unsendable session.
 3. **Dispatch reads the repaired reply.** `#dispatch` repairs its argument
-   rather than trusting it, so the rule from
-   [CLI_DESIGN.md](./CLI_DESIGN.md)'s *The durable announcement lands after
-   repair, not after `finish`* cannot be got wrong by a caller who has not read
-   it. Repair is idempotent, so passing an already-repaired message is free.
+   rather than trusting it, so [STREAMING_DESIGN.md](./STREAMING_DESIGN.md)'s
+   *Events are not an account of a cut turn* cannot be got wrong by a caller
+   who has not read it. A turn loop dispatching from the unrepaired reply would
+   run a call the session does not contain and append a result whose call is
+   missing — breaking `Repair.sendable?` from the other direction, on exactly
+   the cut turns this arrangement exists for. Repair is idempotent, so passing
+   an already-repaired message is free.
 4. **Server-executed calls are skipped.** The provider ran them and the reply
    carries their results; running them again would be a second, unasked-for
    execution of somebody's side effect.
@@ -219,8 +222,13 @@ produces. The `return nil unless repaired` guard is live, not defensive.
 
 ## What this does not answer
 
-Whether `liaison start` and `liaison continue` declare tools at all, and what the
-executable would run if they did. Declaring and executing turned out to be one
-decision rather than two — see the *Tool execution* entry under
-[CLI_DESIGN.md](./CLI_DESIGN.md)'s *Deliberately deferred, not forgotten* — and
-what the terminal prints while a call is in flight is settled there already.
+Whether an application built on this shard declares tools at all, and what it
+would run if it did. That is genuinely an application question, and one worth
+knowing is sharper than it looks: **declaring and executing are one decision,
+not two.** `Repair.needed?` requires `ending.cut?`, so a turn that *completes*
+holding a tool call is untouched, and nothing in `Client` enforces
+`Repair.sendable?` — it appears only in specs. An application that declares
+tools without dispatching them therefore writes exactly the unsendable session
+the archive exists to prevent, and nothing notices until the next request is
+rejected by a protocol strict enough to care. There is no safe half-step:
+either it runs something, or it declares nothing.

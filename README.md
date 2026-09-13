@@ -168,35 +168,18 @@ Gemini          |Positional tool pairing, `thoughtSignature` on calls
 Azure OpenAI is supported as a *deployment* of the Chat Completions and
 Responses protocols, not as a protocol of its own.
 
-## The `liaison` command
+## Building something on it
 
-The shard ships a CLI, which is also the most direct demonstration of the
-handoff — start a session on one deployment, continue it on another.
+This shard is a library and ships no executable. A CLI was built here once, as a
+demonstration, and moved out to its own project when it needed a runtime
+dependency that this one deliberately does not have. That is the expected shape:
+applications depend on `liaison`, not the other way round.
 
-```
-liaison start <deployment> <prompt...> [--id <session-id>] [--stream|--no-stream]
-                                       [--show-reasoning|--hide-reasoning]
-liaison continue <session-id> <prompt...> [--on <deployment>] [--stream|--no-stream]
-                                         [--show-reasoning|--hide-reasoning]
-liaison list
-liaison show <session-id> [--snapshots] [--json]
-liaison prune <session-id> --keep <n>
-liaison delete <session-id>
-```
-
-```console
-$ liaison start ollama "Name three things Vienna is known for."
-Session: brisk-comet
-Vienna is known for its coffee houses, its classical music, and the Ringstrasse.
-
-$ liaison continue brisk-comet "Recommend one coffee house." --on anthropic
-Café Sperl, for the billiard tables and the lack of hurry.
-```
-
-Streaming and reasoning display default off and can be set for good under
-`defaults:` in the config. Deployments are named in `liaison.yaml`; see
-[docs/CLI_DESIGN.md](./docs/CLI_DESIGN.md) for the format and for why it is
-shaped the way it is.
+`MPSH::Archive` is the piece an application needs most and the one that is
+easiest to miss: it round-trips a `Session` to JSON and back, which is what
+turns a conversation into something that survives past one process. Everything
+else — where sessions live, what a deployment is called, what the terminal
+prints — belongs to the application.
 
 ## Installation
 
@@ -220,7 +203,6 @@ Document                                                  |Holds
 [docs/servers/](./docs/servers/)                          |One file per server, and what a green run there does *not* prove
 [docs/STREAMING_DESIGN.md](./docs/STREAMING_DESIGN.md)    |The streamed turn, and the two places its design was wrong      
 [docs/TOOL_EXECUTION.md](./docs/TOOL_EXECUTION.md)        |Caller-supplied tools, and what was decided about them          
-[docs/CLI_DESIGN.md](./docs/CLI_DESIGN.md)                |The `liaison` executable                                         
 [SCOPE.md](./SCOPE.md)                                    |What is still outstanding                                       
 
 ## Contributions, by invitation!

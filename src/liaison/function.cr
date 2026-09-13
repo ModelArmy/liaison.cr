@@ -77,7 +77,7 @@ module Liaison
     # The consistency this buys is deliberate and provisional: every tool
     # failing in one shape is what stops a model learning a different error
     # dialect per tool, but no single shape survives contact with every tool.
-    # Revisit when the CLI has real tools to be opinionated about, not before.
+    # Revisit when a caller has real tools to be opinionated about, not before.
     class Failure < Exception
     end
   end

@@ -219,9 +219,9 @@ describe Liaison::Toolbox do
 
   describe "#dispatch on an interrupted turn" do
     it "runs nothing, because repair has already dropped the call" do
-      # The rule in `docs/CLI_DESIGN.md`'s *The durable announcement lands after
-      # repair, not after `finish`*, enforced here so that a caller who has not
-      # read it cannot get it wrong. Dispatching a call that repair removed
+      # The rule in `docs/STREAMING_DESIGN.md`'s *Events are not an account of
+      # a cut turn*, enforced here so that a caller who has not read it cannot
+      # get it wrong. Dispatching a call that repair removed
       # would append a result whose call is missing from the session — the same
       # invariant broken from the other direction.
       cut = calling("get_weather")

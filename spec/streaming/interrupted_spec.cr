@@ -24,9 +24,9 @@ require "../spec_helper"
 # the one position where the two protocols answer differently and where the
 # answer matters most.
 #
-# **What the pair proves that neither proves alone.** `docs/CLI_DESIGN.md`'s
-# *The durable announcement lands after repair, not after `finish`* rests on a
-# divergence that had no test: Anthropic closes a `tool_use` block explicitly,
+# **What the pair proves that neither proves alone.**
+# `docs/STREAMING_DESIGN.md`'s *Events are not an account of a cut turn* rests
+# on a divergence that had no test: Anthropic closes a `tool_use` block explicitly,
 # so a call closed before the cut survives as far as the reply and is removed by
 # `Repair`; Chat Completions has no per-call end signal, so a call whose
 # arguments arrived whole is refused by the assembler and never reaches the
