@@ -77,7 +77,8 @@ module Liaison::Protocol::Gemini
       budget, level = reasoning(options, model, report)
 
       {Wire::Request.new(model, contents, session.system_prompt, declarations(options),
-        options.max_output_tokens, thinking_budget: budget, thinking_level: level), report}
+        options.max_output_tokens, thinking_budget: budget, thinking_level: level,
+        tool_mode: options.tool_choice.try(&.gemini_mode)), report}
     end
 
     # At most one of the two is ever returned. Setting both in one

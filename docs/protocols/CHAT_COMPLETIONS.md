@@ -62,6 +62,25 @@ This corrected the capability matrix, which had claimed Exact on the grounds
 that the protocol supports reasoning and the vendor owns the block. Both were
 true; neither was sufficient.
 
+## Tool choice
+
+A bare string at the top level — `"auto"` or `"none"` — the flattest of the
+four spellings, as with `reasoning_effort` beside it. The Responses API spells
+it identically, which is one of the few places these two agree with no wrapper
+between them.
+
+Two facts about the alternative, both of which argue for using this instead of
+withdrawing the tool declarations. OpenAI's own caching guidance says to keep
+the definitions stable and set `tool_choice` to `none` rather than removing
+them, because the definitions render ahead of everything else and changing them
+invalidates the whole prefix. And an empty `tools` array is itself rejected —
+`Invalid 'tools': expected an array with at least one element` — so a caller
+who empties it relies on this shard omitting the key entirely, which it does.
+
+A choice with no tools at all is a 400 here (`tool_choice is only allowed when
+'tools' are specified`), so `Options` refuses to construct one. See
+`docs/TOOL_EXECUTION.md` under *Ending the loop*.
+
 ## Compensation
 
 A tool result here is a string, so a tool returning a screenshot cannot be

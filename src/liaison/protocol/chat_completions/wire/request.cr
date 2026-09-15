@@ -224,6 +224,9 @@ module Liaison::Protocol::ChatCompletions
       # A bare string at the top level: the flattest of the four spellings of
       # this idea. `nil` omits the field, leaving the model's own default.
       getter reasoning_effort : String?
+      # A bare string, like `reasoning_effort` above. The Responses API spells
+      # it identically; Anthropic wraps it in an object.
+      getter tool_choice : String?
       # Asks for the reply as a frame stream. Not set by the mapper: whether to
       # stream is a fact about how this call is made, not about what the
       # session contains. `with_stream` is how the adapter says so.
@@ -234,6 +237,7 @@ module Liaison::Protocol::ChatCompletions
                      @max_tokens : Int32? = nil,
                      @reasoning_effort : String? = nil,
                      @max_tokens_field : MaxTokensField = MaxTokensField::MaxTokens,
+                     @tool_choice : String? = nil,
                      @stream : Bool = false)
       end
 
@@ -242,7 +246,7 @@ module Liaison::Protocol::ChatCompletions
       # setter on a struct edits whichever copy you happened to be holding.
       def with_stream(value : Bool) : Request
         Request.new(@model, @messages, @tools, @max_tokens,
-          @reasoning_effort, @max_tokens_field, value)
+          @reasoning_effort, @max_tokens_field, @tool_choice, value)
       end
 
       def to_json(json : JSON::Builder)
@@ -256,6 +260,7 @@ module Liaison::Protocol::ChatCompletions
             field = @max_tokens_field.max_tokens? ? "max_tokens" : "max_completion_tokens"
             json.field field, value
           end
+          @tool_choice.try { |value| json.field "tool_choice", value }
           @reasoning_effort.try { |value| json.field "reasoning_effort", value }
           if @stream
             json.field "stream", true

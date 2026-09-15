@@ -1,0 +1,31 @@
+{
+  "name": "ollama_tool_choice_none_responses",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/responses",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "494",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"instructions\":\"Use the supplied tools when they apply.\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}],\"tool_choice\":\"none\",\"max_output_tokens\":512}",
+        "body_digest": "50e99faf1dcc8e49cc295959628cb3eb1545ba555b3cfda1dc00fa97f8f72fec"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Tue, 15 Sep 2026 20:20:18 GMT",
+          "Content-Length": "1637"
+        },
+        "body": "{\"id\":\"resp_343415\",\"object\":\"response\",\"created_at\":1789503618,\"completed_at\":1789503618,\"status\":\"completed\",\"incomplete_details\":null,\"model\":\"gemma4:26b-mxfp8\",\"previous_response_id\":null,\"instructions\":\"Use the supplied tools when they apply.\",\"output\":[{\"id\":\"rs_resp_343415\",\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"The user is asking for the weather in Paris and specifically requested to use the `get_weather` tool. I should call the `get_weather` tool with the argument `city='Paris'`.\"}],\"encrypted_content\":\"The user is asking for the weather in Paris and specifically requested to use the `get_weather` tool. I should call the `get_weather` tool with the argument `city='Paris'`.\"},{\"id\":\"fc_resp_343415_0\",\"type\":\"function_call\",\"status\":\"completed\",\"call_id\":\"call_pe1a4jmc\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}],\"error\":null,\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"properties\":{\"city\":{\"description\":\"City name\",\"type\":\"string\"}},\"required\":[\"city\"],\"type\":\"object\"}}],\"tool_choice\":\"auto\",\"truncation\":\"disabled\",\"parallel_tool_calls\":true,\"text\":{\"format\":{\"type\":\"text\"}},\"top_p\":1,\"presence_penalty\":0,\"frequency_penalty\":0,\"top_logprobs\":0,\"temperature\":1,\"reasoning\":null,\"usage\":{\"input_tokens\":90,\"output_tokens\":59,\"total_tokens\":149,\"input_tokens_details\":{\"cached_tokens\":89},\"output_tokens_details\":{\"reasoning_tokens\":0}},\"max_output_tokens\":512,\"max_tool_calls\":null,\"store\":false,\"background\":false,\"service_tier\":\"default\",\"metadata\":{},\"safety_identifier\":null,\"prompt_cache_key\":null}\n"
+      },
+      "recorded_at": "2026-09-15T20:20:18Z"
+    }
+  ]
+}

@@ -9,6 +9,13 @@ require "../spec_helper"
 # a real Azure resource accepts. It is not re-proving reasoning, tools, or
 # compensation — those are protocol-level claims already covered elsewhere.
 #
+# **One exception, at the end of the file.** Tool choice is a protocol-level
+# claim that no other suite can settle for this family: Ollama's port accepts
+# the field without enforcing it, so only a real OpenAI model can show `none`
+# is obeyed rather than tolerated. The same reasoning put the Anthropic
+# version of that test in `anthropic_spec.cr`. It stays narrow — enforcement
+# only, nothing about reasoning or compensation.
+#
 # **Recording.** Needs `AZURE_OPENAI_API_KEY` in the environment and
 # `RECORD=1` to cut a transcript. Once committed it replays offline like
 # every other live spec — CI sets no key at all, same as the Anthropic and
@@ -47,6 +54,32 @@ end
 
 private CAP = Liaison::Options.new(max_output_tokens: 64)
 
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
+    %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
+end
+
+private def no_calls : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512,
+    tool_choice: Liaison::ToolChoice::None)
+end
+
+# A finished tool exchange, then a question the same tool would answer. Built
+# by hand rather than minted live, which this protocol family permits and
+# Gemini does not: nothing here requires a call to carry a signature.
+private def after_a_tool_call : M::Session
+  call = M::ToolCallBlock.new("call_live_weather", "get_weather",
+    M::Object{"city" => "Paris".as(M::Value)})
+  session = M::Session.new("Use the supplied tools when they apply.")
+  session << M::Message.user("What is the weather in Paris?")
+  session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
+  session << M::Message.new(M::Role::User,
+    [M::ToolResultBlock.new(call.call_id,
+      [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+  session << M::Message.user("And in Berlin?")
+  session
+end
+
 describe "Azure OpenAI" do
   describe "Chat Completions" do
     it "accepts a request built by AzureChatCompletionsAdapter" do
@@ -84,6 +117,49 @@ describe "Azure OpenAI" do
         # moves to the top-level `instructions` field on every call, not just
         # this one. See RESPONSES.md, "Declared capabilities". What this call
         # actually proves is narrower and is what's asserted: nothing refused.
+        report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+      end
+    end
+  end
+
+  # The one place this file goes past its stated remit, and deliberately.
+  #
+  # Everywhere else here proves auth and path and leaves protocol claims to
+  # the suites that own them. Tool choice cannot be left to those, because the
+  # only other server speaking Chat Completions and Responses is Ollama's
+  # compatible port — which accepts more than it enforces, so a reply with no
+  # tool call there is equally consistent with the field being honoured and
+  # with a model that did not fancy a tool. Proving `none` is *obeyed* on this
+  # protocol family needs a real OpenAI model, and this is the only file with
+  # one.
+  #
+  # Same arrangement as `spec/live/anthropic_spec.cr`: a completed exchange for
+  # one city, then a question about a second, with the tool still declared.
+  # Under `auto` that is a call.
+  #
+  # Enforcement is the assertion; content is not. Anthropic answered this
+  # arrangement with an empty turn — `None` guarantees no call, not an answer —
+  # so prose is not something to require here. The cap is deliberately larger
+  # than `CAP` above: this is a reasoning model, and 64 tokens is a budget
+  # thinking alone can exhaust, which would produce an empty reply for reasons
+  # having nothing to do with tool choice.
+  describe "a turn that may not call a tool" do
+    it "withholds the call over Chat Completions" do
+      Wiretap.intercept("azure_tool_choice_none_chat_completions") do
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions)
+          .send(after_a_tool_call, DEPLOYMENT, options: no_calls)
+
+        reply.content.select(M::ToolCallBlock).should be_empty
+        report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+      end
+    end
+
+    it "withholds the call over the Responses API" do
+      Wiretap.intercept("azure_tool_choice_none_responses") do
+        reply, report = client(Liaison::ProtocolKind::Responses)
+          .send(after_a_tool_call, DEPLOYMENT, options: no_calls)
+
+        reply.content.select(M::ToolCallBlock).should be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
       end
     end

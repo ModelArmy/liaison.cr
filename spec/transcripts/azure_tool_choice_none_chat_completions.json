@@ -1,0 +1,56 @@
+{
+  "name": "azure_tool_choice_none_chat_completions",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://oxaro-alpha.openai.azure.com/openai/deployments/gpt5.4mini/chat/completions?api-version=2025-04-01-preview",
+        "headers": {
+          "content-type": "application/json",
+          "api-key": "[FILTERED]",
+          "Content-Length": "784",
+          "Host": "oxaro-alpha.openai.azure.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gpt5.4mini\",\"messages\":[{\"role\":\"system\",\"content\":\"Use the supplied tools when they apply.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris?\"}]},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_live_weather\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"18C, light rain\",\"tool_call_id\":\"call_live_weather\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}}],\"max_completion_tokens\":512,\"tool_choice\":\"none\"}",
+        "body_digest": "ff9df0c7a507d90e8fb5fa7ffc679916bd35f17793c31aa5045c65314d5a5573"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Length": "1691",
+          "Content-Type": "application/json",
+          "Date": "Tue, 15 Sep 2026 18:26:51 GMT",
+          "Server": "istio-envoy",
+          "azureai-fe-is-streaming": "False",
+          "azureai-fe-offer-type": "paygo",
+          "azureml-model-session": "d20260818070027-dc2b306f",
+          "skip-error-remapping": "true",
+          "x-accel-buffering": "no",
+          "x-ms-is-spilled-over": "false",
+          "x-ms-rai-invoked": "true",
+          "x-ms-served-model": "gpt-5.4-mini-2026-03-17",
+          "x-ratelimit-abusepenalty-active": "False",
+          "x-ratelimit-key": "gpt5.4mini",
+          "x-ratelimit-limit-requests": "1004",
+          "x-ratelimit-limit-tokens": "1004000",
+          "x-ratelimit-remaining-requests": "1003",
+          "x-ratelimit-remaining-tokens": "1003810",
+          "x-ratelimit-renewalperiod-requests": "60",
+          "x-ratelimit-renewalperiod-tokens": "60",
+          "x-ratelimit-reset-requests": "0",
+          "x-ratelimit-reset-tokens": "0",
+          "x-request-id": "4cd0b021-322a-4006-9660-3fbe550840a7",
+          "apim-request-id": "a35d7a87-004b-4a2c-b6db-dc77b3a8b190",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+          "X-Content-Type-Options": "nosniff",
+          "x-ms-region": "Canada East"
+        },
+        "body": "{\"choices\":[{\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"protected_material_code\":{\"detected\":false,\"filtered\":false},\"protected_material_text\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}},\"finish_reason\":\"stop\",\"index\":0,\"logprobs\":null,\"message\":{\"annotations\":[],\"content\":\"I’m sorry, but I can’t check the current weather for Berlin right now. If you want, I can help you estimate what to expect based on the season or suggest a reliable weather source.\",\"refusal\":null,\"role\":\"assistant\"}}],\"created\":1789496812,\"id\":\"chatcmpl-EOS9kPepU9mi4QWJTm5Aeq5Xd9Jhq\",\"model\":\"gpt-5.4-mini-2026-03-17\",\"object\":\"chat.completion\",\"prompt_filter_results\":[{\"prompt_index\":0,\"content_filter_results\":{\"hate\":{\"filtered\":false,\"severity\":\"safe\"},\"jailbreak\":{\"detected\":false,\"filtered\":false},\"self_harm\":{\"filtered\":false,\"severity\":\"safe\"},\"sexual\":{\"filtered\":false,\"severity\":\"safe\"},\"violence\":{\"filtered\":false,\"severity\":\"safe\"}}}],\"routing\":{\"serving_pipereplica\":\"d20260818070027-dc2b306f-default-r1-dp0-default\"},\"service_tier\":\"default\",\"system_fingerprint\":null,\"usage\":{\"completion_tokens\":43,\"completion_tokens_details\":{\"accepted_prediction_tokens\":0,\"audio_tokens\":0,\"reasoning_tokens\":0,\"rejected_prediction_tokens\":0},\"latency_checkpoint\":{\"engine_tbt_ms\":8,\"engine_ttft_ms\":66,\"engine_ttlt_ms\":398,\"pre_inference_ms\":102,\"service_tbt_ms\":8,\"service_ttft_ms\":600,\"service_ttlt_ms\":926,\"user_visible_ttft_ms\":498},\"prompt_tokens\":190,\"prompt_tokens_details\":{\"audio_tokens\":0,\"cached_tokens\":0},\"total_tokens\":233}}\n"
+      },
+      "recorded_at": "2026-09-15T18:26:53Z"
+    }
+  ]
+}

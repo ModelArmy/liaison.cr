@@ -1,0 +1,54 @@
+{
+  "name": "azure_tool_choice_none_responses",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://oxaro-alpha.openai.azure.com/openai/responses?api-version=2025-04-01-preview",
+        "headers": {
+          "content-type": "application/json",
+          "api-key": "[FILTERED]",
+          "Content-Length": "753",
+          "Host": "oxaro-alpha.openai.azure.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gpt5.4mini\",\"instructions\":\"Use the supplied tools when they apply.\",\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"What is the weather in Paris?\"}]},{\"type\":\"function_call\",\"call_id\":\"call_live_weather\",\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"},{\"type\":\"function_call_output\",\"call_id\":\"call_live_weather\",\"output\":\"18C, light rain\"},{\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"type\":\"function\",\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}],\"tool_choice\":\"none\",\"max_output_tokens\":512}",
+        "body_digest": "7221192619dfc4b738aa3824868f91d2c33c1a36435bab61c1d54bec38df5372"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Length": "4268",
+          "Content-Type": "application/json",
+          "Date": "Tue, 15 Sep 2026 18:26:53 GMT",
+          "Server": "istio-envoy",
+          "x-ms-aoai-configured-data-retention-days": "30",
+          "skip-error-remapping": "true",
+          "x-ms-is-spilled-over": "false",
+          "x-ratelimit-key": "gpt5.4mini",
+          "x-ratelimit-remaining-requests": "1003",
+          "x-ratelimit-reset-requests": "0",
+          "x-ratelimit-limit-requests": "1004",
+          "x-ratelimit-renewalperiod-requests": "60",
+          "x-ratelimit-abusepenalty-active": "False",
+          "x-ratelimit-remaining-tokens": "1003972",
+          "x-ratelimit-reset-tokens": "0",
+          "x-ratelimit-limit-tokens": "1004000",
+          "x-ratelimit-renewalperiod-tokens": "60",
+          "azureai-fe-is-streaming": "False",
+          "azureai-fe-offer-type": "paygo",
+          "x-ms-served-model": "gpt-5.4-mini-2026-03-17",
+          "x-request-id": "88b89f8d-1af6-4d14-9f50-0073f3e75a9f",
+          "apim-request-id": "8f445885-069f-400f-841a-1cafe3ccacbe",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+          "X-Content-Type-Options": "nosniff",
+          "x-ms-region": "Canada East"
+        },
+        "body": "{\n  \"id\": \"resp_0ee63d08f9fb38f8006aa98dedbee8819492f01c96da8f2919\",\n  \"object\": \"response\",\n  \"created_at\": 1789496813,\n  \"status\": \"completed\",\n  \"background\": false,\n  \"completed_at\": 1789496814,\n  \"content_filters\": [\n    {\n      \"blocked\": false,\n      \"source_type\": \"prompt\",\n      \"content_filter_raw\": [],\n      \"content_filter_results\": {\n        \"hate\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"sexual\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"violence\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"self_harm\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"jailbreak\": {\n          \"detected\": false,\n          \"filtered\": false\n        }\n      },\n      \"content_filter_offsets\": {\n        \"start_offset\": 0,\n        \"end_offset\": 157,\n        \"check_offset\": 0\n      }\n    },\n    {\n      \"blocked\": false,\n      \"source_type\": \"completion\",\n      \"content_filter_raw\": [],\n      \"content_filter_results\": {\n        \"protected_material_code\": {\n          \"detected\": false,\n          \"filtered\": false\n        },\n        \"protected_material_text\": {\n          \"detected\": false,\n          \"filtered\": false\n        },\n        \"hate\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"sexual\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"violence\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        },\n        \"self_harm\": {\n          \"filtered\": false,\n          \"severity\": \"safe\"\n        }\n      },\n      \"content_filter_offsets\": {\n        \"start_offset\": 0,\n        \"end_offset\": 188,\n        \"check_offset\": 0\n      }\n    }\n  ],\n  \"error\": null,\n  \"frequency_penalty\": 0.0,\n  \"incomplete_details\": null,\n  \"instructions\": \"Use the supplied tools when they apply.\",\n  \"max_output_tokens\": 512,\n  \"max_tool_calls\": null,\n  \"model\": \"gpt5.4mini\",\n  \"moderation\": null,\n  \"output\": [\n    {\n      \"id\": \"msg_0ee63d08f9fb38f8006aa98dee49c481949f205d750c15a92a\",\n      \"type\": \"message\",\n      \"status\": \"completed\",\n      \"content\": [\n        {\n          \"type\": \"output_text\",\n          \"annotations\": [],\n          \"logprobs\": [],\n          \"text\": \"I\\u2019m sorry, but I can\\u2019t check Berlin\\u2019s current weather right now. If you\\u2019d like, I can help you compare typical weather for Berlin this time of year or suggest a good weather site to check.\"\n        }\n      ],\n      \"phase\": \"final_answer\",\n      \"role\": \"assistant\"\n    }\n  ],\n  \"parallel_tool_calls\": true,\n  \"presence_penalty\": 0.0,\n  \"previous_response_id\": null,\n  \"prompt_cache_key\": null,\n  \"prompt_cache_retention\": \"in_memory\",\n  \"reasoning\": {\n    \"context\": \"current_turn\",\n    \"effort\": \"none\",\n    \"mode\": \"standard\",\n    \"summary\": null\n  },\n  \"safety_identifier\": null,\n  \"service_tier\": \"default\",\n  \"store\": true,\n  \"temperature\": 1.0,\n  \"text\": {\n    \"format\": {\n      \"type\": \"text\"\n    },\n    \"verbosity\": \"medium\"\n  },\n  \"tool_choice\": \"none\",\n  \"tool_usage\": {\n    \"image_gen\": {\n      \"input_tokens\": 0,\n      \"input_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"output_tokens\": 0,\n      \"output_tokens_details\": {\n        \"image_tokens\": 0,\n        \"text_tokens\": 0\n      },\n      \"total_tokens\": 0\n    },\n    \"web_search\": {\n      \"num_requests\": 0\n    }\n  },\n  \"tools\": [\n    {\n      \"type\": \"function\",\n      \"description\": \"Look up the current weather in a city\",\n      \"name\": \"get_weather\",\n      \"output_schema\": null,\n      \"parameters\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"city\": {\n            \"type\": \"string\",\n            \"description\": \"City name\"\n          }\n        },\n        \"required\": [\n          \"city\"\n        ],\n        \"additionalProperties\": false\n      },\n      \"strict\": true\n    }\n  ],\n  \"top_logprobs\": 0,\n  \"top_p\": 0.98,\n  \"truncation\": \"disabled\",\n  \"usage\": {\n    \"input_tokens\": 110,\n    \"input_tokens_details\": {\n      \"cache_write_tokens\": 0,\n      \"cached_tokens\": 0\n    },\n    \"output_tokens\": 47,\n    \"output_tokens_details\": {\n      \"reasoning_tokens\": 0\n    },\n    \"total_tokens\": 157\n  },\n  \"user\": null,\n  \"metadata\": {}\n}"
+      },
+      "recorded_at": "2026-09-15T18:26:54Z"
+    }
+  ]
+}

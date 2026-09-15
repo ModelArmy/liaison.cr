@@ -1,0 +1,32 @@
+{
+  "name": "ollama_tool_choice_none_anthropic",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "Content-Length": "454",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"max_tokens\":512,\"system\":\"Use the supplied tools when they apply.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}],\"tool_choice\":{\"type\":\"none\"}}",
+        "body_digest": "b667b5b929581b84285d48f3759d5e415d0e47e436a4f51a6a8aaad2bfc52454"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Tue, 15 Sep 2026 20:20:19 GMT",
+          "Content-Length": "503"
+        },
+        "body": "{\"id\":\"msg_46f23c676ac0877ea43268b4\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"gemma4:26b-mxfp8\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"The user is asking for the weather in Paris and explicitly requests to use the `get_weather` tool. I should call the `get_weather` tool with the argument `city='Paris'`.\"},{\"type\":\"tool_use\",\"id\":\"call_kvev8cgu\",\"name\":\"get_weather\",\"input\":{\"city\":\"Paris\"}}],\"stop_reason\":\"tool_use\",\"usage\":{\"input_tokens\":1,\"cache_read_input_tokens\":89,\"output_tokens\":59}}\n"
+      },
+      "recorded_at": "2026-09-15T20:20:19Z"
+    }
+  ]
+}
