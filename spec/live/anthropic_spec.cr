@@ -31,10 +31,14 @@ end
 # endpoint and expected to 400 — moved to `spec/conformance/anthropic_spec.cr`
 # ("declared divergences") once the fix landed. `Policy::Compensating` now
 # refuses that shape before a request is ever built, so there is nothing left
-# for a network call to prove: the 400 this file recorded is preserved as
-# `spec/transcripts/anthropic_thinking_no_signature.json`, the evidence the
-# fix was built from, but nothing replays it any longer — the client no
-# longer sends the request that produced it.
+# for a network call to prove about the behaviour.
+#
+# The recording itself was lost, and is `SCOPE.md`'s only MUST FIX. It was
+# never committed, and because the fix meant nothing replayed it, no test
+# noticed. Its home is here when it comes back: a replay asserts Anthropic's
+# schema rather than anything this shard does, so it can never go red for a
+# change here — which is what `spec/live/` is for, and is also exactly why it
+# needs a consumer rather than merely a file.
 #
 # Recording A is next: a real signed `thinking` block, requested with
 # `Reasoning::Effort` against a budget-only model, replayed on the next turn.

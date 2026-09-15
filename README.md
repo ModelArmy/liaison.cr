@@ -107,8 +107,16 @@ holding a tool call nobody finished planning — the one shape a provider will
 reject outright.
 
 ```crystal
-session << MPSH::Repair.repaired(reply) if reply.ending.cut?
+if turn = M::Repair.repaired(reply)
+  session << turn
+end
 ```
+
+`#repaired` decides for itself whether anything needs doing, so this replaces
+`session << reply` rather than guarding it: a complete turn comes back
+untouched. `nil` means the cut produced nothing but tool calls, and appending
+nothing is then the right answer — an emptied message is content removed to
+satisfy a validator, not a turn that said something.
 
 `Message#ending` is `complete`, `truncated`, `stopped` or `interrupted`, and it
 is archived, so a session reloaded next week still knows its last turn was a
@@ -184,13 +192,13 @@ prints — belongs to the application.
 Two runnable samples, both against a local Ollama and both thin enough to read
 in a sitting:
 
-File                                            |Shows                                              
-------------------------------------------------|---------------------------------------------------
-[examples/handoff.cr](./examples/handoff.cr)    |Answer on one protocol, save, resume on another    
-[examples/tool_loop.cr](./examples/tool_loop.cr)|A `Function` the model calls, and the caller's loop
+File                                          |Shows                                              
+----------------------------------------------|---------------------------------------------------
+[samples/handoff.cr](./samples/handoff.cr)    |Answer on one protocol, save, resume on another    
+[samples/tool_loop.cr](./samples/tool_loop.cr)|A `Function` the model calls, and the caller's loop
 
 ```console
-$ crystal run examples/handoff.cr
+$ crystal run samples/handoff.cr
 ```
 
 They are documentation, not coverage: `spec/end_to_end/` tests the same two

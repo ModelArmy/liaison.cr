@@ -14,11 +14,54 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 
 ## MUST FIX
 
-Empty. Interrupted-turn repair — the last entry here — is built: `MPSH::Ending`
-on the message, `MPSH::Repair` over the session, and the invariant it closes on
-(*no tool call without its result*) asserted directly rather than described.
-`docs/MPSH_SPECIFICATION.md` §3a carries the argument now, which is where it
-belongs: it is a statement about the format, not an outstanding question.
+### The unsigned-`thinking` 400 has no transcript
+
+`spec/transcripts/anthropic_thinking_no_signature.json` is cited by four places
+— `HANDOFF.md`, `docs/protocols/ANTHROPIC.md`, `spec/live/anthropic_spec.cr`
+and `spec/conformance/anthropic_spec.cr` — as the recorded evidence that
+Anthropic's schema *requires* `thinking.signature` rather than merely
+validating it. The file was never committed: `git log --all` on the path is
+empty, and the working tree and the remote hold the same 50 transcripts.
+
+The claim it backs is load-bearing. `Profile#reasoning_signature_required?` is
+true for exactly one protocol, and `Resolver` checks it *ahead* of `own?`,
+overriding the "empty metadata is portable" default that is right everywhere
+else. That inversion is justified by this 400 and by nothing else. The
+behaviour is guarded offline at `spec/conformance/anthropic_spec.cr`
+("declared divergences"); what is missing is the observation the guard was
+derived from.
+
+**Why it went missing is the part to fix.** Nothing replays it — deliberately,
+since the fix means the client no longer builds that request — so its absence
+could not turn anything red. A re-recording that is equally unconsumed will be
+lost the same way, for the same reason. So this entry is not done until the
+transcript exists **and** a spec replays it.
+
+Three traps, in the order they bite:
+
+- **No policy can produce the request.** `Compensating` refuses the block and
+  `Lenient` drops it; either way it never reaches the wire, so `Client#send`
+  is not a route to a recording. The body has to come from
+  `Anthropic::Mapper.new(profile)` under a `Profile` built with
+  `reasoning_signature_required: false`, posted through `Server#post`.
+- **That `Profile` has to be constructed, not narrowed.** All three `with_*`
+  helpers refuse this direction on purpose —
+  `with_tool_call_signature_required` raises on the identical waiver, on the
+  grounds that a catalog may add a requirement and never remove one. A spec
+  doing this is exercising a configuration the library forbids, and must say
+  so at the point it does it, or it reads as a supported deployment shape.
+  *Record, never hand-write* still holds: the body is real mapper output, and
+  only the profile behind it is the test's.
+- **It costs a key, not money.** The request is rejected at schema validation,
+  before any tokens are billed. Cheapness is not a reason to skip the
+  `RECORD=1` two-step in `DEVELOPMENT.md`; the run *after* the recording is
+  still the one that proves anything.
+
+One thing to settle while writing it, because the answer decides where the
+spec lives: a replay of this transcript asserts the *server's* schema, so it
+cannot go red for any change to this shard. It is evidence, not a guard —
+which is what `spec/live/` already is, and is the argument for putting it back
+there rather than beside the offline guard it justifies.
 
 ---
 

@@ -6,14 +6,14 @@ rather than restates.
 
 ## Read in this order
 
-Document                    |Why                                                                            
-----------------------------|-------------------------------------------------------------------------------
-`docs/MPSH_SPECIFICATION.md`|Authoritative. §8a records what the checkpoint established and what it did not 
-`SCOPE.md`                  |The worklist. Every open question, each with the trap that makes it awkward    
-`DEVELOPMENT.md`            |Layering, conventions, how an agent uses the shard, how to add a protocol      
-`docs/protocols/*.md`       |One per protocol: declared capabilities, limits, the bugs each produced        
-`docs/servers/*.md`         |One per server: what it serves, where it diverges, what a green run misses     
-`README.md`                 |The front door: what the shard is for, and the handoff in twenty lines         
+Document                    |Why                                                                           
+----------------------------|------------------------------------------------------------------------------
+`docs/MPSH_SPECIFICATION.md`|Authoritative. §8a records what the checkpoint established and what it did not
+`SCOPE.md`                  |The worklist. Every open question, each with the trap that makes it awkward   
+`DEVELOPMENT.md`            |Layering, conventions, how an agent uses the shard, how to add a protocol     
+`docs/protocols/*.md`       |One per protocol: declared capabilities, limits, the bugs each produced       
+`docs/servers/*.md`         |One per server: what it serves, where it diverges, what a green run misses    
+`README.md`                 |The front door: what the shard is for, and the handoff in twenty lines        
 
 Where this file and `docs/MPSH_SPECIFICATION.md` disagree, the specification
 wins.
@@ -33,12 +33,18 @@ replayed on the next. But a compatibility port proves the shape is accepted,
 not that the vendor whose protocol it imitates would accept it. The real
 Anthropic endpoint has now also been called directly, and settled two things
 Ollama structurally could not: a `thinking` block with no signature is a
-genuine 400 (`spec/transcripts/anthropic_thinking_no_signature.json`), and a
-real signature genuinely replays on the next turn while the budget path and
-its 1,024-token floor are accepted as documented
+genuine 400, and a real signature genuinely replays on the next turn while the
+budget path and its 1,024-token floor are accepted as documented
 (`spec/transcripts/anthropic_thinking_signature_replay.json`). Detail in
-`docs/protocols/ANTHROPIC.md`. All transcripts are committed under
-`spec/transcripts/` and replay offline, so the suite needs no server.
+`docs/protocols/ANTHROPIC.md`.
+
+The first of those two has **no committed transcript**. The observation was
+made and the fix was built from it, but the recording was never committed, and
+because nothing replays it nothing went red when it went missing. That is
+`SCOPE.md`'s only MUST FIX, and its entry carries the traps — the request can
+no longer be built through `Client` under any policy. Every other transcript is
+committed under `spec/transcripts/` and replays offline, so the suite needs no
+server.
 
 Request options are complete: tool declarations, output caps and reasoning
 controls, the last of which introduced `Capability::Catalog` — the fourth
@@ -189,10 +195,12 @@ it. The four handoff examples pass `Reasoning::Off`, because retention is a
 different axis from portability; the fifth asserts the loss deliberately, under
 both policies.
 
-**`SCOPE.md`'s `MUST FIX` is empty.** Interrupted-turn repair, the last entry
-in it, is built, and the argument that used to live there now lives in
-`docs/MPSH_SPECIFICATION.md` §3a — where it belongs, being a statement about
-the format rather than an open question.
+Interrupted-turn repair was `SCOPE.md`'s last `MUST FIX` and is built; the
+argument that used to live there now lives in `docs/MPSH_SPECIFICATION.md` §3a
+— where it belongs, being a statement about the format rather than an open
+question. `MUST FIX` is not empty, though: the missing Anthropic transcript
+above took its place, and is a gap in this shard's *evidence* rather than in
+its behaviour.
 
 `MPSH::Ending` is a settable field on `MPSH::Message`: `Complete`, `Truncated`,
 `Stopped`, `Interrupted`. The four exporters normalise their own stop reason

@@ -439,9 +439,16 @@ That last one is only achievable if compensation is generated at map time and ne
 
 ## 8a. What the Checkpoint Established
 
-All four protocols are implemented and pass a shared structural conformance
-suite offline. Anthropic and Gemini are **unexecuted**: keys gate execution, not
-mapping.
+> **A record of one checkpoint, kept in its own tense.** It describes the state
+> at the point all four protocols were implemented and none had been executed.
+> Everything under *What remains unproven* has since been settled live. For
+> where the work stands now, read `HANDOFF.md`; this section is retained
+> because the *distribution* of corrections is evidence about the format, and
+> that does not expire.
+
+At that point, all four protocols were implemented and passed a shared
+structural conformance suite offline. Anthropic and Gemini were
+**unexecuted**: keys gate execution, not mapping.
 
 The checkpoint existed to find out whether this format survives a protocol from
 a different family. It did, without a format change — and the distribution of
@@ -470,16 +477,22 @@ Two decisions paid off in ways that would have been expensive to retrofit:
   synthesize scaffolding. The same fixture exercises both, which no intersection
   format could have represented.
 
-### What remains unproven
+### What remained unproven at the checkpoint
 
-Structural verification cannot settle behaviour at request time. Specifically:
-whether a `thinking` block lacking a signature is rejected, whether Gemini's
-`functionResponse` accepts inline binary, and whether `reasoning_content` is
-accepted by the servers that implement it. Each is recorded in `SCOPE.md` with
-the change it would imply.
+Structural verification cannot settle behaviour at request time. Three
+questions were open here and all three have since been answered live: whether a
+`thinking` block lacking a signature is rejected (it is — see
+`docs/protocols/ANTHROPIC.md`), whether Gemini's `functionResponse` accepts
+inline binary, and whether `reasoning_content` is accepted by the servers that
+implement it (`docs/servers/OLLAMA.md` — it is spelled `reasoning` there, which
+is how the reader's assumption was caught).
 
-Export also handles **requests only**. A live handoff needs response-shaped
-export, which is unbuilt.
+Export also handled **requests only** at this point. Response-shaped export,
+which a live handoff needs, was unbuilt and is now built.
+
+The lesson worth keeping is the shape of the gap rather than its contents: a
+green structural suite says nothing about what a server will accept, and each
+of these was settled by one recording against a real endpoint.
 
 ---
 

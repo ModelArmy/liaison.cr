@@ -2,7 +2,7 @@
 #
 # A tool the model can actually run, and the turn loop that runs it.
 #
-#     crystal run examples/tool_loop.cr
+#     crystal run samples/tool_loop.cr
 #
 # Needs a local Ollama with one model pulled. Set $OLLAMA_MODEL to use something
 # other than the default below.

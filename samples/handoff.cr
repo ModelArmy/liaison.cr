@@ -3,7 +3,7 @@
 # The product claim in one file: answer a question on one protocol, write the
 # session to disk, read it back, and continue the same conversation on another.
 #
-#     crystal run examples/handoff.cr
+#     crystal run samples/handoff.cr
 #
 # Needs a local Ollama with one model pulled, since Ollama serves Chat
 # Completions, Responses and Anthropic-compatible endpoints from one port. Set

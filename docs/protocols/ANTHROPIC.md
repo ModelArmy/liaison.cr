@@ -156,11 +156,16 @@ foreign reasoning trace into this protocol now raises `RefusedError` unless
 the caller opts into `Policy::Lenient` — correctly, since the trace really is
 being dropped, but a caller who does not expect a refusal here will find one.
 
-See `spec/transcripts/anthropic_thinking_no_signature.json` for the error body
-this was settled with, and `spec/conformance/anthropic_spec.cr` ("declared
-divergences") for where it is now guarded — offline, since the fix makes the
-request that produced that transcript one the client no longer builds.
-Tracked as closed in `../../SCOPE.md`.
+Guarded offline in `spec/conformance/anthropic_spec.cr` ("declared
+divergences"), since the fix makes the request that produced the original 400
+one the client no longer builds under any policy.
+
+**The error body itself is not in this repository.** It was observed, and this
+protocol's whole signature rule was derived from it, but the transcript was
+never committed and nothing replays it — so its absence broke no test. Getting
+it back is `../../SCOPE.md`'s only `MUST FIX`, and that entry carries the
+awkward part: no policy can now produce the request, so a recording has to go
+through a directly constructed `Profile` rather than through `Client`.
 
 The other half — that a *genuine* signature really does replay — is not
 something the rejection proves, only implies. Confirmed separately:

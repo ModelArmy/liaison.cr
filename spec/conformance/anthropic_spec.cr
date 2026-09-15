@@ -217,11 +217,12 @@ describe "Anthropic round trip" do
     # This is the guard, and it is what makes the live falsifying test
     # obsolete rather than merely passing: `Policy::Compensating` — the
     # client's own default, not something a caller has to opt into — refuses
-    # a signature-less `thinking` block before a request is ever built. The
-    # 400 this was originally proven against lives in
-    # `spec/transcripts/anthropic_thinking_no_signature.json`; nothing here
-    # replays it, because the client no longer sends the request that
-    # produced it. See `spec/live/anthropic_spec.cr`.
+    # a signature-less `thinking` block before a request is ever built.
+    #
+    # The 400 this was originally proven against has no committed transcript;
+    # nothing replays it, because the client no longer sends the request that
+    # produced it, which is also why losing it broke nothing. Recovering it is
+    # `SCOPE.md`'s only MUST FIX. See `spec/live/anthropic_spec.cr`.
     it "refuses a signature-less thinking block under the default policy" do
       session = Liaison::Fixtures.reasoning_with_text
 
