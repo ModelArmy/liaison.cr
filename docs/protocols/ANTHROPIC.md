@@ -132,6 +132,56 @@ One consequence worth knowing before prompt caching arrives: **changing either
 control between turns invalidates cached prefixes**, because the value is
 rendered into the prompt.
 
+## Tool choice, and why emptying `tools` is not an alternative
+
+`tool_choice` is an object here, where the OpenAI protocols take a bare string:
+`{"type": "auto"}` and `{"type": "none"}`. Both are accepted on every model.
+
+The interesting part is what happens without it. This endpoint rejects any
+request whose history holds `tool_use` or `tool_result` blocks and does not
+define tools:
+
+```
+Requests which include `tool_use` or `tool_result` blocks must define tools.
+```
+
+So the obvious way to guarantee a turn makes no call — send the final request
+with no tools — is a **400 on this protocol** for any session that has used a
+tool, which is every session where the question arises. On the OpenAI pair the
+same move merely costs the cached prefix. That asymmetry is why
+`Options#tool_choice` exists at all rather than being left to callers, and it
+is recorded in `docs/TOOL_EXECUTION.md` under *Ending the loop*.
+
+### Live finding: `none` is honoured, and yields an empty turn where it binds
+
+`spec/transcripts/anthropic_tool_choice_none.json` records the harshest
+arrangement available: a completed weather exchange for one city, a question
+about a second, and the tool still declared. Under `auto` that is a tool call.
+With `{"type": "none"}` it is not — the field is genuinely enforced, not merely
+accepted.
+
+What it cost is the part worth knowing. The reply came back **empty** —
+`"content": []`, `stop_reason: end_turn`, nine output tokens — rather than a
+sentence explaining that the answer needed a lookup. Forbidding the only move
+that could answer the question does not produce an apology; it produces
+silence.
+
+That is survivable rather than fatal: an empty assistant message is dropped by
+`normalize` on the next request and recorded as `DropEmptyMessage`, so the
+session stays sendable. But a caller ending a tool loop should ask for
+something the history can already answer — a summary, a status, a handover —
+and `docs/TOOL_EXECUTION.md` says so under *Ending the loop*.
+
+One consequence worth knowing before prompt caching arrives: the published
+invalidation table puts `tool_choice` in the **messages** tier, so changing it
+between turns keeps the tools and system prefixes and loses the conversation —
+the opposite tier from a change to the tool definitions themselves, which
+invalidates everything.
+
+**`Required` is not implemented**, and this protocol is the reason for both
+halves of that decision: forced tool use is model-gated here, and it is
+incompatible with extended thinking. `SCOPE.md` carries the detail.
+
 ## Reasoning requires a replayable signature
 
 A `thinking` block must carry the signature the provider issued, replayed

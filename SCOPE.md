@@ -67,6 +67,125 @@ there rather than beside the offline guard it justifies.
 
 ## WILL FIX
 
+### A provider can ignore an exactly-mapped option, and nothing says so
+
+`Options#tool_choice` maps `None` exactly on all four protocols. Gemini then
+disregards it whenever the conversation already contains a tool call — four
+recordings, two model generations three apart, this shard's own mapping ruled
+out as a cause (`docs/protocols/GEMINI.md` has the table). Anthropic and the
+OpenAI pair enforce it.
+
+The reporting is the problem, not the mapping. `Report` comes back clean and
+correct: nothing was restructured, degraded or refused, because nothing was —
+the request said exactly what the caller asked it to say. The loss happens
+after it leaves, and this shard has no vocabulary for that. Every `Outcome`
+describes what became of the caller's *content*; none describes what became of
+their *intent*.
+
+That gap is the thing to close, and it is wider than `tool_choice`. Any
+provider can accept a parameter and disregard it, so whatever is built here is
+the pattern for the next one found.
+
+**The hazard is concrete, which is why this is not merely tidy-mindedness.** A
+caller ends a tool loop with `None`, receives calls anyway, and archives a
+*completed* message holding unanswered calls — the shape `Repair.sendable?`
+forbids, that `Repair` will not mend because `needed?` requires `ending.cut?`,
+and that `docs/TOOL_EXECUTION.md` warns produces a session rejected on the next
+request. Today nothing in the shard notices.
+
+Four candidate answers, none obviously right:
+
+1. **Check the reply.** If `None` was asked for and calls came back, record it.
+   Protocol-agnostic, needs no `Profile` or `Catalog` axis, and stays correct
+   the day Google fixes this — there is no vendor behaviour to model, only an
+   observation to compare against a request. It also needs no account of
+   *why*, which matters given the trigger below. The trap: it reports after
+   the fact, so a caller learns on the turn it already paid for.
+2. **Declare it on `Profile`.** A `tool_choice_enforced?` axis, false for
+   Gemini, annotated before sending. This was the obvious candidate while the
+   finding was "Gemini ignores `NONE`", and the evidence has since undermined
+   it. The finding is *conditional*: `NONE` is honoured until the conversation
+   contains a tool call. That is a fact about the protocol **and the session's
+   contents**, and a `Profile` getter sees only the first. A boolean there
+   must either over-warn — flagging the no-history case, which demonstrably
+   works — or carry the defect in its own name,
+   `tool_choice_unenforced_after_tool_call?`. When an axis has to describe a
+   specific vendor bug to stay accurate, this is the wrong home for it:
+   `Profile` describes what a protocol can *express*, and Gemini expresses
+   this correctly.
+3. **Document only**, and leave callers to check. Cheapest, and arguably
+   principled — enforcing model behaviour is not a mapper's job. Against it:
+   a silent non-guarantee is exactly what `Report` exists to prevent.
+4. **Strip the unasked-for calls from the reply.** Delivers the guarantee, and
+   is the only option that does. Rejected unless someone argues it back:
+   dropping a block from a *reply* is a different act from adapting a request,
+   it would discard a `thought_signature` that a later turn may need, and it
+   hides the provider's real behaviour from the caller who most needs to see
+   it.
+
+Whichever wins, the sub-question stays: what is this called? Adding a fifth
+`Outcome` means every exhaustive `case` over it changes, and the new value is
+not like its siblings — they describe adaptations this shard performed, and
+this one describes something a provider did. A separate channel on `Report`
+may be the more honest shape, at the cost of a second thing for callers to
+check.
+
+### `ToolChoice::Required` needs a catalog axis and a conflict rule
+
+`Options#tool_choice` ships with `Auto` and `None`, which every protocol
+supports and agrees about. The third value — Anthropic's `any`, OpenAI's
+`required`, Gemini's `ANY` — is left out, and the reason is that it is not the
+one-line addition it appears to be. Two hazards, both attached to this value
+alone:
+
+- **It is model-gated on Anthropic.** Where forced tool use is unsupported,
+  `any` and `tool` fail while `auto` and `none` keep working. That is a
+  `Capability::Catalog` axis, and *A model catalog* below already says a third
+  axis must argue its own default rather than inherit either existing one —
+  the two present axes reach the same optimistic default by opposite
+  reasoning, so neither generalises to this.
+- **It conflicts with an option this shard already has.** Forced tool use is
+  incompatible with extended thinking on Anthropic, so `Required` plus a
+  thinking budget is a request the mapper could build and the endpoint would
+  reject. Nothing in `Options` currently reasons about another of its own
+  fields, and the first rule that does is worth deciding rather than
+  assuming — including where it lives, since a conflict between two request
+  options is neither a `Profile` fact nor a block question.
+
+Neither hazard touches `Auto` or `None`, which is why they shipped without
+waiting for this.
+
+Also still out, and more cheaply: the fourth form, naming a specific tool the
+model must call. It carries an argument, so adopting it turns `ToolChoice` from
+an enum into a closed union and changes every caller's `case`. Additive in
+meaning, breaking in shape. No caller in view.
+
+### Emptying `tools` is a 400 on Anthropic, and nothing catches it
+
+Found while building `tool_choice`, and separate from it. This endpoint rejects
+any request whose history holds `tool_use` or `tool_result` blocks and does not
+define tools:
+
+```
+Requests which include `tool_use` or `tool_result` blocks must define tools.
+```
+
+All four wire requests omit the `tools` key when the array is empty, so
+`Options.new(tools: [] of Tool)` against a session with tool history builds a
+request this shard knows will fail and sends it anyway.
+
+`tool_choice` makes this *avoidable* — a caller no longer has any reason to
+empty the array — but it does not make it impossible, and the failure is a
+rejected request rather than a recorded loss.
+
+The trap in fixing it: the constraint is documented by its error message rather
+than by a schema, and nothing here has observed it. A guard built on that alone
+would be the guessing this repo avoids, so this wants a recording first — which
+is awkward in the usual way, since the request it needs is one no caller should
+now be making. Worth checking whether the other three protocols have an
+equivalent rule before writing anything protocol-specific; the OpenAI pair
+rejects an *empty array* but the key's absence is a different question.
+
 ### Retention governs replay, not display and not storage
 
 Surfaced settling a streaming question, and recorded because the assumption is

@@ -179,7 +179,32 @@ nowhere else. So a tool that *reports* failure sets only `is_error`, and a tool
 that raises unexpectedly must set both — otherwise it crashes and the model is
 never told.
 
-`SCOPE.md`'s remaining entries all predate the streaming work.
+`SCOPE.md`'s remaining entries all predate the streaming work, apart from the
+two `tool_choice` left behind.
+
+**`Options#tool_choice` ends a tool loop**, which was the one thing a caller
+running one could not ask for. `Auto` and `None`, no more: every protocol
+spells both, means the same by both, and accepts both on every model, so this
+needed **no `Capability` machinery at all** — no `Profile` axis, no control
+module, no annotation, every mapping Exact. That is the contrast worth keeping
+in mind next to `reasoning`, which needed all of it because the protocols
+genuinely disagree there. The rule it suggests: a capability axis earns its
+place when a protocol can *fail to honour* a request, not merely when it spells
+one differently.
+
+`Required` is deferred with its reasons written down — model-gated on Anthropic
+and in conflict with `reasoning` there — and so is a second thing found on the
+way: emptying `tools` is a 400 on Anthropic for any session with tool history,
+which is what made the previous workaround unavailable on that protocol rather
+than merely expensive. Both are in `SCOPE.md`.
+
+One live finding came out of proving it, and it is the kind that only a real
+endpoint gives up: **`None` guarantees no call, not an answer.** Asked
+something it could only resolve by calling, and forbidden from calling, Claude
+returns an empty turn rather than an explanation
+(`spec/transcripts/anthropic_tool_choice_none.json`). Recoverable —
+`normalize` drops the empty message and records it — but the lesson for a
+caller ending a loop is to ask for something the history can already answer.
 
 **`spec/end_to_end/` exists because the CLI left.** Those specs were this
 shard's only full-stack coverage — and the only place a session

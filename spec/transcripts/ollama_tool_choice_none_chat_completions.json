@@ -1,0 +1,31 @@
+{
+  "name": "ollama_tool_choice_none_chat_completions",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "http://localhost:11434/v1/chat/completions",
+        "headers": {
+          "content-type": "application/json",
+          "Content-Length": "493",
+          "Host": "localhost:11434",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"gemma4:26b-mxfp8\",\"messages\":[{\"role\":\"system\",\"content\":\"Use the supplied tools when they apply.\"},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}}],\"max_tokens\":512,\"tool_choice\":\"none\"}",
+        "body_digest": "98e173b3b2d8e2d1fb4a8ba44291276438a1ba93a8641d830e19ad49ee605c05"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json",
+          "Date": "Tue, 15 Sep 2026 20:20:17 GMT",
+          "Content-Length": "663"
+        },
+        "body": "{\"id\":\"chatcmpl-122\",\"object\":\"chat.completion\",\"created\":1789503617,\"model\":\"gemma4:26b-mxfp8\",\"system_fingerprint\":\"fp_ollama\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning\":\"The user is asking for the weather in Paris and explicitly instructed to use the `get_weather` tool. I should call the `get_weather` tool with the argument `city='Paris'`.\",\"tool_calls\":[{\"id\":\"call_o2d0q4rp\",\"index\":0,\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":90,\"prompt_tokens_details\":{\"cached_tokens\":0},\"completion_tokens\":59,\"total_tokens\":149}}\n"
+      },
+      "recorded_at": "2026-09-15T20:20:17Z"
+    }
+  ]
+}

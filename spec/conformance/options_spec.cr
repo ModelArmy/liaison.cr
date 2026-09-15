@@ -1,6 +1,7 @@
 require "../spec_helper"
 
-# Tool declarations and output caps, across four spellings of two ideas.
+# Tool declarations, output caps and tool choice, across four spellings of
+# three ideas.
 #
 # These are *request* concerns, not session ones. A session that carried its
 # own tool list would have acquired a home — the failure this shard exists to
@@ -151,6 +152,66 @@ describe "request options" do
         Liaison::Options.new(max_output_tokens: 128))
 
       JSON.parse(exchange.body)["max_tokens"].as_i.should eq 128
+    end
+  end
+
+  describe "tool choice" do
+    # Three protocols take a bare string; Anthropic wraps it in an object and
+    # Gemini nests it two deep under a shouted mode. One idea, three shapes.
+    it "spells the choice four ways" do
+      options = Liaison::Options.new(tools: [weather],
+        tool_choice: Liaison::ToolChoice::None)
+
+      body(Liaison::ProtocolKind::ChatCompletions, options)["tool_choice"].as_s.should eq "none"
+      body(Liaison::ProtocolKind::Responses, options)["tool_choice"].as_s.should eq "none"
+      body(Liaison::ProtocolKind::Anthropic, options)["tool_choice"]["type"].as_s.should eq "none"
+      body(Liaison::ProtocolKind::Gemini, options)["toolConfig"]["functionCallingConfig"]["mode"]
+        .as_s.should eq "NONE"
+    end
+
+    it "spells auto the same four ways" do
+      options = Liaison::Options.new(tools: [weather],
+        tool_choice: Liaison::ToolChoice::Auto)
+
+      body(Liaison::ProtocolKind::ChatCompletions, options)["tool_choice"].as_s.should eq "auto"
+      body(Liaison::ProtocolKind::Responses, options)["tool_choice"].as_s.should eq "auto"
+      body(Liaison::ProtocolKind::Anthropic, options)["tool_choice"]["type"].as_s.should eq "auto"
+      body(Liaison::ProtocolKind::Gemini, options)["toolConfig"]["functionCallingConfig"]["mode"]
+        .as_s.should eq "AUTO"
+    end
+
+    # The guarantee this option exists to keep: the tools are still declared.
+    # Emptying the array instead is what a caller had to do before, and it is a
+    # 400 on Anthropic for any session carrying tool history.
+    it "keeps the declarations on the wire" do
+      options = Liaison::Options.new(tools: [weather],
+        tool_choice: Liaison::ToolChoice::None)
+
+      [Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses,
+       Liaison::ProtocolKind::Anthropic, Liaison::ProtocolKind::Gemini].each do |protocol|
+        body(protocol, options)["tools"]?.should_not be_nil
+      end
+    end
+
+    # Absent means absent. Asserted against a request that *does* offer tools,
+    # since the interesting case is a caller who declares them and says nothing
+    # about how they may be used — this is what keeps every recorded transcript
+    # valid.
+    it "emits nothing when no choice is asked for" do
+      options = Liaison::Options.new(tools: [weather])
+
+      body(Liaison::ProtocolKind::ChatCompletions, options)["tool_choice"]?.should be_nil
+      body(Liaison::ProtocolKind::Responses, options)["tool_choice"]?.should be_nil
+      body(Liaison::ProtocolKind::Anthropic, options)["tool_choice"]?.should be_nil
+      body(Liaison::ProtocolKind::Gemini, options)["toolConfig"]?.should be_nil
+    end
+
+    # A 400 on the OpenAI protocols — `tool_choice is only allowed when tools
+    # are specified` — so it is refused here rather than sent and rejected.
+    it "refuses a choice with no tools to choose from" do
+      expect_raises(ArgumentError, /tools/) do
+        Liaison::Options.new(tool_choice: Liaison::ToolChoice::None)
+      end
     end
   end
 

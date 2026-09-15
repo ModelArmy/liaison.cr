@@ -56,6 +56,16 @@ whose `reasoning_content` is a string with nothing to hold.
 Same fixture, same suite, opposite outcomes, decided by declared capability with
 no protocol-specific test code anywhere.
 
+## Tool choice
+
+Spelled exactly as on Chat Completions: a bare string, `"auto"` or `"none"`, at
+the top level. Notable only for being one of the few options this protocol does
+*not* nest one wrapper deeper than its sibling does — compare `reasoning`,
+which wraps a value Chat Completions leaves bare.
+
+The rest of the story is shared with Chat Completions; see that document, and
+`docs/TOOL_EXECUTION.md` under *Ending the loop*.
+
 ## Compensation
 
 `function_call_output.output` is a string, so an image-bearing tool result needs

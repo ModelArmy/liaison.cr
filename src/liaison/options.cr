@@ -39,6 +39,56 @@ module Liaison
     end
   end
 
+  # How the model may use the tools it was offered.
+  #
+  # Two values, because two is what every protocol here agrees about. `Auto`
+  # and `None` mean the same thing on all four and are accepted by all four,
+  # so nothing in `Capability` mediates this: unlike `reasoning`, there is no
+  # disagreement to reconcile and every mapping is `Exact`.
+  #
+  # **Accepted is not honoured.** Gemini disregards `None` once the
+  # conversation contains a tool call — proven across two model generations,
+  # with this shard's mapping ruled out as the cause; see
+  # `docs/protocols/GEMINI.md`. The other three enforce it. A caller ending a
+  # tool loop on Gemini must therefore check the reply rather than trust the
+  # request, because a completed turn holding unasked-for calls is the one
+  # shape `MPSH::Repair.sendable?` forbids and `Repair` will not mend.
+  #
+  # The missing third value is `Required` — "call something" — and it is
+  # missing deliberately rather than by oversight. It is model-gated on at
+  # least one protocol and conflicts with `reasoning` on the same one, so it
+  # needs a `Capability::Catalog` axis and a cross-option rule that neither
+  # value here does. `SCOPE.md` carries both traps. The fourth form, naming a
+  # specific tool, would carry an argument and turn this into a union.
+  #
+  # Expect the vocabulary to grow. A `case` over it is exhaustive today, not
+  # closed forever.
+  enum ToolChoice
+    # The model decides. This is every protocol's own default, so asking for
+    # it explicitly matters only when overriding an earlier choice.
+    Auto
+
+    # The model may not call a tool on this turn.
+    #
+    # What a tool loop ends with. The alternative available before this
+    # existed — sending the final request with no tools — is a 400 on
+    # Anthropic for any session whose history holds tool blocks, and a lost
+    # prefix cache on the rest.
+    None
+
+    def wire_name : String
+      case self
+      in ToolChoice::Auto then "auto"
+      in ToolChoice::None then "none"
+      end
+    end
+
+    # Gemini shouts its modes, as it does its reasoning levels.
+    def gemini_mode : String
+      wire_name.upcase
+    end
+  end
+
   # What the caller wants of *this* request, as opposed to what the session
   # remembers.
   #
@@ -68,9 +118,22 @@ module Liaison
     # re-cut by adding it.
     getter reasoning : Reasoning::Request?
 
+    # How the offered tools may be used. The tools are still declared and
+    # still emitted; this only constrains what the model may do with them.
+    #
+    # **Absent means absent**, on `reasoning`'s terms and for the same reason:
+    # nothing is emitted on any protocol, the provider's own default stands,
+    # and a request that does not ask for a choice is byte-identical to one
+    # built before this option existed.
+    getter tool_choice : ToolChoice?
+
     def initialize(@tools : Array(Tool) = [] of Tool,
                    @max_output_tokens : Int32? = nil,
-                   @reasoning : Reasoning::Request? = nil)
+                   @reasoning : Reasoning::Request? = nil,
+                   @tool_choice : ToolChoice? = nil)
+      if @tool_choice && @tools.empty?
+        raise ArgumentError.new("tool_choice needs tools to choose from")
+      end
     end
 
     def tools? : Bool

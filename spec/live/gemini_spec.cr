@@ -24,8 +24,21 @@ require "../spec_helper"
 # `gemini-3.1-pro-preview` appears once, for the one claim specific to a tier
 # rather than a generation: Google's docs say thinking cannot be turned off on
 # Gemini 3 Pro at all, only lowered — the opposite of what Flash confirmed.
+#
+# `MODEL_CURRENT` appears once too, and for the same reason in reverse: a
+# claim specific to a *generation* rather than a protocol. `gemini-3.5-flash`
+# is now three Flash generations behind (3.6 in July 2026, 3.7 in August, 3.8
+# current), and Google's model page calls that tier previous-generation. The
+# file is deliberately **not** migrated wholesale — every other transcript
+# here is pinned to 3.5 and re-recording them all would cost a pile of live
+# calls to re-prove claims already settled. A newer model is introduced only
+# where the model generation is itself the question.
 private MODEL_35  = "gemini-3.5-flash"
 private MODEL_PRO = "gemini-3.1-pro-preview"
+# Confirm against `GET /v1beta/models` before recording — that call is free,
+# and this ID is the one thing here taken from documentation rather than from
+# a response this key actually received.
+private MODEL_CURRENT = "gemini-3.8-flash"
 
 private def gemini : Liaison::Server
   Liaison::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
@@ -48,6 +61,57 @@ private def tool_question : M::Session
   session = M::Session.new("Use the supplied tools when they apply.")
   session << M::Message.user("What is the weather in Paris? Use the get_weather tool.")
   session
+end
+
+# A completed tool exchange, then a question whose obvious answer is another
+# call, sent with `None`. Shared because the same arrangement runs against two
+# model generations and the model must be the only thing differing between
+# them.
+#
+# The first turn mints a real signed call rather than fabricating one, which
+# is not optional here: `Catalog` marks these models as signing their own
+# calls, so a hand-built block degrades out of the request entirely. Hence two
+# requests per recording.
+# As `tool_choice_loop`, but the follow-up text rides in the same message as
+# the tool result rather than in a message after it. The difference between
+# these two is the whole of what separates a liaison defect from a Gemini one.
+private def tool_choice_merged_turn
+  session = tool_question
+  first, _ = client.send(session, MODEL_CURRENT, options: armed)
+  session << first
+
+  calls = first.content.select(M::ToolCallBlock)
+  calls.size.should eq 1
+
+  blocks = calls.map do |call|
+    M::ToolResultBlock.new(call.call_id,
+      [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)
+  end
+  blocks << M::TextBlock.new("And in Berlin?").as(M::Block)
+  session << M::Message.new(M::Role::User, blocks)
+
+  client.send(session, MODEL_CURRENT, options: Liaison::Options.new(
+    tools: [weather_tool], max_output_tokens: 512,
+    tool_choice: Liaison::ToolChoice::None))
+end
+
+private def tool_choice_loop(model : String)
+  session = tool_question
+  first, _ = client.send(session, model, options: armed)
+  session << first
+
+  calls = first.content.select(M::ToolCallBlock)
+  calls.size.should eq 1
+
+  session << M::Message.new(M::Role::User, calls.map { |call|
+    M::ToolResultBlock.new(call.call_id,
+      [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)
+  })
+  session << M::Message.user("And in Berlin?")
+
+  client.send(session, model, options: Liaison::Options.new(
+    tools: [weather_tool], max_output_tokens: 512,
+    tool_choice: Liaison::ToolChoice::None))
 end
 
 describe "Gemini" do
@@ -149,6 +213,102 @@ describe "Gemini" do
         # And the request was still accepted, which is the whole point: the
         # 400 this replaces was not recoverable, a degradation is.
         reply.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+  end
+
+  describe "a turn that may not call a tool" do
+    # Pinned to the old generation, and asserting what was observed rather
+    # than what was asked for.
+    #
+    # The request carries `toolConfig.functionCallingConfig.mode: "NONE"`,
+    # correctly placed at the top level, alongside the declarations. Google
+    # documents that mode as the model not predicting any function call at
+    # all — behaving as though no declarations were passed. This model
+    # returned a `functionCall` for Berlin regardless, signature and all.
+    #
+    # Asserted as-observed so that the day it changes, a spec goes red and
+    # somebody reads this. It is not an endorsement.
+    it "sends `NONE` correctly and is ignored on 3.5 Flash" do
+      Wiretap.intercept("gemini_tool_choice_none_35") do
+        reply, report = tool_choice_loop(MODEL_35)
+
+        # Nothing refused, nothing degraded: the mapping is exact and the
+        # request was accepted. The shard did its whole job.
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+        reply.content.select(M::ToolCallBlock).size.should eq 1
+      end
+    end
+
+    # The question that decided how this gets modelled, and it answered
+    # against us. `gemini-3.5-flash` is three Flash generations behind — 3.6 in
+    # July 2026, 3.7 in August, 3.8 current. If the newer model had honoured
+    # `NONE`, the finding above would have been a fact about one model
+    # generation, which `Capability::Catalog` already exists to hold.
+    #
+    # It did not. Byte-identical `toolConfig` on the wire, byte-identical
+    # shape coming back: a `functionCall` for Berlin with its signature, and
+    # `finishMessage: "Model generated function call(s)."` So this is not a
+    # legacy-model quirk to be keyed by name — it spans the Flash line, and
+    # the shard needs a way to say "mapped exactly, sent faithfully, not
+    # honoured", which no `Outcome` currently says. `SCOPE.md` carries it.
+    it "sends `NONE` correctly and is ignored on a current model too" do
+      Wiretap.intercept("gemini_tool_choice_none_38") do
+        reply, report = tool_choice_loop(MODEL_CURRENT)
+
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+        reply.content.select(M::ToolCallBlock).size.should eq 1
+      end
+    end
+
+    # `NONE` *is* honoured here, and the reply proves the mode reached the
+    # model rather than merely being tolerated: it answers that it has no
+    # access to a `get_weather` tool, which is Google's documented semantics
+    # exactly — behaviour as though no declarations were passed.
+    #
+    # So the option works on this protocol. Something about the *other*
+    # arrangement defeats it.
+    it "is honoured with no prior call in the history" do
+      Wiretap.intercept("gemini_tool_choice_none_no_history") do
+        reply, report = client.send(tool_question, MODEL_CURRENT,
+          options: Liaison::Options.new(tools: [weather_tool],
+            max_output_tokens: 512,
+            tool_choice: Liaison::ToolChoice::None))
+
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+        reply.content.select(M::ToolCallBlock).should be_empty
+        reply.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+
+    # The one that isolated the cause, by holding the prior call and removing
+    # the adjacency — the follow-up text rides in the same message as the tool
+    # result. Across the four recordings the variables finally separate:
+    #
+    #   transcript    adjacent `user`?   prior call?   honoured?
+    #   no_history    no                 no            yes
+    #   merged        no                 yes           no
+    #   current       yes                yes           no
+    #   35            yes                yes           no
+    #
+    # `no_history` and `merged` differ in one variable and disagree; adjacency
+    # is ruled out and this mapper is not at fault. **A prior `functionCall`
+    # in the conversation is what defeats `NONE`** — the family behind
+    # googleapis/python-genai#1818, where tool calling stays sticky once a
+    # tool has been used.
+    #
+    # Which is the cruellest possible shape for this defect. `NONE` works
+    # exactly until the first tool call and stops working forever after, so it
+    # is unavailable for the one job it exists to do: ending a tool loop, whose
+    # last turn has prior calls in context by definition.
+    #
+    # Asserted as observed, so the day Google fixes it a spec goes red.
+    it "is ignored once a call is in the history, however the result is carried" do
+      Wiretap.intercept("gemini_tool_choice_none_merged") do
+        reply, report = tool_choice_merged_turn
+
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+        reply.content.select(M::ToolCallBlock).size.should eq 1
       end
     end
   end

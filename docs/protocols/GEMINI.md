@@ -94,6 +94,64 @@ One consequence worth knowing before prompt caching arrives: like Anthropic,
 this protocol renders the reasoning control into the prompt, so changing
 either unit between turns invalidates cached prefixes.
 
+## Tool choice: nested, shouted, and not enforced after a call
+
+The only one of the four to nest this rather than putting it at the top level:
+
+```json
+{"toolConfig": {"functionCallingConfig": {"mode": "NONE"}}}
+```
+
+`toolConfig` is a sibling of `tools` and `contents`, **not** a member of
+`generationConfig` — which is where the protocol's other per-request settings
+live, and therefore the wrong guess to make. The modes are shouted, as the
+thinking levels are: `AUTO` and `NONE`. `mode` defaults to `AUTO` when the
+object is absent, so omitting it entirely is the same as asking for `AUTO`,
+which is what keeps *absent means absent* honest here.
+
+### `NONE` stops working once a tool has been called
+
+A placement difference would be unremarkable. This is not that.
+
+Google documents `NONE` as the model not predicting any function call at all,
+behaving as though no declarations were passed. It does that — **until the
+conversation contains a `functionCall`.** After that the mode is ignored, and
+the model calls anyway.
+
+Four recordings, isolating it one variable at a time:
+
+Transcript (`gemini_tool_choice_none_…`)|Adjacent `user`|Prior call|Honoured
+----------------------------------------|---------------|----------|--------
+`_no_history`                           |no             |no        |**yes** 
+`_merged`                               |no             |yes       |no      
+`_current`                              |yes            |yes       |no      
+`_35`                                   |yes            |yes       |no      
+
+`_no_history` returns prose saying it has no access to the tool, which is the
+documented behaviour exactly — so the mode does reach the model and is not
+merely tolerated. `_merged` differs from it in one variable and disagrees,
+which rules out the other candidate cause: that our two consecutive `user`
+messages, a shape the Anthropic mapper merges and this one does not, were
+confusing the model. They were not. This mapper is not at fault.
+
+Not a model-generation quirk either. `gemini-3.5-flash` and `gemini-3.8-flash`
+are three Flash generations apart and behave identically, byte for byte in
+request and in reply shape. So `Capability::Catalog`, which keys facts by
+model, is the wrong home for it.
+
+**What it costs.** The defect lands exactly where the option is needed. Ending
+a tool loop is a turn with prior calls in context by definition, so `None` is
+unavailable for the one job it exists to do on this protocol. It remains usable
+for a turn before any tool has been called — forcing a conversational reply
+while tools sit declared — which is a narrower use but a real one.
+
+**The hazard for a caller.** A reply holding calls that were never asked for,
+on a turn the caller intends as the last one, archives a *completed* message
+with unanswered calls: the shape `Repair.sendable?` forbids and `Repair` will
+not touch, since `needed?` requires `ending.cut?`. On this protocol a tool loop
+must check the reply rather than trust the request. `SCOPE.md` carries what
+the shard should do about that.
+
 ## Structural divergences
 
 Individually mechanical; collectively the reason this protocol is a real test.

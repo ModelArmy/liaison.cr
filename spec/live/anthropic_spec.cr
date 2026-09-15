@@ -27,6 +27,11 @@ private def client(policy : Liaison::Capability::Policy = Liaison::Capability::P
   Liaison::Client.new(Liaison::Provider.for(anthropic, Liaison::ProtocolKind::Anthropic), policy)
 end
 
+private def weather_tool : Liaison::Tool
+  Liaison::Tool.new("get_weather", "Look up the current weather in a city",
+    %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
+end
+
 # What used to live here — a signature-less `thinking` block sent to this
 # endpoint and expected to 400 — moved to `spec/conformance/anthropic_spec.cr`
 # ("declared divergences") once the fix landed. `Policy::Compensating` now
@@ -92,6 +97,85 @@ describe "Anthropic" do
         second_report.annotations.map(&.outcome).should_not contain(M::Outcome::Degraded)
         second_report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
         second.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+  end
+
+  # Ending a tool loop, on the protocol where nothing else can.
+  #
+  # These are the examples the option was built for, and the only ones that can
+  # falsify anything. Ollama's ports accept the field and prove the shape; they
+  # cannot show the model withheld a call it would otherwise have made, because
+  # they accept more than they enforce.
+  #
+  # Note what both requests demonstrate in passing. The tools are still
+  # declared, which is not optional here: this endpoint rejects any request
+  # whose history holds `tool_use` or `tool_result` blocks and does not define
+  # tools, so emptying the array — the only guarantee available before this
+  # option existed — is a 400 rather than a fallback. See
+  # `docs/protocols/ANTHROPIC.md`.
+  describe "a turn that may not call a tool" do
+    # The falsifying one, and deliberately the harshest arrangement available:
+    # a completed exchange for one city, then a question about a second city
+    # with the tool still on the table. Under `Auto` that is a tool call. It
+    # is not one here.
+    #
+    # It also answers a question the shape of the option cannot: **`None`
+    # guarantees no call, not an answer.** Asked something it could only have
+    # resolved by calling, and forbidden from calling, the model returned an
+    # empty turn — `content: []`, `stop_reason: end_turn` — rather than
+    # explaining itself. So a caller who ends a loop with a question the
+    # history cannot answer gets nothing, and archives an empty assistant
+    # message. Survivable: `normalize` drops empty messages on the next
+    # request and records `DropEmptyMessage`. Still a loss, and cheaper to
+    # avoid than to absorb — see the example below for the shape that does.
+    it "withholds the call where a call is the obvious move" do
+      Wiretap.intercept("anthropic_tool_choice_none") do
+        call = M::ToolCallBlock.new("mc_live_weather", "get_weather",
+          M::Object{"city" => "Paris"})
+        session = M::Session.new("Use the supplied tools when they apply.")
+        session << M::Message.user("What is the weather in Paris?")
+        session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
+        session << M::Message.new(M::Role::User,
+          [M::ToolResultBlock.new(call.call_id,
+            [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+        session << M::Message.user("And in Berlin?")
+
+        reply, report = client.send(session, MODEL,
+          options: Liaison::Options.new(tools: [weather_tool],
+            max_output_tokens: 512,
+            tool_choice: Liaison::ToolChoice::None))
+
+        # The claim, stated directly, and the whole of it.
+        reply.content.select(M::ToolCallBlock).should be_empty
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+      end
+    end
+
+    # What a bounded host actually sends: the history ends with a tool result,
+    # nothing further is asked, and the turn exists to say what was found.
+    # Answerable without calling anything, which is the difference from the
+    # example above — and the reason that one returns nothing and this one
+    # returns prose.
+    it "answers from what the history already holds" do
+      Wiretap.intercept("anthropic_tool_choice_none_summary") do
+        call = M::ToolCallBlock.new("mc_live_weather", "get_weather",
+          M::Object{"city" => "Paris"})
+        session = M::Session.new("Use the supplied tools when they apply.")
+        session << M::Message.user("What is the weather in Paris?")
+        session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
+        session << M::Message.new(M::Role::User,
+          [M::ToolResultBlock.new(call.call_id,
+            [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+
+        reply, report = client.send(session, MODEL,
+          options: Liaison::Options.new(tools: [weather_tool],
+            max_output_tokens: 512,
+            tool_choice: Liaison::ToolChoice::None))
+
+        reply.content.select(M::ToolCallBlock).should be_empty
+        reply.content.select(M::TextBlock).should_not be_empty
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
       end
     end
   end

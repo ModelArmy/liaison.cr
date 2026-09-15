@@ -1,0 +1,58 @@
+{
+  "name": "anthropic_tool_choice_none",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Content-Length": "726",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-haiku-4-5\",\"max_tokens\":512,\"system\":\"Use the supplied tools when they apply.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"mc_live_weather\",\"name\":\"get_weather\",\"input\":{\"city\":\"Paris\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"mc_live_weather\",\"content\":[{\"type\":\"text\",\"text\":\"18C, light rain\"}]},{\"type\":\"text\",\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}],\"tool_choice\":{\"type\":\"none\"}}",
+        "body_digest": "93a88db2bb31621124072d606eb086c2864198fd76876787f1a2359d40d17ba2"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Date": "Tue, 15 Sep 2026 17:13:53 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "anthropic-ratelimit-input-tokens-limit": "500000",
+          "anthropic-ratelimit-input-tokens-remaining": "500000",
+          "anthropic-ratelimit-input-tokens-reset": "2026-09-15T17:13:53Z",
+          "anthropic-ratelimit-output-tokens-limit": "80000",
+          "anthropic-ratelimit-output-tokens-remaining": "80000",
+          "anthropic-ratelimit-output-tokens-reset": "2026-09-15T17:13:53Z",
+          "anthropic-ratelimit-requests-limit": "1000",
+          "anthropic-ratelimit-requests-remaining": "999",
+          "anthropic-ratelimit-requests-reset": "2026-09-15T17:13:52Z",
+          "anthropic-ratelimit-tokens-limit": "580000",
+          "anthropic-ratelimit-tokens-remaining": "580000",
+          "anthropic-ratelimit-tokens-reset": "2026-09-15T17:13:53Z",
+          "Server": "cloudflare",
+          "request-id": "req_011Cf5bnADjFTKzMh1ujvRiX",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "traceresponse": "00-d8a02f8555da0721792d917cbc93bf7a-6327a16fd55abfdb-01",
+          "vary": "Accept-Encoding",
+          "server-timing": "x-originResponse;dur=544",
+          "X-Robots-Tag": "none",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "cf-cache-status": "DYNAMIC",
+          "CF-RAY": "a3b943b6dcbbf54f-YYZ"
+        },
+        "body": "{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf5bnAnidqzXuXaGefJdr\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":662,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":9,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}"
+      },
+      "recorded_at": "2026-09-15T17:13:52Z"
+    }
+  ]
+}

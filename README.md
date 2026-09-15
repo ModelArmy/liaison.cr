@@ -147,6 +147,25 @@ not hold, and one whose tool raised — because a session holding a call without
 its result is the shape a provider rejects. A tool returns `Array(MPSH::Block)`,
 so a tool that answers with an image or a file needs no special handling.
 
+A loop that stops on its own terms — a round cap, a deadline, a budget — needs
+a last turn that says something and calls nothing:
+
+```crystal
+reply, _ = client.send(session, model, options: Liaison::Options.new(
+  tools: toolbox.tools,
+  tool_choice: Liaison::ToolChoice::None))
+```
+
+The tools stay declared; the model is told it may not use them. Withdrawing the
+declarations instead looks equivalent and is not: it costs the provider's
+prefix cache on the turn carrying the most history, and on Anthropic it is a
+400 outright once the conversation contains a tool call.
+
+Ask this turn for something the history can already answer — a summary, or
+where the work got to. `None` guarantees no tool call, not an answer: a model
+forbidden to make the one call that would resolve a question returns an empty
+turn instead.
+
 ### Choosing how much loss you will accept
 
 Translation loss is graded, and the policy decides what to do about it:
