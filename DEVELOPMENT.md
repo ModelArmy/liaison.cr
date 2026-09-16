@@ -568,6 +568,18 @@ abstraction is the first protocol from a different family.
    module and no annotation. If a fifth protocol breaks that, the value it
    cannot honour is the one that needs the machinery, not the option.
 
+   Where the spelling goes is the rule worth taking from this. `ToolChoice`
+   carries `wire_name`, the form three protocols share; Gemini's shouted
+   version is a table in its own `capabilities.cr`, beside `REASONING_LEVELS`,
+   which does the same for `Reasoning::Effort`. **A canonical type carries what
+   protocols agree on; disagreement lives in the protocol that disagrees.** So
+   a new protocol spelling these differently adds a table under
+   `protocol/<name>/`, and never a method named after itself on the shared
+   type. Resist deriving one spelling from another even when it would work:
+   `"AUTO"` happens to be `"auto"` uppercased, but `ANY` against `required` is
+   not, and a derivation that holds only for the current vocabulary breaks on
+   the value that grows it.
+
    Then reasoning control, which is the awkward one, because protocols disagree
    about the *unit* and not merely the spelling. Declare `reasoning_unit` — and
    declare `Either` honestly if the protocol spells both, rather than picking
