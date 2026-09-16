@@ -1,5 +1,6 @@
 require "../../capability/profile"
 require "../../reasoning"
+require "../../options"
 
 module Liaison::Protocol::Gemini
   METADATA_KEY = "gemini"
@@ -40,6 +41,24 @@ module Liaison::Protocol::Gemini
     Reasoning::Effort::High   => "HIGH",
     Reasoning::Effort::XHigh  => "HIGH",
     Reasoning::Effort::Max    => "HIGH",
+  }
+
+  # Both modes, shouted, beside `toolConfig.functionCallingConfig.mode`.
+  #
+  # A table rather than an uppercasing of `ToolChoice#wire_name`, even though
+  # that would give the right answer for these two. The agreement is a
+  # coincidence of vocabulary, not a relationship: this protocol spells the
+  # third form `ANY` where Anthropic spells it `any` and the OpenAI pair spell
+  # it `required`, so a derivation is wrong the moment `Required` arrives.
+  # `REASONING_LEVELS` above makes the same point more loudly, collapsing two
+  # rungs this protocol does not spell.
+  #
+  # Note what a table cannot express and this protocol needs anyway: `NONE` is
+  # accepted, mapped exactly, and then disregarded once the conversation
+  # contains a tool call. See `docs/protocols/GEMINI.md`.
+  TOOL_MODES = {
+    ToolChoice::Auto => "AUTO",
+    ToolChoice::None => "NONE",
   }
 
   # Confirmed live by an active rejection, not documentation guesswork:

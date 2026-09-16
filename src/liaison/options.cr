@@ -76,16 +76,14 @@ module Liaison
     # prefix cache on the rest.
     None
 
+    # Lowercase on both OpenAI protocols and on Anthropic, which wraps it in
+    # an object but spells the value the same. Gemini shouts its modes; see
+    # that protocol's capabilities.
     def wire_name : String
       case self
       in ToolChoice::Auto then "auto"
       in ToolChoice::None then "none"
       end
-    end
-
-    # Gemini shouts its modes, as it does its reasoning levels.
-    def gemini_mode : String
-      wire_name.upcase
     end
   end
 
