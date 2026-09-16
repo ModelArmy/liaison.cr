@@ -64,7 +64,8 @@ module Liaison::Protocol::Anthropic
 
       {Wire::Request.new(model, messages, cap,
         session.system_prompt, declarations(options),
-        thinking_budget: budget, effort: effort, thinking_disabled: disabled), report}
+        thinking_budget: budget, effort: effort, thinking_disabled: disabled,
+        tool_choice: options.tool_choice.try(&.wire_name)), report}
     end
 
     # Returns the thinking budget, the effort rung and whether thinking is

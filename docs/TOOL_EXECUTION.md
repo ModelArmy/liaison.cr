@@ -220,6 +220,81 @@ a tool call leaves no message to append and nothing to dispatch. Those are the
 same fact, and `#dispatch` reports it as the same `nil` a reply with no calls
 produces. The `return nil unless repaired` guard is live, not defensive.
 
+## Ending the loop
+
+A loop that runs has to stop, and stopping is not the same as the model
+falling silent. A bounded host — one that caps rounds, or hits a deadline, or
+has spent its budget — needs a last turn that summarises, reports where it got
+to, or leaves something resumable. That turn must not produce more calls.
+
+The reason is the invariant above, reached from the other side. A turn that
+*completes* holding unanswered calls is untouched by `Repair`, which requires
+`ending.cut?`. So a host that stops its loop on a reply carrying calls archives
+exactly the session `Repair.sendable?` forbids, and nothing notices until the
+next request is rejected.
+
+`Options#tool_choice` is how a caller asks for that turn:
+
+```crystal
+client.send(session, model, options: Liaison::Options.new(
+  tools: toolbox.tools,
+  tool_choice: Liaison::ToolChoice::None))
+```
+
+**The tools stay declared.** That is the whole point, and it is what separates
+this from the workaround it replaces. A caller could always send the final
+request with an empty `tools` array, and on two of the four protocols that
+works at the cost of the prefix cache — tool definitions sit ahead of
+everything else, so removing them invalidates from position zero on the turn
+carrying the most history. On Anthropic it does not work at all: that endpoint
+rejects any request whose history holds `tool_use` or `tool_result` blocks and
+does not define tools. The guarantee and the cache are both kept by
+constraining the tools rather than withdrawing them.
+
+**Two values, and no capability machinery behind them — with one caveat that
+turned out to matter.** `Auto` and `None` mean the same thing on all four
+protocols and are accepted by all four, so there is no unit to reconcile, no
+clamp, no fallback, and nothing for `Capability` to mediate at mapping time.
+Every mapping is `Exact`, and that much is still true.
+
+What it is not is a guarantee. **Gemini ignores `NONE` once the conversation
+contains a tool call** — proven across four recordings and two model
+generations, with our own mapper ruled out as a cause; see
+`docs/protocols/GEMINI.md`. Anthropic and the OpenAI pair honour it.
+
+That falsifies the test this option was designed against — *a capability axis
+earns its place when a protocol can fail to honour what the caller asked* — and
+the failure is instructive. The axis machinery covers what a protocol **cannot
+express**. It has nothing to say about a protocol that accepts a parameter and
+then disregards it, because there the mapping really is exact and the loss
+happens after the request leaves. `SCOPE.md` carries the open question of how
+this shard should report that.
+
+**So on Gemini, check the reply.** A tool loop ending with `None` can come back
+holding calls, and a *completed* turn with unanswered calls is the shape
+`Repair.sendable?` forbids and `Repair` will not touch, since `needed?`
+requires `ending.cut?`. The caller either dispatches them or drops them; it
+cannot archive them.
+
+**`None` guarantees no call. It does not guarantee an answer.** Found live, and
+the one thing about this option that is not obvious from its shape: a model
+asked something it could only resolve by calling a tool, and forbidden from
+calling one, returns an **empty turn** rather than explaining the difficulty —
+`content: []`, `stop_reason: end_turn`, on Anthropic. An empty assistant
+message is survivable, since `normalize` drops it on the next request and
+records `DropEmptyMessage`, but it is a recorded loss and a wasted turn.
+
+The practical rule for ending a loop: **ask for something the history can
+answer.** A summary of what was found, a statement of where the work got to, a
+handover note — all answerable from the tool results already in the session. A
+fresh question needing a fresh lookup is the one shape that reliably comes back
+empty, because the model is being asked for the one thing it has just been
+forbidden to do. Both cases are recorded in `spec/live/anthropic_spec.cr`.
+
+`Required` is deliberately absent. It is model-gated on Anthropic and conflicts
+with `reasoning` there, so it needs a `Capability::Catalog` axis and a
+cross-option rule that neither value here does; `SCOPE.md` carries both traps.
+
 ## What this does not answer
 
 Whether an application built on this shard declares tools at all, and what it
@@ -230,5 +305,9 @@ holding a tool call is untouched, and nothing in `Client` enforces
 `Repair.sendable?` — it appears only in specs. An application that declares
 tools without dispatching them therefore writes exactly the unsendable session
 the archive exists to prevent, and nothing notices until the next request is
-rejected by a protocol strict enough to care. There is no safe half-step:
-either it runs something, or it declares nothing.
+rejected by a protocol strict enough to care.
+
+The one sanctioned way to declare tools and run none is `ToolChoice::None`,
+above, which asks the model not to call one rather than leaving it free to and
+then ignoring the result. Short of that there is no safe half-step: either it
+runs something, or it declares nothing.

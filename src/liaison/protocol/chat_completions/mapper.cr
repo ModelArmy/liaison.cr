@@ -68,7 +68,8 @@ module Liaison::Protocol::ChatCompletions
 
       flush_compensation(wire, pending, report)
       {Wire::Request.new(model, wire, declarations(options), options.max_output_tokens,
-        reasoning_effort(options, report), @max_tokens_field), report}
+        reasoning_effort(options, report), @max_tokens_field,
+        options.tool_choice.try(&.wire_name)), report}
     end
 
     # The named rung, lowercase, or nothing at all.

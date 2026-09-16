@@ -58,7 +58,8 @@ module Liaison::Protocol::Responses
 
       flush_compensation(items, pending, report)
       {Wire::Request.new(model, items, session.system_prompt, declarations(options),
-        options.max_output_tokens, reasoning_effort(options, report)), report}
+        options.max_output_tokens, reasoning_effort(options, report),
+        options.tool_choice.try(&.wire_name)), report}
     end
 
     # Identical to Chat Completions in unit and vocabulary, differing only in

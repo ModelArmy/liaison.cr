@@ -1,0 +1,74 @@
+{
+  "name": "gemini_tool_choice_none_merged",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Content-Length": "464",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512}}",
+        "body_digest": "af1d2010a4ccbe0237d03d300d369cbefdc2f78831152c878b824ab257826bb4"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Tue, 15 Sep 2026 20:22:28 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=1163",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Paris\"\n              },\n              \"id\": \"call_68440\"\n            },\n            \"thoughtSignature\": \"EoECCv4BARFNMg/BULEt6TQgRuirCSkFkEhzoEmaHAU30FtAmSiGjl+iJofzjf5APh+8sgwGO5MIUl7M6oT4L9QtHb1EsKPLv/iI93mueop16Gq0op0R3sVXOBYa42Q7REm6dvPgNIitDZ14G7cRFYVuviI4lodtpKCRxibJS924PLE/EIbmupgA+v6iMtY9svVNRYE27g3EX9/Y6YKrHQ0ur9W6W5JHq/0r2Nys1NuxZcdcGyg72d41RmkRRiQfFOpFbxnK0zWcg600tNctDza3PDypYPRpbrz/L4XjGzm2xKqBfGJiLeFretwLVYgZdupfhHoq4jY4EJn/eGElWIZ1f9I=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 129,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"thoughtsTokenCount\": 38,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"AqmpaqWlO_Xe_uMP2PCl8Aw\"\n}\n"
+      },
+      "recorded_at": "2026-09-15T20:22:28Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Content-Length": "1116",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}},\"thoughtSignature\":\"EoECCv4BARFNMg/BULEt6TQgRuirCSkFkEhzoEmaHAU30FtAmSiGjl+iJofzjf5APh+8sgwGO5MIUl7M6oT4L9QtHb1EsKPLv/iI93mueop16Gq0op0R3sVXOBYa42Q7REm6dvPgNIitDZ14G7cRFYVuviI4lodtpKCRxibJS924PLE/EIbmupgA+v6iMtY9svVNRYE27g3EX9/Y6YKrHQ0ur9W6W5JHq/0r2Nys1NuxZcdcGyg72d41RmkRRiQfFOpFbxnK0zWcg600tNctDza3PDypYPRpbrz/L4XjGzm2xKqBfGJiLeFretwLVYgZdupfhHoq4jY4EJn/eGElWIZ1f9I=\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}},{\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512}}",
+        "body_digest": "08aa517c737bc3e734642bbc6ec72005fe731d2c6743887d2fcd13c2f0ea86bc"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Tue, 15 Sep 2026 20:22:28 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=786",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Berlin\"\n              },\n              \"id\": \"call_99657\"\n            },\n            \"thoughtSignature\": \"EvUBCvIBARFNMg9PpiSEjwagCiwgIZZIE+c4DxdM5YJZVVjt3U7Fr1MN3f4XtXBZwMB19MuHqjH0+1J9m+9Bnp+8Pzs7zCQRaMEV+FzAI3mBEuUSg87qCeAkxTJAWWkZ4oJUis+aergx0/B2+K5pzrCf49l5GlV6WEncoLUgEgAtb3ZQy+MRqQ5uM4l6LOiW96pyblfpsVNCcXEbKTjUE3epLpg7UMxZNem+nWysPLoOYExFyrbXi7u4PV7DouNM01cUN5p8NgmLTh5c7jGHsFrY5CezSu8ePqnsVTfx1Wq3iNtSRITAOQ8D2MRKv1L0JpHXSqFRWHk=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 152,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 203,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 152\n      }\n    ],\n    \"thoughtsTokenCount\": 35,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"BKmpatCdDr-qsOIPzLuPgQE\"\n}\n"
+      },
+      "recorded_at": "2026-09-15T20:22:28Z"
+    }
+  ]
+}

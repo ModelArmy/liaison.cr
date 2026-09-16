@@ -181,13 +181,20 @@ module Liaison::Protocol::Gemini
       # unconstrained request means here.
       getter thinking_budget : Int32?
       getter thinking_level : String?
+      # `toolConfig.functionCallingConfig.mode`, and the only one of the four
+      # that nests this rather than putting it at the top level. A placement
+      # difference, not a semantic one — the modes mean what the other three
+      # mean. Top-level all the same: `toolConfig` is a sibling of `tools`,
+      # not a member of `generationConfig`.
+      getter tool_mode : String?
 
       def initialize(@model : String, @contents : Array(Content),
                      @system_instruction : String? = nil,
                      @tools : Array(ToolDeclaration) = [] of ToolDeclaration,
                      @max_output_tokens : Int32? = nil,
                      @thinking_budget : Int32? = nil,
-                     @thinking_level : String? = nil)
+                     @thinking_level : String? = nil,
+                     @tool_mode : String? = nil)
       end
 
       def path : String
@@ -215,6 +222,13 @@ module Liaison::Protocol::Gemini
                     json.array { @tools.each(&.to_json(json)) }
                   end
                 end
+              end
+            end
+          end
+          @tool_mode.try do |mode|
+            json.field("toolConfig") do
+              json.object do
+                json.field("functionCallingConfig") { json.object { json.field "mode", mode } }
               end
             end
           end

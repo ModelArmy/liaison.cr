@@ -1,0 +1,58 @@
+{
+  "name": "anthropic_tool_choice_none_summary",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Content-Length": "686",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-haiku-4-5\",\"max_tokens\":512,\"system\":\"Use the supplied tools when they apply.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the weather in Paris?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"mc_live_weather\",\"name\":\"get_weather\",\"input\":{\"city\":\"Paris\"}}]},{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"mc_live_weather\",\"content\":[{\"type\":\"text\",\"text\":\"18C, light rain\"}]}]}],\"tools\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}],\"tool_choice\":{\"type\":\"none\"}}",
+        "body_digest": "43957e030b0477f91e1a05f275ed78b9c39a6ce4fe2092af74eb6404e7226755"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Date": "Tue, 15 Sep 2026 17:20:23 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "anthropic-ratelimit-input-tokens-limit": "500000",
+          "anthropic-ratelimit-input-tokens-remaining": "500000",
+          "anthropic-ratelimit-input-tokens-reset": "2026-09-15T17:20:23Z",
+          "anthropic-ratelimit-output-tokens-limit": "80000",
+          "anthropic-ratelimit-output-tokens-remaining": "80000",
+          "anthropic-ratelimit-output-tokens-reset": "2026-09-15T17:20:23Z",
+          "anthropic-ratelimit-requests-limit": "1000",
+          "anthropic-ratelimit-requests-remaining": "999",
+          "anthropic-ratelimit-requests-reset": "2026-09-15T17:20:23Z",
+          "anthropic-ratelimit-tokens-limit": "580000",
+          "anthropic-ratelimit-tokens-remaining": "580000",
+          "anthropic-ratelimit-tokens-reset": "2026-09-15T17:20:23Z",
+          "Server": "cloudflare",
+          "request-id": "req_011Cf5cGwT6L4JjtRd7TTEqV",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "traceresponse": "00-182c50a0719745437d260f5748167b6e-aa2e27d6cfb26eb9-01",
+          "vary": "Accept-Encoding",
+          "server-timing": "x-originResponse;dur=863",
+          "X-Robots-Tag": "none",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "cf-cache-status": "DYNAMIC",
+          "CF-RAY": "a3b94d3f0e5baae6-YYZ"
+        },
+        "body": "{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_011Cf5cGx7XFmMKiukt8nW7r\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"The weather in Paris is currently **18°C (64°F) with light rain**. You might want to bring an umbrella if you're planning to go out!\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":653,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":39,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}"
+      },
+      "recorded_at": "2026-09-15T17:20:23Z"
+    }
+  ]
+}

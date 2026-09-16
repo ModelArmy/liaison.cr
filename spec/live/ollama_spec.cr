@@ -47,6 +47,10 @@ private TEXT_CHAT      = "ollama_chat_completions_text"
 private TEXT_RESPONSES = "ollama_responses_text"
 private TEXT_ANTHROPIC = "ollama_anthropic_text"
 
+private CHOICE_NONE_CHAT      = "ollama_tool_choice_none_chat_completions"
+private CHOICE_NONE_RESPONSES = "ollama_tool_choice_none_responses"
+private CHOICE_NONE_ANTHROPIC = "ollama_tool_choice_none_anthropic"
+
 private REASONING_OFF_CHAT       = "ollama_reasoning_off_chat_completions"
 private REASONING_OFF_ANTHROPIC  = "ollama_reasoning_off_anthropic"
 private REASONING_RUNG_ANTHROPIC = "ollama_reasoning_rung_anthropic"
@@ -85,6 +89,12 @@ end
 
 private def armed : Liaison::Options
   Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
+end
+
+# Tools offered, and the model told it may not call one.
+private def no_calls : Liaison::Options
+  Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512,
+    tool_choice: Liaison::ToolChoice::None)
 end
 
 private def tool_question : M::Session
@@ -378,6 +388,51 @@ describe "Ollama" do
 
         answer.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+      end
+    end
+  end
+
+  # Ending a tool loop: the tools stay declared and the model is told not to
+  # call one.
+  #
+  # What these prove is the narrow half. The field is accepted in each
+  # protocol's own spelling and the turn completes — which is worth having,
+  # since the shape is ours and the server's agreement is not a given. What
+  # they cannot prove is that the model *obeyed*: this server accepts more than
+  # the endpoints it imitates (`docs/servers/OLLAMA.md`), so a reply with no
+  # tool call here is consistent with the field being honoured and equally
+  # consistent with its being ignored by a model that did not want a tool. The
+  # falsifying version needs a vendor; see `spec/live/anthropic_spec.cr`.
+  describe "tool choice" do
+    it "accepts `none` over Chat Completions" do
+      Wiretap.intercept(CHOICE_NONE_CHAT) do
+        reply, report = client(Liaison::ProtocolKind::ChatCompletions)
+          .send(tool_question, MODEL, options: no_calls)
+
+        report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+        reply.content.should_not be_empty
+      end
+    end
+
+    it "accepts `none` over the Responses API" do
+      Wiretap.intercept(CHOICE_NONE_RESPONSES) do
+        reply, report = client(Liaison::ProtocolKind::Responses)
+          .send(tool_question, MODEL, options: no_calls)
+
+        report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+        reply.content.should_not be_empty
+      end
+    end
+
+    # Lenient for this port's usual reason: it returns an unsigned `thinking`
+    # block on every reply, which has nothing to do with tool choice.
+    it "accepts `none` over the Anthropic Messages API" do
+      Wiretap.intercept(CHOICE_NONE_ANTHROPIC) do
+        reply, report = client(Liaison::ProtocolKind::Anthropic, Liaison::Capability::Policy::Lenient)
+          .send(tool_question, MODEL, options: no_calls)
+
+        report.annotations.map(&.outcome).should_not contain M::Outcome::Refused
+        reply.content.should_not be_empty
       end
     end
   end

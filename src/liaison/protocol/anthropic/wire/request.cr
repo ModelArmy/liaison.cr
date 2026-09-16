@@ -247,6 +247,8 @@ module Liaison::Protocol::Anthropic
       getter thinking_budget : Int32?
       getter effort : String?
       getter? thinking_disabled : Bool
+      # An object with a `type`, where the OpenAI protocols take a bare string.
+      getter tool_choice : String?
       # Asks for the reply as a frame stream. Not set by the mapper: whether to
       # stream is a fact about how this call is made, not about what the
       # session contains. `with_stream` is how the adapter says so.
@@ -258,6 +260,7 @@ module Liaison::Protocol::Anthropic
                      @thinking_budget : Int32? = nil,
                      @effort : String? = nil,
                      @thinking_disabled : Bool = false,
+                     @tool_choice : String? = nil,
                      @stream : Bool = false)
       end
 
@@ -266,7 +269,7 @@ module Liaison::Protocol::Anthropic
       # setter on a struct edits whichever copy you happened to be holding.
       def with_stream(value : Bool) : Request
         Request.new(@model, @messages, @max_tokens, @system, @tools,
-          @thinking_budget, @effort, @thinking_disabled, value)
+          @thinking_budget, @effort, @thinking_disabled, @tool_choice, value)
       end
 
       def to_json(json : JSON::Builder)
@@ -285,6 +288,9 @@ module Liaison::Protocol::Anthropic
           json.field "stream", true if @stream
           unless @tools.empty?
             json.field("tools") { json.array { @tools.each(&.to_json(json)) } }
+          end
+          @tool_choice.try do |choice|
+            json.field("tool_choice") { json.object { json.field "type", choice } }
           end
           if budget = @thinking_budget
             json.field("thinking") do

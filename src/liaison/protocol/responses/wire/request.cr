@@ -242,6 +242,10 @@ module Liaison::Protocol::Responses
       # as on Chat Completions — the same value, one wrapper deeper, which is
       # this protocol's habit throughout.
       getter reasoning_effort : String?
+      # A bare string at the top level, spelled exactly as on Chat
+      # Completions — one of the few places these two agree without a wrapper
+      # between them.
+      getter tool_choice : String?
       # Asks for the reply as a frame stream rather than one body. Not set by
       # the mapper: whether to stream is a fact about how this call is being
       # made, not about what the session contains, and the mapper's whole job
@@ -252,6 +256,7 @@ module Liaison::Protocol::Responses
                      @tools : Array(ToolDeclaration) = [] of ToolDeclaration,
                      @max_output_tokens : Int32? = nil,
                      @reasoning_effort : String? = nil,
+                     @tool_choice : String? = nil,
                      @stream : Bool = false)
       end
 
@@ -261,7 +266,7 @@ module Liaison::Protocol::Responses
       # you happened to be holding.
       def with_stream(value : Bool) : Request
         Request.new(@model, @input, @instructions, @tools,
-          @max_output_tokens, @reasoning_effort, value)
+          @max_output_tokens, @reasoning_effort, @tool_choice, value)
       end
 
       def to_json(json : JSON::Builder)
@@ -276,6 +281,7 @@ module Liaison::Protocol::Responses
           end
           # `max_output_tokens` here, `max_tokens` on the other three. One idea,
           # four spellings.
+          @tool_choice.try { |value| json.field "tool_choice", value }
           @max_output_tokens.try { |value| json.field "max_output_tokens", value }
           @reasoning_effort.try do |value|
             json.field("reasoning") { json.object { json.field "effort", value } }
