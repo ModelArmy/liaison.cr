@@ -58,10 +58,10 @@ no protocol-specific test code anywhere.
 
 ## Tool choice
 
-Spelled exactly as on Chat Completions: a bare string, `"auto"` or `"none"`, at
-the top level. Notable only for being one of the few options this protocol does
-*not* nest one wrapper deeper than its sibling does — compare `reasoning`,
-which wraps a value Chat Completions leaves bare.
+Spelled exactly as on Chat Completions: `tool_choice`, a bare string, `"auto"`
+or `"none"`, at the top level. Notable only for being one of the few options
+this protocol does *not* nest one wrapper deeper than its sibling does —
+compare `reasoning`, which wraps a value Chat Completions leaves bare.
 
 The rest of the story is shared with Chat Completions; see that document, and
 `docs/TOOL_EXECUTION.md` under *Ending the loop*.

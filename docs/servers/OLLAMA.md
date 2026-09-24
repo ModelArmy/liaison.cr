@@ -219,6 +219,21 @@ first-user ordering and required parameters where a real endpoint may not be.
 And a non-Claude model behind an Anthropic-shaped API inherits none of Claude's
 capabilities.
 
+**Tool choice is the sharpest instance, and the one that proved the distinction
+matters.** `spec/live/ollama_spec.cr` records `ToolChoice::None` accepted on all
+three ports, and every one of those runs is green. They establish that the field
+is accepted and the turn completes — nothing more. They cannot establish that
+the model *withheld* a call, because a reply with no tool call here is equally
+consistent with the mode being honoured and with a model that did not want a
+tool.
+
+That gap is not theoretical. Gemini accepts the same request, maps it exactly,
+and disregards it once the conversation contains a tool call — which only a
+vendor endpoint could reveal. So when a request parameter asks a model to *not*
+do something, a green run here is close to no evidence at all: the null result
+it produces is the result a broken implementation produces too. Test those
+against a vendor or accept that they are untested.
+
 The next servers are chosen to close exactly these gaps: **Anthropic** because
 it validates signatures, **Gemini** because nothing else will ever exercise that
 protocol live, and **Azure** because it will amend the design — it speaks Chat

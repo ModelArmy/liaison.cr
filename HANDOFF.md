@@ -22,7 +22,8 @@ wins.
 
 Phase 3 is complete: **the live handoff works.** Four protocols — Chat
 Completions, Responses, Anthropic, Gemini — each with a mapper, an exporter, a
-response reader, and a wire request that can declare tools and cap output.
+response reader, and a wire request that can declare tools, constrain their
+use, and cap output.
 Zero runtime dependencies; `wiretap` is development-only.
 
 Three of the four protocols have been exercised against Ollama's compatible
@@ -183,28 +184,55 @@ never told.
 two `tool_choice` left behind.
 
 **`Options#tool_choice` ends a tool loop**, which was the one thing a caller
-running one could not ask for. `Auto` and `None`, no more: every protocol
-spells both, means the same by both, and accepts both on every model, so this
-needed **no `Capability` machinery at all** — no `Profile` axis, no control
-module, no annotation, every mapping Exact. That is the contrast worth keeping
-in mind next to `reasoning`, which needed all of it because the protocols
-genuinely disagree there. The rule it suggests: a capability axis earns its
-place when a protocol can *fail to honour* a request, not merely when it spells
-one differently.
+running one could not ask for. `Auto` and `None`, no more. Every protocol
+spells both and means the same by both, so the mapping needed no `Profile`
+axis, no control module and no annotation: every outcome is `Exact`. Gemini's
+shouted spelling is a table in its own `capabilities.cr`, beside
+`REASONING_LEVELS` — see the layering rule below.
+
+**Then Gemini falsified the rule that shape was chosen under.** The reasoning
+was that a capability axis earns its place when a protocol can *fail to honour*
+a request, and that neither of these two values could be failed. Gemini
+disregards `NONE` once the conversation contains a tool call — four recordings,
+two Flash generations three apart, this shard's own message shaping ruled out;
+`docs/protocols/GEMINI.md` has the table. Anthropic and the OpenAI pair enforce
+it.
+
+What that taught is worth more than the option: **the capability machinery
+covers what a protocol cannot *express*, and has nothing to say about one that
+accepts a parameter and then disregards it.** There the mapping really is
+exact and the loss happens after the request leaves. `Report` has no vocabulary
+for that — every `Outcome` describes what became of the caller's content, none
+what became of their intent — and closing that gap is now a `WILL FIX` with
+four candidate answers and one already eliminated. The hazard is concrete:
+unasked-for calls on a *completed* turn are the shape `Repair.sendable?`
+forbids and `Repair` will not mend, and nothing notices today. Worth deciding
+on a second example rather than on this one.
+
+A second live finding, the kind only a real endpoint gives up: **`None`
+guarantees no call, not an answer.** Asked something it could only resolve by
+calling, and forbidden from calling, Claude returns an empty turn rather than
+an explanation (`spec/transcripts/anthropic_tool_choice_none.json`).
+Recoverable — `normalize` drops the empty message and records it — but the
+lesson for a caller ending a loop is to ask for something the history can
+already answer.
 
 `Required` is deferred with its reasons written down — model-gated on Anthropic
-and in conflict with `reasoning` there — and so is a second thing found on the
+and in conflict with `reasoning` there — and so is a third thing found on the
 way: emptying `tools` is a 400 on Anthropic for any session with tool history,
 which is what made the previous workaround unavailable on that protocol rather
-than merely expensive. Both are in `SCOPE.md`.
+than merely expensive. All in `SCOPE.md`.
 
-One live finding came out of proving it, and it is the kind that only a real
-endpoint gives up: **`None` guarantees no call, not an answer.** Asked
-something it could only resolve by calling, and forbidden from calling, Claude
-returns an empty turn rather than an explanation
-(`spec/transcripts/anthropic_tool_choice_none.json`). Recoverable —
-`normalize` drops the empty message and records it — but the lesson for a
-caller ending a loop is to ask for something the history can already answer.
+**A layering rule got corrected doing this, and it applies to every canonical
+type.** `ToolChoice` briefly carried a `gemini_mode` method — a protocol-named
+method on a protocol-agnostic type. `Reasoning::Effort` had already answered
+that question the other way and nobody noticed: it carries only `wire_name`,
+the form protocols share, and Gemini's shouted version lives in Gemini's
+`capabilities.cr`. So: **a canonical type carries what protocols agree on;
+disagreement lives in the protocol that disagrees.** `DEVELOPMENT.md` states it
+under *adding a protocol*, including why deriving one spelling from another is
+a trap even when it works — `"AUTO"` is `"auto"` uppercased, but `ANY` against
+`required` is not.
 
 **`spec/end_to_end/` exists because the CLI left.** Those specs were this
 shard's only full-stack coverage — and the only place a session
