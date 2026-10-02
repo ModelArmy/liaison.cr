@@ -22,7 +22,7 @@ toolbox = Liaison::Toolbox.new([Weather.new, Clock.new] of Liaison::Function)
 
 loop do
   reply, _ = client.send(session, model, options: Options.new(tools: toolbox.tools))
-  session << reply
+  session << (MPSH::Repair.repaired(reply) || break)
 
   results = toolbox.dispatch(reply)
   break unless results
@@ -31,7 +31,9 @@ end
 ```
 
 `#tools` on the way out, `#dispatch` on the way back, and `nil` from `#dispatch`
-is the loop's exit condition. The toolbox does not own the session, does not
+is the loop's exit condition. The reply is repaired before it is kept, so a cut
+turn's unfinished calls never enter the session; `#dispatch` repairs too, so
+the two agree. The toolbox does not own the session, does not
 decide when a conversation is finished, and does not loop.
 
 ## Layering
@@ -102,7 +104,8 @@ out is not*.
 `call` takes an `MPSH::Object`, not a JSON string. By the time a reply exists
 the exporter has already parsed the arguments; handing over a string would mean
 serializing something parsed so that it could be parsed again, and `block.cr`
-says which direction fails.
+says which direction fails. (Arguments that do not parse currently arrive as an
+empty object rather than failing the reply; `SCOPE.md` logs this as a defect.)
 
 `MPSH::Value` is a real union rather than a `JSON::Any`, deliberately, so a
 function reaches into arguments with `as?(String)` and there is no wire identity
