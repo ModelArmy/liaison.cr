@@ -20,10 +20,10 @@ module Liaison::Capability
       Drop     # emit nothing; the request loses what the caller asked for
     end
 
-    # The full matrix. A rung rendered as a budget is `Restructured`: it uses
-    # the vendor's own published mapping. A budget rendered as a rung is
-    # `Degraded`: the number is lost, through a table no vendor publishes, and
-    # a rung is a behavioural signal rather than a cap.
+    # The full matrix. A rung rendered as a budget is `Restructured`: the
+    # rung's meaning survives, through a budget table each protocol draws from
+    # its vendor's guidance. A budget rendered as a rung is `Degraded`: the
+    # number is lost, and a rung is a behavioural signal rather than a cap.
     def resolve(request : Reasoning::Request, unit : ReasoningUnit) : {Rendering, MPSH::Outcome}
       case unit
       in ReasoningUnit::None
