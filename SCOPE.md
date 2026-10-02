@@ -114,6 +114,26 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
+### Unreadable tool-call arguments become an empty object
+
+A tool call whose arguments do not parse, or parse to something other than a
+JSON object, is read as a call with no arguments (`{}`) instead of failing. The
+call then reaches `Toolbox#dispatch`, which runs the tool with arguments the
+model never sent. Where, one per protocol:
+
+- `src/liaison/protocol/anthropic/stream.cr`, `Assembler#arguments`: a closed
+  `tool_use` block's accumulated `partial_json`
+- `src/liaison/protocol/anthropic/export.cr`, `parse_input`
+- `src/liaison/protocol/chat_completions/export.cr`, `parse_arguments`
+- `src/liaison/protocol/responses/export.cr`, `parse_arguments`
+- `src/liaison/protocol/gemini/export.cr`, `parse_object`
+
+The four exporters run on both buffered and streamed replies. A blank string is
+a legitimate empty argument list and should stay `{}`; anything else that does
+not parse to an object is a malformed response. Likely fix: raise
+`Protocol::MalformedResponseError` there, as the readers do for a body missing
+its required shape. Predicted by reading; no spec covers it.
+
 ### A raise mid-stream leaves the shared connection mid-body
 
 `Server#stream` closes the connection when its block returns `false`, because
