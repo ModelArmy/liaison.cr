@@ -6,23 +6,13 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Gemini
-  # Wire in, MPSH out.
+  # Wire in, MPSH out, for a request body. A `functionResponse` names only
+  # the function it answers, so the nth response to a name answers the nth
+  # call to it, and `name#ordinal` is minted into an MPSH `call_id` through
+  # the `CallIdTable`.
   #
-  # The unwrapping is mechanical. The interesting work is pairing, because the
-  # wire carries no identifiers: a `functionResponse` names the function it
-  # answers and nothing more.
-  #
-  # Reconstruction therefore counts. The nth call to a given function name is
-  # answered by the nth response naming that function, and `name#ordinal` is
-  # the key both directions agree on. That key is minted into an MPSH `call_id`
-  # through the same translation table the other protocols use for real ids —
-  # which is what the table was designed for, and the reason MPSH refuses to
-  # store provider identifiers as canonical content.
-  #
-  # The limit is worth stating: this holds because responses arrive in the order
-  # their calls were made. A provider that reordered them, or omitted one,
-  # would break the correspondence and there would be nothing in the wire to
-  # detect it with.
+  # This relies on responses arriving in call order; a reordered or missing
+  # response would mispair, undetectably.
   class Exporter
     getter calls : MPSH::CallIdTable
 
@@ -58,22 +48,13 @@ module Liaison::Protocol::Gemini
       session
     end
 
-    # The response direction.
+    # Reads a reply body; `candidates[]` holds alternatives, so index 0 is the
+    # reply.
     #
-    # `candidates[]` is the alternatives plural, so index 0 is the reply.
-    #
-    # The awkward part is pairing, and it is awkward in a new way here. On the
-    # request side an ordinal is counted across the whole session, so
-    # `name#0` is stable and both directions agree on it. A reply is not part
-    # of that count: its calls have not been mapped yet, and minting against
-    # `name#0` would collide with a key the request side has already bound,
-    # handing back an existing call's identifier.
-    #
-    # So reply calls are keyed in their own space. Only the function *name*
-    # has to survive — `function_name` recovers it by splitting at the last
-    # `#` — and the next `map` rebinds every call to its real session ordinal
-    # before any result is rendered. The reply-scoped key is provisional by
-    # construction, which is why it is safe for it to be arbitrary.
+    # A reply's calls are keyed in their own space rather than the session's
+    # ordinals, which they have not been counted into; reusing `name#0` would
+    # collide with a call already bound. Only the name must survive, and the
+    # next `map` rebinds each call to its session ordinal.
     def export_reply(body : String) : MPSH::Message
       export_reply(Wire::Response.from_json(body))
     end
@@ -95,8 +76,8 @@ module Liaison::Protocol::Gemini
       reply = MPSH::Message.new(MPSH::Role::Assistant, blocks,
         response.model_version.try { |model| MPSH::Provenance.new(NAME, model) })
 
-      # `MAX_TOKENS` is this protocol's spelling of a turn cut short by an
-      # output cap, normalised onto `Message#ending` and also kept verbatim.
+      # `MAX_TOKENS` means the output cap cut the turn short: normalised onto
+      # `Message#ending`, and kept verbatim.
       candidate.finish_reason.try do |value|
         reply.put_meta(METADATA_KEY, "finishReason", value)
         reply.ending = MPSH::Ending::Truncated if value == "MAX_TOKENS"
@@ -106,9 +87,7 @@ module Liaison::Protocol::Gemini
       reply
     end
 
-    # A reply carries no tool *results* — those are something the caller sends
-    # — so only calls need keying, and they get the provisional space
-    # described above.
+    # A reply holds no tool results, only calls, keyed as above.
     private def reply_block(part : Wire::Part, ordinals : Hash(String, Int32)) : MPSH::Block?
       case part
       when Wire::FunctionCallPart
@@ -147,14 +126,9 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # Gemini 3 attaches a `thoughtSignature` to a `functionCall` part and
-    # enforces it strictly on replay — confirmed live by a 400, not
-    # documentation (`spec/live/gemini_spec.cr`). Stored the same way a
-    # `ThoughtPart`'s signature is: `provider_metadata`, same key, so a tool
-    # call minted on another protocol and handed to this one is
-    # indistinguishable from one this protocol never signed — both have
-    # nothing under `METADATA_KEY`, and both need the same answer once the
-    # mapper is taught to check.
+    # Keeps the call's `thoughtSignature` in `provider_metadata`, where a
+    # thought's is kept. A call from another protocol has nothing there, and
+    # `Resolver` treats both alike.
     private def tool_call(mpsh_id : String, part : Wire::FunctionCallPart) : MPSH::ToolCallBlock
       block = MPSH::ToolCallBlock.new(mpsh_id, part.name, parse_object(part.args))
       if value = part.thought_signature
@@ -163,9 +137,8 @@ module Liaison::Protocol::Gemini
       block
     end
 
-    # The response payload is an object rather than a string on this protocol.
-    # We write `{"output": ...}`; anything else is kept whole as text rather
-    # than guessed at.
+    # The response payload is an object on this protocol. `{"output": ...}`
+    # yields its text; anything else is kept whole as text.
     private def response_text(json : String) : String
       parsed = JSON.parse(json)
       parsed["output"]?.try(&.as_s?) || json
@@ -192,19 +165,16 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # Local to this protocol: a carrier is a `user` content, and a `model` one
-    # never is. That check sat *below* the synthetic test in the original and
-    # stays below it here, which is what `eligible` is for — an early return
-    # would outrank `synthetic?` and change the answer.
+    # A carrier is a `user` content, never a `model` one. Passed as
+    # `eligible`, so it is checked after `synthetic?`.
     private def carrier?(content : Wire::Content,
                          pending : Array(MPSH::ToolResultBlock)) : Bool
       Capability::Carrier.carrier?(pending, content.synthetic?, content.parts,
         eligible: content.role == "user") { |part| part.is_a?(Wire::TextPart) }
     end
 
-    # Fresh ordinal tables per part: a carrier holds lifted media, never a
-    # function call or response, so nothing in it participates in the ordinal
-    # pairing this protocol uses in place of identifiers.
+    # Fresh ordinal tables: a carrier holds lifted media, never a call or
+    # response.
     private def absorb_carrier(content : Wire::Content,
                                pending : Array(MPSH::ToolResultBlock)) : Nil
       Capability::Carrier.absorb(pending, content.parts) do |part|

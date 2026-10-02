@@ -6,24 +6,10 @@ module Liaison::Protocol::Gemini
   METADATA_KEY = "gemini"
   NAME         = "gemini"
 
-  # The most structurally divergent protocol: assistant role renamed, every
-  # message wrapped in `parts`, model in the URL path, and tool calls paired to
-  # results by name and ordering with no identifier at all.
-  #
-  # Widest native media support of the four, and the only one taking audio
-  # natively.
-  #
-  # `tool_results: TextOnly` is a conservative declaration pending confirmation
-  # that `functionResponse` can carry inline binary data. If it can, this
-  # becomes `Blocks` and the image-bearing tool result stops compensating here.
-  # A named rung rendered as a token budget, for the 2.5-series deployments
-  # that take one. Google's documented ranges differ per model — Flash tops out
-  # lower than Pro — so these sit inside the narrowest of them rather than at
-  # any one model's ceiling.
-  #
-  # `Max` is -1, which this protocol reads as *dynamic thinking*: the model
-  # decides how much to spend. That is a better rendering of "no constraint"
-  # than any large number would be, and it is the protocol's own idiom.
+  # A named rung rendered as a token budget, for 2.5-series deployments.
+  # Google's ranges differ per model (Flash tops out below Pro), so these sit
+  # inside the narrowest. `Max` is -1, which this protocol reads as dynamic
+  # thinking: the model decides how much to spend.
   REASONING_BUDGETS = {
     Reasoning::Effort::Low    => 1024,
     Reasoning::Effort::Medium => 4096,
@@ -32,9 +18,8 @@ module Liaison::Protocol::Gemini
     Reasoning::Effort::Max    => -1,
   }
 
-  # Three rungs, shouted. `xhigh` and `max` have no spelling here, so they
-  # clamp to `HIGH` and the mapper records the loss — the same treatment a
-  # media type outside the accepted set gets, one axis over.
+  # Three rungs, uppercase. `xhigh` and `max` clamp to `HIGH`, and the mapper
+  # records the loss.
   REASONING_LEVELS = {
     Reasoning::Effort::Low    => "LOW",
     Reasoning::Effort::Medium => "MEDIUM",
@@ -43,41 +28,33 @@ module Liaison::Protocol::Gemini
     Reasoning::Effort::Max    => "HIGH",
   }
 
-  # Both modes, shouted, beside `toolConfig.functionCallingConfig.mode`.
+  # Tool-calling modes for `toolConfig.functionCallingConfig.mode`. A table,
+  # not an uppercased `ToolChoice#wire_name`: the vocabularies only happen to
+  # agree for these two values.
   #
-  # A table rather than an uppercasing of `ToolChoice#wire_name`, even though
-  # that would give the right answer for these two. The agreement is a
-  # coincidence of vocabulary, not a relationship: this protocol spells the
-  # third form `ANY` where Anthropic spells it `any` and the OpenAI pair spell
-  # it `required`, so a derivation is wrong the moment `Required` arrives.
-  # `REASONING_LEVELS` above makes the same point more loudly, collapsing two
-  # rungs this protocol does not spell.
-  #
-  # Note what a table cannot express and this protocol needs anyway: `NONE` is
-  # accepted, mapped exactly, and then disregarded once the conversation
-  # contains a tool call. See `docs/protocols/GEMINI.md`.
+  # Gemini accepts `NONE`, then disregards it once the conversation holds a
+  # tool call; see `docs/protocols/GEMINI.md`.
   TOOL_MODES = {
     ToolChoice::Auto => "AUTO",
     ToolChoice::None => "NONE",
   }
 
-  # Confirmed live by an active rejection, not documentation guesswork:
-  # `thinkingBudget: 0` — `Rendering::Disable`'s compatibility fallback for a
-  # levels-preferring model — gets a 400 here, `Budget 0 is invalid. This
-  # model only works in thinking mode.`, rather than being silently accepted
-  # or silently ignored. See `spec/live/gemini_spec.cr`.
-  #
-  # A tier-specific fact, not a generation-wide one — Flash on the same
-  # generation honours a budget of 0 correctly — so it lives here as a closed
-  # list rather than as a substring match on "pro", which would be both
-  # fragile and wrong the moment a differently-behaved Pro model exists.
-  # Expected to stay short: growing it needs the same kind of live rejection
-  # that put the first entry here, the same discipline `Catalog::BUDGET_ONLY`
-  # already follows for the reasoning-unit axis.
+  # Models that reject `thinkingBudget: 0` (`Budget 0 is invalid. This model
+  # only works in thinking mode.`, recorded in `spec/live/gemini_spec.cr`), so
+  # `Reasoning::Off` becomes the lowest rung, recorded as `Degraded`. A tier
+  # fact: Flash on the same generation accepts 0. Exact names, added only on
+  # a live rejection.
   CANNOT_DISABLE_THINKING = Set{
     "gemini-3.1-pro-preview",
   }
 
+  # The most structurally divergent protocol: the assistant role is `model`,
+  # every message is wrapped in `parts`, the model goes in the URL path, and
+  # tool calls pair with results by name and order, with no identifier. The
+  # widest media support of the four.
+  #
+  # `tool_results: TextOnly` is conservative, pending confirmation that a
+  # `functionResponse` can carry inline binary data.
   PROFILE = Capability::Profile.new(
     provider: NAME,
     accepted_media: {
@@ -86,10 +63,8 @@ module Liaison::Protocol::Gemini
       MPSH::BlockKind::Document => Set{"application/pdf"},
     },
     binary_form: Capability::BinaryForm::Native,
-    # Both, split at the 2.5/3 line: `thinkingBudget` on the former,
-    # `thinkingLevel` on the latter. Sending both in one `thinkingConfig` is a
-    # 400, which is the sharpest argument for resolving the unit before a
-    # mapper renders anything.
+    # `thinkingBudget` on the 2.5 series, `thinkingLevel` on Gemini 3; both in
+    # one `thinkingConfig` is a 400. `Catalog` resolves it per model.
     reasoning_unit: Capability::ReasoningUnit::Either,
     tool_calls: Capability::ToolCallForm::Block,
     tool_results: Capability::ToolResultForm::TextOnly,
@@ -97,11 +72,9 @@ module Liaison::Protocol::Gemini
     refusal_channel: false,
     can_synthesize_user_message: true,
     system_placement: Capability::SystemPlacement::Structured,
-    # `tool_call_signature_required` is deliberately *not* set here, though
-    # Gemini is the only protocol that has the requirement at all: it arrived
-    # with the 3 series and the 2.5 series does not have it, so it is keyed on
-    # the model by `Capability::Catalog::SIGNED_TOOL_CALLS`, not declared on
-    # the protocol.
+    # `tool_call_signature_required` is left false: Gemini 3 requires signed
+    # calls and 2.5 does not, so `Catalog::SIGNED_TOOL_CALLS` sets it per
+    # model.
     string_shorthand: false
   )
 end

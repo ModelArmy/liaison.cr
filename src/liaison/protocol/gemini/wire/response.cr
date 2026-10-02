@@ -5,20 +5,13 @@ require "../../errors"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Gemini
-  # The response half of the wire vocabulary.
+  # The response half of the wire form. `candidates[]` holds alternative
+  # answers; this shard never sets `candidateCount`, so it reads the first.
   #
-  # `candidates[]` is the alternatives plural, as `choices[]` is on Chat
-  # Completions and unlike `output[]` or Anthropic's `content[]`. We never set
-  # `candidateCount`, so exactly one is expected and index 0 is the reply, not
-  # a truncation.
-  #
-  # Two smaller traps, both this protocol's alone. The assistant role is
-  # spelled `model`. And a part is identified by *which key it has* rather than
-  # by a `type` field — `text`, `functionCall`, `inlineData` — so the reader
-  # branches on key presence, and a thought is a `text` part wearing a
-  # `thought: true` flag rather than a part type of its own. Checking the flag
-  # before the text is therefore load-bearing: read in the other order, every
-  # thought silently becomes ordinary assistant prose.
+  # A part is identified by which key it has (`text`, `functionCall`,
+  # `inlineData`), not by a `type` field, and a thought is a `text` part with
+  # `thought: true`. The flag is checked first: read the other way, every
+  # thought becomes ordinary prose.
   module Wire
     struct Usage
       getter prompt_tokens : Int32?
@@ -31,14 +24,8 @@ module Liaison::Protocol::Gemini
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a bare nil check. A streamed chunk carries
-        # `"usage": null` on every frame until the last one, so the key is
-        # *present* holding a JSON null — which is not Crystal's `nil`, passes
-        # a truthiness guard, and is then indexed into as a hash. Absent and
-        # explicitly null mean the same thing here, and now behave the same.
-        #
-        # Found against Azure and OpenAI, which both send it; Ollama omits the
-        # key entirely, so the emulator was the forgiving one.
+        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
+        # absent instead of being indexed as a hash.
         fields = any.try(&.as_h?)
         return unless fields
 
@@ -76,8 +63,7 @@ module Liaison::Protocol::Gemini
                      @usage : Usage? = nil)
       end
 
-      # The reply we asked for. Implicit `candidateCount = 1`; see the note
-      # above.
+      # The one answer requested; see the note above.
       def candidate : Candidate?
         @candidates.first?
       end
@@ -92,15 +78,8 @@ module Liaison::Protocol::Gemini
         from_any(parsed)
       end
 
-      # The same reader, from an object someone else already parsed.
-      #
-      # Streaming needs it, and needs it more here than anywhere else: every
-      # chunk of a Gemini stream is a whole `GenerateContentResponse`, so the
-      # assembler can read each one with *this* reader rather than growing a
-      # second understanding of what a part is. Given that part reading on this
-      # protocol branches on key presence, checks `thought` before `text`, and
-      # tolerates two spellings of `inlineData`, a second copy of it would be a
-      # second set of those traps to get right.
+      # Reads a response already parsed. Every stream chunk is a whole
+      # response, so the assembler reads each with this, by the same rules.
       def self.from_any(parsed : JSON::Any) : Response
         raw = parsed["candidates"]?.try(&.as_a?)
         unless raw
@@ -121,16 +100,13 @@ module Liaison::Protocol::Gemini
 
         Candidate.new(
           any["index"]?.try(&.as_i?) || position,
-          # `model`, not `assistant`. The single most common source of a
-          # silently wrong mapping on this protocol, and the response
-          # direction is no exception.
+          # `model`, not `assistant`.
           Content.new(body.try(&.["role"]?).try(&.as_s?) || "model", parts),
           any["finishReason"]?.try(&.as_s?))
       end
 
-      # No `type` discriminator anywhere. A part is whichever key it carries,
-      # and the thought flag is checked first because a thought part *also*
-      # carries `text`.
+      # Identified by key, with the thought flag checked first, since a
+      # thought part also carries `text`.
       private def self.part(any : JSON::Any) : Part?
         return thought(any) if any["thought"]?.try(&.as_bool?)
 
@@ -138,9 +114,8 @@ module Liaison::Protocol::Gemini
           return function_call(call, any["thoughtSignature"]?.try(&.as_s?))
         end
 
-        # Both spellings appear in the wild: the REST surface emits camelCase,
-        # several compatibility servers emit the snake_case form the request
-        # side writes.
+        # The REST API sends camelCase; some compatible servers send the
+        # snake_case the request side writes.
         if data = any["inlineData"]? || any["inline_data"]?
           return inline_data(data)
         end
@@ -152,18 +127,10 @@ module Liaison::Protocol::Gemini
         name = any["name"]?.try(&.as_s?)
         return unless name
 
-        # `args` is a structured object here, and the wire type stores it as
-        # raw JSON text. Re-serialized rather than parsed; parsing happens once,
-        # at export.
-        #
-        # Note what is *absent*: an identifier. There is no id on the wire to
-        # read, which is why pairing is reconstructed from name and ordering
-        # and why MPSH mints its own `call_id`.
-        #
-        # `thought_signature` is passed in rather than read from `any` here:
-        # Gemini attaches it as a sibling of `functionCall` on the enclosing
-        # part, not as a field within the `functionCall` object itself, and
-        # `any` at this point is already the inner object.
+        # `args` is structured; re-serialized to raw JSON text and parsed once,
+        # on export. There is no id to read. `thought_signature` is passed in
+        # because it sits beside `functionCall` on the enclosing part, not
+        # inside it.
         FunctionCallPart.new(name,
           (any["args"]? || JSON::Any.new({} of String => JSON::Any)).to_json,
           thought_signature)
