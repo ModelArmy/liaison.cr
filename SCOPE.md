@@ -114,6 +114,32 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
+### A degraded tool call leaves its result behind as `unknown_function`
+
+When `Resolver` degrades a tool call because the target requires a signature it
+does not carry (any foreign call sent to a Gemini 3 model), the Gemini mapper
+drops the call but still maps its result. With no binding in the `CallIdTable`,
+`function_name` falls back to `"unknown_function"`, so the request carries a
+`functionResponse` answering a call that is not there, under a name the model
+never used. Where: `src/liaison/protocol/gemini/mapper.cr`, `function_call`
+and `function_response`.
+
+Bounded by policy: `Degraded` exceeds the default `Compensating`, so this is
+sent only under `Lenient`. But `Lenient` is what a caller picks to hand a
+tool-using session to Gemini 3, which is this shard's defining move. Whether
+Gemini rejects the orphan or the model is merely confused is unrecorded.
+Likely fix: degrade the result with its call, rendering both as text, as a
+server-executed call is elsewhere. Predicted by reading; no spec covers it.
+
+### `SIGNED_TOOL_CALLS` lags its own criterion
+
+The set admits Gemini 3 spellings this repository has used or seen named by the
+API. `gemini-3.8-flash` is used in `spec/live/gemini_spec.cr` (`MODEL_CURRENT`)
+and is not listed, so a foreign tool call sent to it maps `Exact` and draws the
+400. Its replays pass only because every call they send was minted by the model
+itself. Where: `src/liaison/capability/catalog.cr`. Fix: add the spelling, once
+a recording shows the 400 on that model.
+
 ### Nothing records a session's annotations
 
 `docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a

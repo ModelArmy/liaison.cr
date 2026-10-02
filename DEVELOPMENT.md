@@ -208,11 +208,27 @@ wrongly optimistic replays a signature a real endpoint rejects and breaks the
 turn, while wrongly pessimistic costs fidelity that is recorded and
 recoverable.
 
-**The reasoning unit is the one deliberate exception**, and the exception is
-argued rather than assumed: its budget-only models are a closed, shrinking set,
-so an unknown model is far likelier to be new than ancient and the optimistic
-default is right by construction. Where that argument does not hold — every
-other axis so far — the pessimistic default stands.
+**The reasoning unit is a deliberate exception**, and the exception is argued
+rather than assumed: its budget-only models are a closed, shrinking set, so an
+unknown model is far likelier to be new than ancient and the optimistic default
+is right by construction. Where no such argument holds, the pessimistic default
+stands.
+
+**Tool-call signatures are optimistic too, by a different argument.**
+`Catalog::SIGNED_TOOL_CALLS` lists the *new* behaviour, so an unlisted model is
+likelier to need an entry than not, and a stale table fails open. It stays
+optimistic because the two errors differ in reach: a missing entry is a 400 that
+names the missing field and is fixed by one line, while a wrong entry silently
+degrades every tool call sent to a model that never needed it. A loud failure on
+one new model beats a quiet one on every old model. For the same reason, entries
+are only spellings this repository has used or seen named by the API.
+
+**Catalog entries are exact strings, never patterns.** Model names arrive as bare
+API names, Ollama tags (`gemma4:26b-mxfp8`) and Bedrock identifiers
+(`anthropic.claude-sonnet-4-20250514-v1:0`), and a pattern over them misfires
+silently. An unlisted spelling gets the default. Where that is wrong,
+`Provider`'s `reasoning_unit:` overrides it, which a deployment name carrying no
+model identity, such as Azure's, requires.
 
 **Reasoning retention is not a catalog axis, though it is keyed on the model.**
 `ReasoningRetention::CompletedTurns` exists because one model family asks that
