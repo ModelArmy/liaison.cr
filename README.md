@@ -79,6 +79,10 @@ reply, report = Liaison::Client.new(provider).send(session, "claude-haiku-4-5")
 report.annotations.each { |note| puts note }   # what the handoff cost, if anything
 ```
 
+The report is per call. To keep a record of what a session has lost across
+handoffs, add the annotations to it yourself with `session.annotate(note)`:
+`Client` does not, and an archive holds only what the session does.
+
 Nothing in `vienna.json` names a vendor as its owner. That is the whole idea.
 
 ### Watching the reply arrive
@@ -97,14 +101,13 @@ reply, report = Liaison::Client.new(provider).send(session, "llama3.2") do |even
 end
 ```
 
-A protocol with no streaming seam falls back to a single request. `report.streamed?`
+An adapter that cannot stream falls back to a single request; `report.streamed?`
 says which happened.
 
 ### When a turn does not finish
 
 A stream can drop, a model can hit an output cap, and either leaves a reply
-holding a tool call nobody finished planning — the one shape a provider will
-reject outright.
+holding a tool call nobody finished planning, a shape providers reject outright.
 
 ```crystal
 if turn = M::Repair.repaired(reply)
@@ -133,7 +136,7 @@ toolbox = Liaison::Toolbox.new([Weather.new, Clock.new] of Liaison::Function)
 
 loop do
   reply, _ = client.send(session, model, options: Liaison::Options.new(tools: toolbox.tools))
-  session << reply
+  session << (M::Repair.repaired(reply) || break)
 
   results = toolbox.dispatch(reply)
   break unless results
@@ -157,9 +160,9 @@ reply, _ = client.send(session, model, options: Liaison::Options.new(
 ```
 
 The tools stay declared; the model is told it may not use them. Withdrawing the
-declarations instead looks equivalent and is not: it costs the provider's
-prefix cache on the turn carrying the most history, and on Anthropic it is a
-400 outright once the conversation contains a tool call.
+declarations instead also prevents a call, but costs the provider's prefix cache
+on the turn carrying the most history. On Gemini, check the reply anyway: it
+disregards `None` once the conversation holds a tool call.
 
 Ask this turn for something the history can already answer — a summary, or
 where the work got to. `None` guarantees no tool call, not an answer: a model
@@ -243,7 +246,7 @@ Document                                                  |Holds
 [DEVELOPMENT.md](./DEVELOPMENT.md)                        |Layering, conventions, how to add a protocol                    
 [docs/protocols/](./docs/protocols/)                      |One file per protocol: gotchas and compensations                
 [docs/servers/](./docs/servers/)                          |One file per server, and what a green run there does *not* prove
-[docs/STREAMING_DESIGN.md](./docs/STREAMING_DESIGN.md)    |The streamed turn, and the two places its design was wrong      
+[docs/STREAMING_DESIGN.md](./docs/STREAMING_DESIGN.md)    |The streamed turn, and the three places its design was wrong    
 [docs/TOOL_EXECUTION.md](./docs/TOOL_EXECUTION.md)        |Caller-supplied tools, and what was decided about them          
 [SCOPE.md](./SCOPE.md)                                    |What is still outstanding                                       
 
