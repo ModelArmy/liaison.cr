@@ -219,10 +219,9 @@ describe "Anthropic round trip" do
     # client's own default, not something a caller has to opt into — refuses
     # a signature-less `thinking` block before a request is ever built.
     #
-    # The 400 this was originally proven against has no committed transcript;
-    # nothing replays it, because the client no longer sends the request that
-    # produced it, which is also why losing it broke nothing. Recovering it is
-    # `SCOPE.md`'s only MUST FIX. See `spec/live/anthropic_spec.cr`.
+    # The 400 it rests on is recorded and replayed in
+    # `spec/live/anthropic_spec.cr`, through a profile with the requirement
+    # waived, since the client no longer builds that request.
     it "refuses a signature-less thinking block under the default policy" do
       session = Liaison::Fixtures.reasoning_with_text
 

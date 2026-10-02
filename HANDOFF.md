@@ -34,18 +34,20 @@ replayed on the next. But a compatibility port proves the shape is accepted,
 not that the vendor whose protocol it imitates would accept it. The real
 Anthropic endpoint has now also been called directly, and settled two things
 Ollama structurally could not: a `thinking` block with no signature is a
-genuine 400, and a real signature genuinely replays on the next turn while the
-budget path and its 1,024-token floor are accepted as documented
+schema 400, missing field rather than invalid value
+(`spec/transcripts/anthropic_thinking_no_signature.json`), and a real
+signature genuinely replays on the next turn while the budget path and its
+1,024-token floor are accepted as documented
 (`spec/transcripts/anthropic_thinking_signature_replay.json`). Detail in
 `docs/protocols/ANTHROPIC.md`.
 
-The first of those two has **no committed transcript**. The observation was
-made and the fix was built from it, but the recording was never committed, and
-because nothing replays it nothing went red when it went missing. That is
-`SCOPE.md`'s only MUST FIX, and its entry carries the traps — the request can
-no longer be built through `Client` under any policy. Every other transcript is
-committed under `spec/transcripts/` and replays offline, so the suite needs no
-server.
+The first of those is evidence for a request `Client` refuses to build, so its
+spec maps through a hand-built `Profile` with the signature requirement waived
+and posts through `Server#post`. That spec exists because the original
+recording was lost: nothing replayed it, so nothing went red when it went
+missing. A transcript nobody consumes is not evidence the suite keeps. Every
+transcript is committed under `spec/transcripts/` and replays offline, so the
+suite needs no server.
 
 Request options are complete: tool declarations, output caps and reasoning
 controls, the last of which introduced `Capability::Catalog` — the fourth
@@ -251,9 +253,7 @@ both policies.
 Interrupted-turn repair was `SCOPE.md`'s last `MUST FIX` and is built; the
 argument that used to live there now lives in `docs/MPSH_SPECIFICATION.md` §3a
 — where it belongs, being a statement about the format rather than an open
-question. `MUST FIX` is not empty, though: the missing Anthropic transcript
-above took its place, and is a gap in this shard's *evidence* rather than in
-its behaviour.
+question. `MUST FIX` is now empty.
 
 `MPSH::Ending` is a settable field on `MPSH::Message`: `Complete`, `Truncated`,
 `Stopped`, `Interrupted`. The four exporters normalise their own stop reason

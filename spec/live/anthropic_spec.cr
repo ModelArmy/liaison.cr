@@ -32,25 +32,78 @@ private def weather_tool : Liaison::Tool
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
-# What used to live here — a signature-less `thinking` block sent to this
-# endpoint and expected to 400 — moved to `spec/conformance/anthropic_spec.cr`
-# ("declared divergences") once the fix landed. `Policy::Compensating` now
-# refuses that shape before a request is ever built, so there is nothing left
-# for a network call to prove about the behaviour.
+# The signature waiver Anthropic's profile refuses, built by hand.
 #
-# The recording itself was lost, and is `SCOPE.md`'s only MUST FIX. It was
-# never committed, and because the fix meant nothing replayed it, no test
-# noticed. Its home is here when it comes back: a replay asserts Anthropic's
-# schema rather than anything this shard does, so it can never go red for a
-# change here — which is what `spec/live/` is for, and is also exactly why it
-# needs a consumer rather than merely a file.
-#
-# Recording A is next: a real signed `thinking` block, requested with
-# `Reasoning::Effort` against a budget-only model, replayed on the next turn.
-# It confirms the own-vendor Exact path actually works and the
-# `REASONING_BUDGETS` clamp is shaped right — both still genuinely need a
-# paid call, and neither changed when the fix above landed.
+# **A configuration this library forbids.** `Profile`'s `with_*` helpers only
+# narrow, and none can switch `reasoning_signature_required` off. This exists
+# solely to produce the request the shard refuses to send, so that the 400 the
+# requirement rests on is recorded rather than remembered. Everything else is
+# the profile `Client` would map with for `MODEL`.
+private def unsigned_thinking_profile(adapter : Liaison::AnthropicAdapter) : C::Profile
+  base = adapter.narrowed(MODEL)
+  C::Profile.new(base.provider,
+    metadata_key: base.metadata_key,
+    accepted_media: base.accepted_media,
+    binary_form: base.binary_form,
+    tool_calls: base.tool_calls,
+    tool_results: base.tool_results,
+    reasoning: base.reasoning,
+    reasoning_unit: base.reasoning_unit,
+    server_executed: base.server_executed?,
+    refusal_channel: base.refusal_channel?,
+    can_synthesize_user_message: base.can_synthesize_user_message?,
+    alternation_required: base.alternation_required?,
+    first_message_must_be_user: base.first_message_must_be_user?,
+    system_placement: base.system_placement,
+    string_shorthand: base.string_shorthand?,
+    reasoning_signature_required: false,
+    tool_call_signature_required: base.tool_call_signature_required?)
+end
+
 describe "Anthropic" do
+  # The evidence behind `Profile#reasoning_signature_required?`, true for this
+  # protocol alone. `spec/conformance/anthropic_spec.cr` guards the behaviour;
+  # this records why. A replay asserts Anthropic's schema, not this shard, so
+  # it cannot go red for any change here.
+  #
+  # `Client#send` cannot produce this request under any policy: `Compensating`
+  # refuses the block and `Lenient` drops it. The body comes from the mapper
+  # under the waived profile above and goes out through `Server#post`.
+  #
+  # Same session as `gemini_spec.cr`'s unsigned thought, which Gemini accepts.
+  describe "a thinking block with no signature" do
+    it "is rejected by the schema as a missing field" do
+      Wiretap.intercept("anthropic_thinking_no_signature") do
+        session = M::Session.new("You are terse.")
+        session << M::Message.user("What is the tallest mountain on Earth?")
+        session << M::Message.new(M::Role::Assistant, [
+          M::ReasoningBlock.new(
+            "The user is asking about the tallest mountain. It's Everest.").as(M::Block),
+          M::TextBlock.new("The tallest mountain on Earth is Mount Everest.").as(M::Block),
+        ])
+        session << M::Message.user("And the deepest ocean trench?")
+
+        adapter = Liaison::AnthropicAdapter.new
+        request, report = P::Anthropic::Mapper.new(unsigned_thinking_profile(adapter))
+          .map(session, MODEL, max_tokens: 256)
+        body = request.to_json
+
+        # Checked before sending: if the block were dropped, this would be a
+        # valid, billed request proving nothing.
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Degraded)
+        thinking = JSON.parse(body)["messages"][1]["content"][0]
+        thinking["type"].should eq "thinking"
+        thinking["signature"]?.should be_nil
+
+        error = expect_raises(Liaison::TransportError, /thinking\.signature: Field required/) do
+          anthropic.post(adapter.path(MODEL), adapter.headers(anthropic.credential), body,
+            ->adapter.error_detail(String))
+        end
+        error.status.should eq 400
+      end
+    end
+  end
+
   # `claude-haiku-4-5` is in `Catalog::BUDGET_ONLY`, so `Effort::Low` resolves
   # to `thinking.budget_tokens: 1024` — the floor, and the cheapest way to
   # exercise both the clamp and the budget spelling in one call. `cap: 1536`

@@ -101,8 +101,8 @@ module Liaison::Capability
     # (`messages.N.content.M.thinking.signature: Field required`). Without
     # this flag, `Resolver#own?`'s "empty metadata is portable by
     # construction" rule — correct for a protocol with no signature concept
-    # — called this block `Exact` and sent an invalid request. See
-    # `spec/live/anthropic_spec.cr` and `SCOPE.md`'s "Known gap".
+    # — calls this block `Exact` and sends an invalid request. Recorded in
+    # `spec/live/anthropic_spec.cr`.
     getter? reasoning_signature_required : Bool
 
     # Whether this protocol's tool calls are only valid carrying a replayable

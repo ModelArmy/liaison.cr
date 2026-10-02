@@ -1,0 +1,46 @@
+{
+  "name": "anthropic_thinking_no_signature",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Content-Length": "459",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-haiku-4-5\",\"max_tokens\":256,\"system\":\"You are terse.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"The user is asking about the tallest mountain. It's Everest.\"},{\"type\":\"text\",\"text\":\"The tallest mountain on Earth is Mount Everest.\"}]},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"And the deepest ocean trench?\"}]}]}",
+        "body_digest": "224bb39d96c7dac0414753be02560f54f0fc95affb4393874e1a54081ae5dec1"
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "Date": "Fri, 02 Oct 2026 04:46:26 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "x-should-retry": "false",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "request-id": "req_011CfcoXt9iVAWfSmNb9H4Hb",
+          "traceresponse": "00-a6b4bb2708ba7d77c3f61277f881e972-a253d168bd343732-01",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "vary": "Accept-Encoding",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "Server": "cloudflare",
+          "cf-cache-status": "DYNAMIC",
+          "X-Robots-Tag": "none",
+          "CF-RAY": "a4411032b976f2b5-YUL"
+        },
+        "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"messages.1.content.0.thinking.signature: Field required\"},\"request_id\":\"req_011CfcoXt9iVAWfSmNb9H4Hb\"}"
+      },
+      "recorded_at": "2026-10-02T04:46:26Z"
+    }
+  ]
+}

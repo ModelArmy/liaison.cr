@@ -210,12 +210,14 @@ Guarded offline in `spec/conformance/anthropic_spec.cr` ("declared
 divergences"), since the fix makes the request that produced the original 400
 one the client no longer builds under any policy.
 
-**The error body itself is not in this repository.** It was observed, and this
-protocol's whole signature rule was derived from it, but the transcript was
-never committed and nothing replays it — so its absence broke no test. Getting
-it back is `../../SCOPE.md`'s only `MUST FIX`, and that entry carries the
-awkward part: no policy can now produce the request, so a recording has to go
-through a directly constructed `Profile` rather than through `Client`.
+The 400 itself is recorded in
+`spec/transcripts/anthropic_thinking_no_signature.json` and replayed by
+`spec/live/anthropic_spec.cr`. No policy can produce that request any more, so
+the spec maps through a `Profile` built by hand with
+`reasoning_signature_required: false`, a configuration the library forbids, and
+posts through `Server#post`. The replay asserts Anthropic's schema, not this
+shard, so it cannot go red for a change here; it is kept because a transcript
+nothing consumes was lost once already.
 
 The other half — that a *genuine* signature really does replay — is not
 something the rejection proves, only implies. Confirmed separately:
