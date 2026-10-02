@@ -17,14 +17,6 @@ actions:
     command: SHARDS_BIN_PATH=bin/debug shards build --debug
     description: Build for development (debugging)
     aliases: [build, bd]
-  jrun-debug:
-    command: bin/debug/liaison
-    load_secrets: true
-    aliases: [jrun, jrd]
-  jrun-release:
-    command: bin/release/liaison
-    load_secrets: true
-    aliases: [jrr]
   run:
     command: crystal run
     description: Compile and run the source file
