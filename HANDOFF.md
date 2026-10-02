@@ -413,13 +413,12 @@ than a green run here to settle it. See `docs/protocols/ANTHROPIC.md`.
   what the code under test reads,
   never anything downstream of it that happens to read the same ambient
   state.
-- **A guard at the right seam still needs a non-raising twin.** Session id
-  validation went into `Sessions.path_for` — correct, since an id becomes
-  dangerous exactly when it becomes a path, and no future verb can forget it
-  there. But `list` enumerates the folder through the same method, so one
-  `.DS_Store` took the whole listing down on first real use. A validator for
-  *input* and a predicate for *enumeration* are different questions;
-  `validate_id` and `valid_id?` are both needed.
+- **A guard at the right seam still needs a non-raising twin.** Validate an
+  identifier where it becomes dangerous — where it turns into a path, say — so
+  no caller can forget it. But if enumeration passes through the same guard,
+  one stray `.DS_Store` takes the whole listing down. Validating *input* and
+  filtering *enumeration* are different questions, and want one method that
+  raises and one that answers.
 - **Crystal is not Ruby, in three places this shard has already hit.** `out` is
   a reserved word and cannot name a property or a local. There is no trailing
   `while` modifier, only trailing `if`/`unless`. And a variable captured by a
@@ -446,6 +445,9 @@ than a green run here to settle it. See `docs/protocols/ANTHROPIC.md`.
 ## Deferred, and staying deferred
 
 Session tree, branching, scatter/gather, provider bindings, stateful handles,
-streaming, tool execution, prompt caching, compaction. See
-`docs/IMPLEMENTATION_PLAN.md` §7 and `docs/PSR_BRANCHING_AND_SCATTER_GATHER.md`,
-which carries a deferred-status banner for exactly this reason.
+prompt caching, compaction. See `docs/IMPLEMENTATION_PLAN.md` §7 and
+`docs/PSR_BRANCHING_AND_SCATTER_GATHER.md`, which carries a deferred-status
+banner for exactly this reason.
+
+§7 also lists streaming and tool execution. Both are built: streaming in full,
+tool execution as its library half, which is all this shard owes (*Next*).
