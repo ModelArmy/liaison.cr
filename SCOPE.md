@@ -114,6 +114,57 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
+### A raise mid-stream leaves the shared connection mid-body
+
+`Server#stream` closes the connection when its block returns `false`, because
+the keep-alive socket is left part-way through a response body. When the block
+*raises* instead, `close if stopped` is never reached. The stdlib does not cover
+it: `HTTP::Client#handle_response` closes the body IO in an `ensure`, but
+closing an `HTTP::ChunkedContent` or `FixedLengthContent` does not skip to its
+end, and the socket is closed only when the response is not keep-alive. The
+next request on that `Server` reads the remainder of the old body as its
+response. Where: `src/liaison/server.cr`, `stream`.
+
+The block raises whenever the caller's event handler does, or an assembler
+rejects a frame (`Protocol::MalformedResponseError`, an in-band
+`Protocol::StreamError`). Every `Provider` on the server shares the socket, so
+the failure surfaces on an unrelated later call. Likely fix: close on any
+non-normal exit (`rescue` then re-raise, or `ensure` with a completion flag).
+Predicted by reading the stdlib (`src/http/client.cr`, `src/http/content.cr`);
+no spec covers it.
+
+### `error_detail` raises on a JSON error body that is not an object
+
+`Adapter#nested_error` reads `JSON.parse(body)["error"]?.try(&.["message"]?)`
+and rescues only `JSON::ParseException`. `JSON::Any#[]?(String)` raises a plain
+`Exception` on anything but a hash, so `{"error": "text"}` (a string `error`, as
+some OpenAI-compatible servers send) or a top-level array (which the Gemini
+adapter's own comment says Gemini may return) raises from inside
+`Server#post`. The `TransportError` with the status is replaced by an
+unrelated exception. Where: `src/liaison/adapters/adapter.cr`, `nested_error`,
+used by all four adapters. Likely fix: rescue broadly there and return `nil`,
+or check `as_h?` at each step. Predicted by reading the stdlib
+(`src/json/any.cr`); no spec covers it.
+
+### A `reasoning_unit` override bypasses the signed-tool-call axis
+
+`Adapter#narrowed(model)` returns early when a `reasoning_unit` override is
+set, and so never calls `Catalog.narrow`, which applies both catalog axes. On a
+Gemini 3 model with an explicit unit, `tool_call_signature_required` is never
+switched on, so a foreign unsigned tool call maps `Exact` and draws the 400
+the catalog entry exists to prevent. Where: `src/liaison/adapters/adapter.cr`,
+`narrowed(model)`. Likely fix: let the override replace only the unit axis, then
+apply the rest of the catalog. Predicted by reading.
+
+### `Provider.for_azure` accepts any `reasoning_unit` and ignores it
+
+`Provider.for` raises `ArgumentError` for a unit the protocol does not spell;
+`for_azure` has no such check. Both Azure protocols declare `Effort`, so a
+`Budget` override is accepted and then silently ignored by `narrowed(model)`,
+which applies an override only to an `Either` unit. Where:
+`src/liaison/provider.cr`, `for_azure`. Likely fix: the same guard as `for`.
+Predicted by reading.
+
 ### A degraded tool call leaves its result behind as `unknown_function`
 
 When `Resolver` degrades a tool call because the target requires a signature it
