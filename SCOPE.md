@@ -114,6 +114,20 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
+### `Archive.read` raises more than `FormatError` on a malformed archive
+
+`FormatError` covers a missing or unrecognised `format`, and unrecognised block
+kinds, endings and outcomes. Anything else structurally wrong escapes as
+whatever the JSON accessor raises: a missing `messages` key is a `KeyError`
+(`root["messages"]`), a `messages` that is not an array a `TypeCastError`
+(`.as_a`), and unparseable text a `JSON::ParseException`. Where:
+`src/liaison/mpsh/archive.cr`, `read` and the `read_*` helpers.
+
+It matters to an application loading archives from disk: a corrupt file
+should be one rescuable error, not four. Likely fix: wrap the body of `read` and
+re-raise the accessor exceptions as `FormatError` with the original as
+`cause`. Predicted by reading; no spec covers it.
+
 ### Retention governs replay, not display and not storage
 
 Surfaced settling a streaming question, and recorded because the assumption is
