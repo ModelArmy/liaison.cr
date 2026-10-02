@@ -1,27 +1,15 @@
 module Liaison
-  # What the caller asks of the model's *reasoning* on this request.
+  # What the caller asks of the model's reasoning on one request. A closed
+  # union, so a mapper's `case ... in` is exhaustive and a request cannot
+  # carry a rung and a budget at once, which every protocol rejects.
   #
-  # A closed union of three, matching `MPSH::Block`'s convention rather than a
-  # struct with nilable fields: a mapper writes `case … in` and the compiler
-  # refuses to let it forget a case. A struct carrying an optional level and an
-  # optional budget would also permit both at once, which is a request every
-  # protocol here rejects.
-  #
-  # These are request options, never session content. A stored conversation
-  # that remembered how hard the model was asked to think would have acquired a
-  # provider's assumptions, and portability is the thing this shard refuses to
-  # give up.
+  # Request options, never session content (`docs/MPSH_SPECIFICATION.md`,
+  # §3a).
   module Reasoning
-    # Named rungs, in the vendors' own vocabulary.
-    #
-    # Not an invented abstraction. Anthropic and OpenAI both present exactly
-    # these five today, down to the spelling of `xhigh`, and both default to
-    # `high`. Adopting a vendor's ladder is the whole justification for a shared
-    # enum here — inventing a scale and then guessing at equivalences is the
-    # move this deliberately avoids.
-    #
-    # `minimal` and `none` are excluded. `none` is what `Off` means, and
-    # `minimal` appears on one family only, where `Low` is the honest neighbour.
+    # Named rungs, taken from the vendors' own ladders rather than an invented
+    # scale: Anthropic and OpenAI spell these five, though which ones a model
+    # accepts varies. `none` is excluded because `Off` means it; `minimal`
+    # because only one family has it, where `Low` is its neighbour.
     enum Effort
       Low
       Medium
@@ -29,8 +17,8 @@ module Liaison
       XHigh
       Max
 
-      # Lowercase on both OpenAI protocols and on Anthropic. Gemini shouts its
-      # levels, and spells fewer of them; see that protocol's mapper.
+      # Lowercase, as both OpenAI protocols and Anthropic spell it. Gemini's
+      # levels are in `Protocol::Gemini::REASONING_LEVELS`.
       def wire_name : String
         case self
         in Effort::Low    then "low"
@@ -42,7 +30,7 @@ module Liaison
       end
     end
 
-    # An exact token budget, for callers who want one.
+    # An exact token budget. Raises `ArgumentError` unless positive.
     struct Budget
       getter tokens : Int32
 
@@ -50,13 +38,10 @@ module Liaison
         raise ArgumentError.new("reasoning budget must be positive") unless @tokens > 0
       end
 
-      # The coarse bucket used when a budget must be rendered as a rung.
-      #
-      # Deliberately one ladder for every protocol, and deliberately lossy: the
-      # resolver already classifies this direction as **Degraded**, because a
-      # number cannot be recovered from a name. The vendors publish rung → tokens
-      # and nobody publishes the inverse, so any table here is ours and is
-      # therefore kept in one place where it can be argued with.
+      # The rung a budget becomes for a protocol that takes only rungs. One
+      # table for every protocol, and ours, since no vendor publishes
+      # budget-to-rung; `ReasoningControl` reports the conversion as
+      # `Degraded`.
       def to_effort : Effort
         case tokens
         when .< 2_048  then Effort::Low
@@ -68,9 +53,8 @@ module Liaison
       end
     end
 
-    # "Do not think." Distinct from asking for nothing at all, which leaves the
-    # provider's default alone — and the knob that would have stopped a local
-    # model spending 4,096 tokens reasoning without reaching an answer.
+    # Asks for no thinking. Not the same as no request, which leaves the
+    # provider's default.
     struct Off
     end
 

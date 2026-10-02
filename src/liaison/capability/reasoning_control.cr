@@ -3,20 +3,11 @@ require "../reasoning"
 require "../mpsh/annotation"
 
 module Liaison::Capability
-  # One rule, four spellings — `Resolver`'s argument applied to a request
-  # option rather than to a block.
-  #
-  # It lives beside `Structural` rather than inside `Resolver` for the same
-  # reason `Structural` does: the resolver answers questions about blocks, and
-  # a reasoning control is not one. What the two share is that the answer is
-  # *derived* from a declared `Profile`, so the outcome a caller is told about
-  # and the branch a mapper takes cannot drift apart.
-  #
-  # This is also where `SCOPE.md`'s note about `Report` comes true: the report
-  # now describes request fidelity as well as history fidelity. Deliberate. A
-  # caller who asks the model to think hard, against a protocol that cannot
-  # pass the request on, has lost something — and silence is the failure this
-  # whole model exists to prevent.
+  # Decides how a reasoning request is rendered for a protocol's
+  # `ReasoningUnit`, and at what fidelity. Beside `Structural` rather than in
+  # `Resolver`, which answers questions about blocks. Derived from the
+  # `Profile`, so the outcome a caller is told and the branch a mapper takes
+  # agree.
   module ReasoningControl
     extend self
 
@@ -29,17 +20,10 @@ module Liaison::Capability
       Drop     # emit nothing; the request loses what the caller asked for
     end
 
-    # The whole matrix, and small enough to read as one.
-    #
-    # The asymmetry between the two conversions is the point, and it is not
-    # aesthetic. A rung rendered as a budget adopts a mapping the vendor
-    # publishes for its own product, so the information survives the change of
-    # unit: **Restructured**. A budget rendered as a rung throws away a number
-    # that nobody can recover, using a ladder we invented because no vendor
-    # publishes that direction: **Degraded**. The second also cannot honour
-    # what the caller actually asked for, since a rung is a behavioural signal
-    # and not a cap — a distinction that matters most to the caller who chose
-    # to name a budget in the first place.
+    # The full matrix. A rung rendered as a budget is `Restructured`: it uses
+    # the vendor's own published mapping. A budget rendered as a rung is
+    # `Degraded`: the number is lost, through a table no vendor publishes, and
+    # a rung is a behavioural signal rather than a cap.
     def resolve(request : Reasoning::Request, unit : ReasoningUnit) : {Rendering, MPSH::Outcome}
       case unit
       in ReasoningUnit::None
@@ -47,11 +31,9 @@ module Liaison::Capability
         # asked for something they will not get.
         {Rendering::Drop, MPSH::Outcome::Degraded}
       in ReasoningUnit::Either
-        # Unresolved: the protocol spells both units and nobody said which one
-        # this deployment wants. `Catalog` narrows this per model before a
-        # mapper ever sees it, so reaching here means the model was unknown to
-        # the catalog *and* the default was declined — in which case guessing
-        # is a rejected request and dropping is a recorded loss.
+        # `Either`, unresolved. `Catalog.narrow` always resolves it, so this is
+        # reached only by a mapper built from an un-narrowed profile. Guessing
+        # would risk a 400; dropping is a recorded loss.
         {Rendering::Drop, MPSH::Outcome::Degraded}
       in ReasoningUnit::Effort
         case request

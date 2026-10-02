@@ -1,14 +1,11 @@
 require "../mpsh/turns"
 
 module Liaison::Capability
-  # A **playback preference**, not a capability.
-  #
-  # Capability answers "can this protocol carry the block". Retention answers
-  # "does the caller want it replayed". They are separate axes and must not be
-  # conflated: a protocol that carries reasoning perfectly may still be asked to
-  # receive none of it, and no annotation is warranted when that happens.
-  # Annotations record loss the caller did not ask for. Burying a deliberate
-  # choice in the same channel as silent damage makes the channel worthless.
+  # Which past reasoning blocks the caller wants replayed: a playback
+  # preference, not a capability. A protocol that carries reasoning may still
+  # be asked to receive none, and that is not annotated, since annotations
+  # record loss the caller did not ask for. It governs replay only; replies
+  # keep their reasoning.
   enum ReasoningRetention
     All            # replay everything the target can read; the default
     CompletedTurns # drop reasoning from closed turns, own and foreign alike
@@ -24,27 +21,12 @@ module Liaison::Capability
     end
   end
 
-  # Applies retention to a history at map time. Returns indices only — nothing
-  # is copied, nothing is mutated, and the canonical session is untouched.
+  # Applies retention to a history at map time, returning the message indices
+  # whose reasoning survives. Nothing is copied or mutated.
   #
-  # The requirement that motivated `CompletedTurns` is *model*-specific, not
-  # protocol-specific — one model family asking that past reasoning be dropped
-  # once a turn closes. Everything else in this shard is keyed on protocol,
-  # which left an open question: should a model catalog exist for this?
-  #
-  # **Settled: no.** It is operator configuration, stated per deployment by
-  # whatever is doing the deploying, not a table in this library. The line is
-  # between
-  # hard protocol facts and soft quality preferences. `Capability::Catalog`
-  # holds the former — get `SIGNED_TOOL_CALLS` wrong and the request 400s, and
-  # the vendor is the authority. This is the latter: get it wrong and the
-  # answers are merely worse, the source is a model card rather than an API
-  # contract, and two people running the same model may reasonably disagree.
-  #
-  # Which is why this enum stays a plain caller-supplied preference and gains
-  # no lookup of its own: an application that lets an operator name models can
-  # read it off a config file and add a model without waiting on a release
-  # here.
+  # `CompletedTurns` serves a model-specific requirement but is supplied by the
+  # caller, not looked up in `Catalog`; see *Three identities, kept apart* in
+  # `DEVELOPMENT.md`.
   module Retention
     extend self
 
