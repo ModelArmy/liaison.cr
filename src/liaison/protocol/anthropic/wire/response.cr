@@ -5,19 +5,12 @@ require "../../errors"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Anthropic
-  # The response half of the wire vocabulary.
+  # The response half of the wire form. The reply is the top-level object,
+  # with `content[]` at its root.
   #
-  # The only one of the four with no wrapper: the reply *is* the top-level
-  # object, and `content[]` sits at its root. No `choices`, no `candidates`, no
-  # index to pick. That is the same trait that makes this protocol the closest
-  # of the four to MPSH, seen from the response side.
-  #
-  # It is also the one reader where a mistake is a **correctness** bug rather
-  # than a fidelity one. `server_tool_use` and its result arrive already
-  # executed; reading either as an ordinary `tool_use` would hand the caller a
-  # call to dispatch, and dispatching it means running a tool they do not have.
-  # The block types are distinct here precisely so that cannot happen by
-  # accident, and this reader keeps them distinct.
+  # `server_tool_use` and its result arrive already executed, and are kept
+  # distinct from `tool_use`: read as an ordinary call, one would be handed to
+  # the caller to dispatch.
   module Wire
     struct Usage
       getter input_tokens : Int32?
@@ -27,14 +20,8 @@ module Liaison::Protocol::Anthropic
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a bare nil check. A streamed chunk carries
-        # `"usage": null` on every frame until the last one, so the key is
-        # *present* holding a JSON null — which is not Crystal's `nil`, passes
-        # a truthiness guard, and is then indexed into as a hash. Absent and
-        # explicitly null mean the same thing here, and now behave the same.
-        #
-        # Found against Azure and OpenAI, which both send it; Ollama omits the
-        # key entirely, so the emulator was the forgiving one.
+        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
+        # absent instead of being indexed as a hash.
         fields = any.try(&.as_h?)
         return unless fields
 
@@ -84,22 +71,15 @@ module Liaison::Protocol::Anthropic
           usage: Usage.parse(parsed["usage"]?))
       end
 
-      # One content block, from an object someone else assembled.
-      #
-      # Streaming needs it: Anthropic sends a block's skeleton in
-      # `content_block_start` and fills it with deltas, so the assembler holds
-      # a reconstructed object rather than a body. Reading it through *this*
-      # reader is what keeps a streamed `tool_use` and a non-streamed one the
-      # same block — including the suffix match that makes an unheard-of
-      # server-tool result still read as provider-run.
+      # One content block, from an object someone else assembled. The stream
+      # assembler rebuilds each block and reads it here, so streamed and
+      # buffered blocks are read by the same rules.
       def self.from_content_block(any : JSON::Any) : Block?
         block(any)
       end
 
-      # A reply can in principle carry any block this protocol defines, so all
-      # of them are read. The alternative — reading only what a model is
-      # *expected* to emit — is how a capability quietly stops working the
-      # first time a provider starts using one.
+      # Reads every block type the protocol defines, not only those a model is
+      # expected to emit.
       private def self.block(any : JSON::Any) : Block?
         type = any["type"]?.try(&.as_s?)
         return unless type
@@ -112,7 +92,7 @@ module Liaison::Protocol::Anthropic
         when "tool_use"
           tool_use(any).try { |parts| ToolUseBlock.new(*parts) }
         when "server_tool_use"
-          # Distinct type, distinct block. See the note above.
+          # A provider-run call: its own block type.
           tool_use(any).try { |parts| ServerToolUseBlock.new(*parts) }
         when "image"
           binary(any).try { |parts| ImageBlock.new(*parts) }
@@ -123,10 +103,8 @@ module Liaison::Protocol::Anthropic
         when "tool_result"
           tool_result(any)
         else
-          # The server-tool result block type is tool-specific —
-          # `web_search_tool_result` and its siblings — so it is matched by
-          # suffix rather than enumerated. A new provider-run tool must not
-          # need a code change here to be read as provider-run.
+          # Server-tool results are matched by the `_tool_result` suffix, so a
+          # new provider-run tool reads as provider-run without a code change.
           type.ends_with?("_tool_result") ? server_tool_result(any, type) : nil
         end
       end
@@ -135,18 +113,16 @@ module Liaison::Protocol::Anthropic
         name = any["name"]?.try(&.as_s?)
         return unless name
 
-        # `input` is a structured object here, not a JSON string as on the
-        # OpenAI protocols. The wire type stores it as raw JSON text, so it is
-        # re-serialized rather than parsed — parsing happens once, at export.
+        # `input` is a structured object here. It is re-serialized to raw JSON
+        # text, and parsed once, on export.
         {any["id"]?.try(&.as_s?) || "", name, (any["input"]? || JSON::Any.new({} of String => JSON::Any)).to_json}
       end
 
       private def self.binary(any : JSON::Any) : {String, String}?
         source = any["source"]?
         return unless source
-        # Only inline base64 is read. A URL source names bytes we do not have,
-        # and inventing a payload we never received is the one thing a reader
-        # must not do.
+        # Inline base64 only. A URL source names bytes this reader does not
+        # have, and it does not invent a payload.
         return unless source["type"]?.try(&.as_s?) == "base64"
 
         media_type = source["media_type"]?.try(&.as_s?)
@@ -170,9 +146,8 @@ module Liaison::Protocol::Anthropic
         ServerToolResultBlock.new(id, nested(any), type)
       end
 
-      # `content` nests, and so does this. The recursion is the capability that
-      # forced the nested block list into MPSH in the first place — an
-      # image-bearing tool result is native here and expressible nowhere else.
+      # `content` nests, so this recurses: an image-bearing tool result is
+      # native here.
       private def self.nested(any : JSON::Any) : Array(Block)
         body = any["content"]?
         return [] of Block unless body
@@ -186,9 +161,8 @@ module Liaison::Protocol::Anthropic
         end
       end
 
-      # A signature must be replayed unmodified, and `redacted_thinking`
-      # carries no text at all. Both are kept, so that reasoning which occurred
-      # is never reduced to an omission.
+      # Keeps the signature, and keeps `redacted_thinking`, which has no text,
+      # as a block, so reasoning that occurred is never dropped.
       private def self.thinking(any : JSON::Any) : Block
         ThinkingBlock.new(
           any["thinking"]?.try(&.as_s?),

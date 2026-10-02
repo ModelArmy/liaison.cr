@@ -5,19 +5,9 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Anthropic
-  # Wire in, MPSH out.
-  #
-  # The shallowest of the three exporters, because this protocol already models
-  # tool calls, results and thinking as content blocks. There is nothing to
-  # un-hoist, no fused representation to split, and no compensation scaffolding
-  # to recognise — the capability that forces scaffolding elsewhere is native
-  # here.
-  #
-  # What is *not* recoverable is structural, and it is the mirror of that
-  # strictness. Merged messages cannot be unmerged, and a prepended placeholder
-  # is indistinguishable from a real opening turn except by its exact text. Both
-  # are declared Compensated, so the conformance suite asserts the predicted
-  # divergence rather than fidelity.
+  # Wire in, MPSH out. Tool calls, results and thinking are already content
+  # blocks, so little is restructured. Merged messages cannot be unmerged,
+  # and the first-user placeholder is recognised only by its exact text.
   class Exporter
     getter calls : MPSH::CallIdTable
 
@@ -37,17 +27,8 @@ module Liaison::Protocol::Anthropic
       session
     end
 
-    # The response direction.
-    #
-    # The shallowest of the four, because the reply *is* the top-level object:
-    # `content[]` at the root, no wrapper, no index to pick, and every block
-    # type already handled by `to_block` on the request side.
-    #
-    # The one thing that must not go wrong is `server_tool_use`. It arrives
-    # already executed, and `to_block` marks it `server_executed: true` so the
-    # caller's `reject(&.server_executed?)` keeps it out of the dispatch loop.
-    # Reading it as an ordinary `tool_use` would be a correctness bug, not a
-    # fidelity one — the caller would be asked to run a tool it does not have.
+    # Reads a reply body. `server_tool_use` becomes a call marked
+    # `server_executed`, so a caller's dispatch loop skips it.
     def export_reply(body : String) : MPSH::Message
       export_reply(Wire::Response.from_json(body))
     end
@@ -58,8 +39,8 @@ module Liaison::Protocol::Anthropic
       reply = MPSH::Message.new(MPSH::Role::Assistant, blocks,
         response.model.try { |model| MPSH::Provenance.new(NAME, model) })
 
-      # `max_tokens` is this protocol's spelling of a turn cut short by an
-      # output cap, normalised onto `Message#ending` and also kept verbatim.
+      # `max_tokens` means the output cap cut the turn short: normalised onto
+      # `Message#ending`, and kept verbatim.
       response.stop_reason.try do |value|
         reply.put_meta(METADATA_KEY, "stop_reason", value)
         reply.ending = MPSH::Ending::Truncated if value == "max_tokens"
@@ -71,10 +52,9 @@ module Liaison::Protocol::Anthropic
       reply
     end
 
-    # Scaffolding invented to satisfy the first-user rule. Recognised by its
-    # exact text, on the same terms as the compensation placeholder: a foreign
-    # session using different wording is undetectable, and a genuine opening
-    # message with this text would be misread. Both limits are inherent.
+    # The first-user placeholder, recognised by its exact text. A foreign
+    # session with other wording goes undetected, and a genuine opening message
+    # with this text is misread.
     private def placeholder?(message : Wire::Message) : Bool
       return true if message.synthetic?
       return false unless message.role == "user" && message.content.size == 1
@@ -102,8 +82,7 @@ module Liaison::Protocol::Anthropic
         MPSH::ToolCallBlock.new(
           calls.mpsh_id(block.id), block.name, parse_input(block.input))
       when Wire::ToolResultBlock
-        # The exact path in reverse: nested content comes straight back, in
-        # position, with no placeholder to unpick.
+        # Nested content returns as it was, in position.
         MPSH::ToolResultBlock.new(
           calls.mpsh_id(block.tool_use_id),
           block.content.compact_map { |nested| to_block(nested).as(MPSH::Block?) },
@@ -118,8 +97,8 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # The result block type is tool-specific and not derivable, so it is kept
-    # under the vendor namespace rather than guessed at on the next mapping.
+    # The result type is tool-specific, so it is kept under the vendor
+    # namespace for the next mapping.
     private def server_result(block : Wire::ServerToolResultBlock) : MPSH::ToolResultBlock
       exported = MPSH::ToolResultBlock.new(
         calls.mpsh_id(block.tool_use_id),
@@ -129,10 +108,8 @@ module Liaison::Protocol::Anthropic
       exported
     end
 
-    # A signature must be replayed unmodified, which is what namespaced
-    # metadata is for. `redacted_thinking` carries no text at all, so the
-    # structural fact that reasoning occurred is retained as a redacted block
-    # rather than becoming an omission.
+    # Keeps the signature in namespaced metadata for replay, and keeps
+    # `redacted_thinking`, which has no text, as a redacted block.
     private def thinking(block : Wire::ThinkingBlock) : MPSH::ReasoningBlock
       redacted = block.redacted_data != nil
       text = redacted ? nil : block.thinking

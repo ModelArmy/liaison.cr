@@ -10,25 +10,16 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Anthropic
-  # Placeholder text for a message invented to satisfy the first-user rule.
-  # A protocol marker on the same terms as the compensation placeholder: export
-  # recognises scaffolding by it, so it must stay byte-identical.
+  # Text of the user message prepended when history opens with an assistant
+  # turn. Export recognises the scaffolding by this exact text.
   FIRST_USER_PLACEHOLDER = "[liaison: continuing a conversation that began earlier]"
 
   # MPSH view in, request body out.
   #
-  # Two things distinguish this mapper from the OpenAI pair, and they pull in
-  # opposite directions.
-  #
-  # It is the **most capable** target: tool results take nested blocks, so the
-  # fixture that Chat Completions must fake maps here with no compensation at
-  # all. That pair — one protocol faking a capability, one with it natively,
-  # exercised by the same fixture — is what actually validates the design.
-  #
-  # It is also the **strictest validator**: roles must alternate, the first
-  # message must be from the user, and `max_tokens` is required. None of those
-  # is a block-level concern, so all three are handled by a normalisation pass
-  # over the message sequence before any block is rendered.
+  # Roles must alternate and the first message must be the user's, so a
+  # sequence pass after rendering drops empty messages, prepends a
+  # placeholder user turn, and merges consecutive same-role messages, each
+  # recorded as a structural adaptation.
   class Mapper
     getter profile : Capability::Profile
     getter calls : MPSH::CallIdTable
@@ -56,9 +47,8 @@ module Liaison::Protocol::Anthropic
       end
 
       messages = normalize(rendered, report)
-      # `options.max_output_tokens` wins when set. The positional `max_tokens`
-      # stays because this protocol requires a value and had one before options
-      # existed; it is the fallback, not a second way to say the same thing.
+      # `options.max_output_tokens` wins; the positional `max_tokens` is the
+      # fallback this protocol requires.
       cap = options.max_output_tokens || max_tokens
       budget, effort, disabled = reasoning(options, cap, report)
 
@@ -68,9 +58,8 @@ module Liaison::Protocol::Anthropic
         tool_choice: options.tool_choice.try(&.wire_name)), report}
     end
 
-    # Returns the thinking budget, the effort rung and whether thinking is
-    # switched off — at most one of which is ever set, because the deployment's
-    # unit was resolved before this mapper ran.
+    # The thinking budget, the effort rung, and whether thinking is off. At
+    # most one is set, since the unit was resolved before mapping.
     private def reasoning(options : Options, cap : Int32,
                           report : Capability::Report) : {Int32?, String?, Bool}
       request = options.reasoning
@@ -97,21 +86,11 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # Two hard rules from this protocol, and a third from this shard.
+    # The budget must be at least 1,024 and below the output cap, which it
+    # shares with the answer; `Max` resolves to one under the cap.
     #
-    # The budget must be at least 1,024, and strictly less than `max_tokens` —
-    # thinking tokens count against the same ceiling as the answer, so a budget
-    # that fills it leaves the model nothing to answer with. Hence the clamp,
-    # and hence `Max` resolving to one token under the cap rather than to a
-    # number.
-    #
-    # The third rule is ours: **never raise the caller's cap to make a budget
-    # fit.** A caller who set an output cap set it for a reason, and quietly
-    # spending more of their money than they asked for is exactly the silent
-    # behaviour this model exists to prevent. Where the clamp falls below the
-    # floor there is no legal request to send, so the control is dropped and
-    # recorded — a request without thinking, rather than a request the endpoint
-    # rejects.
+    # The caller's cap is never raised to fit a budget. Where the clamp falls
+    # below the floor, no thinking is requested and the loss is recorded.
     private def clamped_budget(request : Reasoning::Request, cap : Int32,
                                report : Capability::Report) : Int32?
       wanted = case request
@@ -129,12 +108,7 @@ module Liaison::Protocol::Anthropic
       nil
     end
 
-    # Tool declarations and generation options, translated per protocol.
-    #
-    # Added as a trailing parameter rather than folded in with `policy` and
-    # `retention`: those govern what may be lost translating *history*, these
-    # govern what the model is asked to do *next*. Two questions that happen to
-    # ride on one call.
+    # Tool declarations from `Options`.
     private def declarations(options : Options) : Array(Wire::ToolDeclaration)
       options.tools.map do |tool|
         Wire::ToolDeclaration.new(tool.name, tool.description, tool.parameters)
@@ -145,17 +119,13 @@ module Liaison::Protocol::Anthropic
       message.role.user? ? "user" : "assistant"
     end
 
-    # Sequence-level normalisation, applied after rendering and before sending.
-    #
-    # Both adaptations are Compensated rather than Restructured, and for the
-    # same reason: they are one-way. Export sees the merged message, or the
-    # placeholder, with no way to recover what was there before — so the
-    # conformance suite asserts the *predicted* divergence rather than fidelity.
+    # Drops empty messages, prepends a placeholder when history opens with the
+    # assistant, and merges consecutive same-role messages. The placeholder and
+    # merges are `Compensated`: export cannot undo them, so conformance expects
+    # the divergence.
     private def normalize(messages : Array(Wire::Message),
                           report : Capability::Report) : Array(Wire::Message)
-      # Dropping an empty message is Degraded, so it is recorded rather than
-      # done quietly. A silent drop is exactly the failure this design exists to
-      # prevent, and it is easy to reach for `reject` without noticing.
+      # Dropping an empty message is `Degraded`, so each is recorded.
       messages.count(&.content.empty?).times do
         report.record(Capability::Structural.outcome(
           Capability::Structural::Adaptation::DropEmptyMessage),
@@ -219,9 +189,8 @@ module Liaison::Protocol::Anthropic
       blocks
     end
 
-    # The exact path, and the counterpart to Chat Completions' compensation.
-    # Nested content maps straight through — a screenshot stays a screenshot,
-    # in position, with no placeholder and no synthesized message.
+    # Nested content maps straight through, in position, with no placeholder
+    # and no synthesized message.
     private def tool_result(block : MPSH::ToolResultBlock, index : Int32,
                             report : Capability::Report) : Wire::Block?
       outcome = Capability::Resolver.outcome(block, profile)
@@ -255,9 +224,8 @@ module Liaison::Protocol::Anthropic
       provider_id = calls.provider_id(block.call_id) || block.call_id
       calls.bind(block.call_id, provider_id)
 
-      # A provider-run tool is its own block type here. Emitting one as an
-      # ordinary `tool_use` would lose the flag and invite a client to dispatch
-      # a tool it does not have — a correctness bug, not a fidelity one.
+      # A provider-run call is its own block type here; as `tool_use` it would
+      # lose the flag and invite dispatch.
       if block.server_executed?
         return Wire::ServerToolUseBlock.new(provider_id, block.name, block.arguments.to_json)
       end
@@ -277,8 +245,8 @@ module Liaison::Protocol::Anthropic
         redacted_data: meta.try(&.["redacted_data"]?).try(&.as?(String)))
     end
 
-    # No refusal channel here, so the reason is carried as text. A refusal with
-    # no reason has nothing to carry, which the resolver reports as Degraded.
+    # No refusal channel, so the reason travels as text. A refusal with no
+    # reason has nothing to carry, which the resolver reports as `Degraded`.
     private def refusal(block : MPSH::RefusalBlock, index : Int32,
                         report : Capability::Report) : Wire::Block?
       outcome = Capability::Resolver.outcome(block, profile)
@@ -298,9 +266,8 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # The first protocol where the degrade-versus-refuse ladder actually fires:
-    # no audio media type is accepted, so a voice note becomes its transcript or
-    # stops the request.
+    # No audio is accepted, so a voice note becomes its transcript or is
+    # refused.
     private def binary(block : MPSH::BinaryBlock, index : Int32,
                        report : Capability::Report,
                        nesting : Capability::Resolver::Nesting) : Wire::Block?

@@ -5,40 +5,20 @@ require "../../streaming/assembler"
 require "../errors"
 
 module Liaison::Protocol::Anthropic
-  # Frames from Anthropic's message stream, assembled into a `Wire::Response`.
+  # Frames from Anthropic's message stream, assembled into a
+  # `Wire::Response`.
   #
-  # ## The first protocol where the rule does real work
+  # The partial-form rule applies per block. A cut stream keeps the text and
+  # thinking it received, since a prefix of prose is prose, and drops an
+  # unfinished `tool_use`, whose `partial_json` means nothing until complete.
+  # See `materialise`.
   #
-  # `Streaming::Assembler`'s rule — never stitch anything whose partial form is
-  # invalid — was a single verdict per protocol until now. Responses gives
-  # finished items and Gemini gives fragmentary text, so each had one answer.
-  # Anthropic gives both **in the same stream**, block by block:
+  # Each block is rebuilt as the JSON object a buffered reply would carry and
+  # read by `Wire::Response.from_content_block`, so streamed and buffered
+  # blocks are read by the same rules.
   #
-  # - a `text` block's deltas are text, and a prefix of them is a short answer;
-  # - a `thinking` block's deltas are the same, though its signature is not;
-  # - a `tool_use` block's deltas are `partial_json` — fragments of an
-  #   arguments object that mean nothing until the last one arrives.
-  #
-  # So a stream cut mid-flight keeps the text and the thinking it had, and
-  # drops the half-built call, and this assembler decides that per block rather
-  # than for the reply. See `#materialise`.
-  #
-  # ## Blocks are reconstructed, then read by the ordinary reader
-  #
-  # `content_block_start` carries a block's skeleton, deltas fill it, and
-  # `content_block_stop` closes it. Rather than build `Wire::Block`s directly,
-  # this rebuilds the JSON object the non-streamed reply would have contained
-  # and hands it to `Wire::Response.from_content_block`. That keeps one
-  # understanding of what a block is — including the suffix rule that makes an
-  # unheard-of `*_tool_result` read as provider-run, which a second reader
-  # would have had to remember to reproduce.
-  #
-  # ## Indices, not order
-  #
-  # Every block frame carries an `index`, and Anthropic does not promise those
-  # arrive in order or without gaps. Blocks are therefore held in a hash keyed
-  # by index and sorted on the way out, rather than pushed onto an array in
-  # arrival order.
+  # Blocks are keyed by their frames' `index` and sorted on output, not kept
+  # in arrival order.
   class Assembler < ::Liaison::Streaming::Assembler
     # One content block being built.
     class Pending
@@ -97,14 +77,10 @@ module Liaison::Protocol::Anthropic
             yield Streaming::ReasoningDelta.new(text)
           end
         when "input_json_delta"
-          # Deliberately silent. These are fragments of a tool call's
-          # arguments, and an event carrying them would invite exactly the
-          # accumulation this design refuses — `ToolCallStarted` already said
-          # a call is coming, and it said so with the name alone.
+          # No event: argument fragments are not for watching.
           delta["partial_json"]?.try(&.as_s?).try { |chunk| pending.json += chunk }
         when "signature_delta"
-          # Arrives at the end of a thinking block and must be replayed
-          # unmodified. Not an event: nobody watches a signature.
+          # Replayed unmodified later; no event.
           delta["signature"]?.try(&.as_s?).try { |value| pending.signature = value }
         end
       else
@@ -165,8 +141,8 @@ module Liaison::Protocol::Anthropic
       index_of(payload).try { |index| @blocks[index]?.try(&.closed=(true)) }
     end
 
-    # Where the stop reason lives, and where the output-token count is finally
-    # correct — `message_start`'s usage is the input side only.
+    # The stop reason, and the final output-token count; `message_start`
+    # carried the input side only.
     private def advanced(payload : JSON::Any) : Nil
       payload["delta"]?.try do |delta|
         delta["stop_reason"]?.try(&.as_s?).try { |value| @stop_reason = value }
@@ -175,14 +151,9 @@ module Liaison::Protocol::Anthropic
       Wire::Usage.parse(payload["usage"]?).try { |value| @usage = merged(value) }
     end
 
-    # Turns what has been collected into blocks, applying the rule per block.
-    #
-    # A closed block is materialised whatever it is. An open one is materialised
-    # only if what arrived is meaningful on its own: text and thinking are,
-    # because a prefix of prose is prose. A `tool_use` block is not, because its
-    # `partial_json` is fragments of an object — so a call still arriving when
-    # the stream ended is dropped rather than guessed at, and never reaches a
-    # session where something might try to dispatch it.
+    # Closed blocks are materialised whatever they are. An open block is kept
+    # only if it is text or thinking with content; an unfinished tool call is
+    # dropped.
     private def materialise : Array(Wire::Block)
       @blocks.keys.sort!.compact_map do |index|
         pending = @blocks[index]
@@ -216,11 +187,9 @@ module Liaison::Protocol::Anthropic
       JSON::Any.new(fields)
     end
 
-    # An empty or unreadable accumulation becomes an empty object rather than a
-    # raise. Only closed tool blocks reach here, so unreadable means the
-    # provider sent something this cannot represent — and a call with no
-    # arguments is a truthful reading of that, where a raise would discard an
-    # otherwise complete reply.
+    # A closed tool block whose arguments are empty or unparseable reads as a
+    # call with no arguments, rather than raising and losing the whole
+    # reply.
     private def arguments(json : String) : JSON::Any
       return JSON::Any.new({} of String => JSON::Any) if json.blank?
 
@@ -229,9 +198,8 @@ module Liaison::Protocol::Anthropic
       JSON::Any.new({} of String => JSON::Any)
     end
 
-    # `message_delta` reports output tokens while `message_start` reported
-    # input tokens, and neither carries the other. Keeping both means the
-    # exported usage matches what a non-streamed reply would have said.
+    # Merges `message_delta`'s output count into `message_start`'s input
+    # count, so usage matches a buffered reply's.
     private def merged(update : Wire::Usage) : Wire::Usage
       previous = @usage
       return update unless previous
