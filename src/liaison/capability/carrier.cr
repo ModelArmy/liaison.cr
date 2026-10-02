@@ -3,60 +3,34 @@ require "./structural"
 require "../mpsh/block"
 
 module Liaison::Capability
-  # The compensation carrier, in one place.
+  # The compensation carrier, for the three protocols whose tool results take
+  # text only. Non-text content is lifted out of a tool result, a marker is
+  # left where it stood, and the content goes in a synthesized user message
+  # after the run of results; export reverses it.
   #
-  # Three protocols cannot put non-text content inside a tool result, so the
-  # content is lifted out, a marker is left where it stood, and the content
-  # rides in a synthesized user message afterwards. Both directions of that
-  # trick were written three times, expressed differently each time, and were
-  # wrong once: the Gemini mapper flushed only before user messages, so the
-  # carrier landed *after* the model's reply, where export could no longer see
-  # the results it belonged to. One missing case, two divergences.
-  #
-  # What differs between the three protocols is only the wire type — a
-  # `Wire::Message`, a `Wire::MessageItem`, a `Wire::Content` — and the wire
-  # type is exactly what this module refuses to know. It takes the parts and
-  # gives them back; the caller builds its own message. Everything else, which
-  # is to say the rule, lives here once.
-  #
-  # `Structural` is the home because the outcome was already recorded there:
-  # deferral is a sequence-level adaptation, not a per-block resolution.
+  # This module holds the rule and never sees a wire type: callers pass parts
+  # in and build their own message. See *The compensation carrier, both
+  # directions* in `DEVELOPMENT.md`.
   module Carrier
     extend self
 
-    # The marker left where lifted content stood.
-    #
-    # One constant, not three. It was three identical strings that had to stay
-    # byte-identical forever, since a session mapped by one protocol may be
-    # exported by another and the marker is matched *exactly* on the way back.
-    # Three copies of a value with that requirement is a bug with a start date.
-    #
-    # Never localized, for the same reason: this is read by our own exporter,
-    # structurally, not by the model. `SCOPE.md`'s *A localizable content
-    # synthesizer* draws the line — markers never, glue always.
+    # The marker left where lifted content stood. One constant, matched exactly
+    # on export by every protocol, since a session mapped by one may be
+    # exported by another. Never localized: the exporter reads it, not the
+    # model.
     PLACEHOLDER = "[liaison: content returned separately in the following message]"
 
     # ---- Mapping: request out ------------------------------------------------
 
     # Emits the buffered carrier, if any, and clears the buffer.
     #
-    # Ordering is not cosmetic. A single assistant turn may request several
-    # tools in parallel, and strict servers — Azure's OpenAI endpoint among
-    # them — require every message answering that turn to appear before
-    # anything else. Emitting a carrier inline after each result interleaves
-    # scaffolding between tool responses and is rejected, even though
-    # permissive servers such as Ollama and LM Studio accept it.
+    # Call it at anything that is not a tool result: a user message, an
+    # assistant message, or the end of the request. Strict servers reject a
+    # carrier between the tool results answering one turn, so one carrier may
+    # hold several results' content.
     #
-    # So carriers are deferred until the run of tool results ends, and several
-    # results' worth of content may ride in one carrier. The flush points are
-    # the same in all three protocols and are the part that was got wrong:
-    # *anything* that is not itself a tool result ends the run — genuine user
-    # content, an assistant turn, or the end of the request — not just user
-    # content.
-    #
-    # The block receives the buffered parts and appends whatever message its
-    # own protocol spells that with. It is called only when there is something
-    # to carry, so a caller need not check first.
+    # The block receives the parts and appends its protocol's message. It is
+    # called only when there is something to carry.
     def flush(pending : Array(T), report : Report, & : Array(T) -> Nil) : Nil forall T
       return if pending.empty?
 
@@ -71,27 +45,14 @@ module Liaison::Capability
     # ---- Export: request back in ---------------------------------------------
 
     # Whether a message following a run of tool results is a carrier rather
-    # than genuine input opening a new turn.
+    # than genuine input. A guess, narrowed by three signals in turn:
+    # `synthetic` (decisive, but lost once archived), a marker still open in
+    # the run, and no text of its own, which the block tests per part. A
+    # genuine user message holding only an image is misread.
     #
-    # The ambiguity is real and this narrows it rather than closing it. A
-    # foreign session produced by another client doing the same twiddling with
-    # different marker text is undetectable, and a genuine user message that
-    # follows a tool result and carries only an image is a legitimate
-    # conversation that will be misread as scaffolding. Three signals, weakest
-    # last:
-    #
-    # 1. `synthetic` — decisive, but only within one process. A carrier read
-    #    back from JSON has no such flag and must be recognised structurally.
-    # 2. A marker in the run above, which is our own constant.
-    # 3. No text of its own, since a carrier only ever holds lifted non-text.
-    #
-    # `eligible` carries each caller's own precondition — Gemini wants
-    # `role: "user"`, Chat Completions' content may be a bare `String` with no
-    # parts to inspect at all. It is a parameter rather than a check hoisted to
-    # the call site because both sat *below* the synthetic test originally, and
-    # lifting them above it would flip the answer for a synthetic message that
-    # failed them. Everything after the synthetic short-circuit is a plain
-    # conjunction, so where among those it sits does not matter.
+    # `eligible` is each caller's own precondition, such as Gemini's
+    # `role: "user"`. It is checked after `synthetic`, so a synthetic message
+    # that fails it is still a carrier.
     def carrier?(run : Array(MPSH::ToolResultBlock), synthetic : Bool,
                  parts : Array(T), eligible : Bool = true,
                  & : T -> Bool) : Bool forall T
@@ -103,24 +64,13 @@ module Liaison::Capability
       parts.none? { |part| yield part }
     end
 
-    # Returns carrier content to the results that referenced it, in order.
+    # Returns carrier content to the results that referenced it. Each result
+    # takes as many parts as it left markers, in order, so one carrier can
+    # serve a run of results.
     #
-    # Each result takes as many parts as it left markers, in the order it left
-    # them, which is what lets one carrier serve a whole run of results.
-    #
-    # Placement is *positional*: the markers are located once, up front, and
-    # each part is written to the slot its own marker occupies. The three
-    # implementations this module replaced all counted markers but filled the
-    # first one still open, and those two only agree while every part converts.
-    # A part the target cannot express returns `nil`, and under first-open
-    # filling the next part that did convert slid up into the skipped slot,
-    # leaving the surviving marker trailing at the end — right count, wrong
-    # order, inside a single tool result. Addressing the slot directly removes
-    # the discrepancy rather than documenting it.
-    #
-    # Locating the markers before writing anything is what makes that safe: a
-    # replacement swaps one block for another and never resizes the array, so
-    # an index taken up front still points where it did.
+    # Each part is written to its own marker's position, found before any
+    # writing; replacement never resizes the array. A part the block converts
+    # to `nil` leaves its marker standing where it was.
     def absorb(run : Array(MPSH::ToolResultBlock), parts : Array(T),
                & : T -> MPSH::Block?) : Nil forall T
       queue = parts.dup
@@ -140,9 +90,7 @@ module Liaison::Capability
       marker_indices(result).size
     end
 
-    # Where they are, in order. Public because it is the honest expression of
-    # what a marker count means, and because `absorb` needs the positions
-    # rather than the tally.
+    # The positions of those markers, in order.
     def marker_indices(result : MPSH::ToolResultBlock) : Array(Int32)
       indices = [] of Int32
 
@@ -153,13 +101,9 @@ module Liaison::Capability
       indices
     end
 
-    # A tool result arrives from the wire as one string, and the markers inside
-    # it record where non-text content belonged. Splitting on the marker
-    # restores the block boundaries, which is what lets a carrier be absorbed
-    # back into the right positions rather than merely appended.
-    #
-    # Splitting on the marker itself rather than on newlines matters: genuine
-    # tool output contains newlines, and splitting on those would shred it.
+    # Splits a tool result's wire text back into blocks at each marker, so a
+    # carrier can be absorbed into the right positions. Splits on the marker,
+    # not on newlines, which genuine tool output contains.
     def split(body : String) : Array(MPSH::Block)
       return [] of MPSH::Block if body.empty?
 

@@ -3,13 +3,8 @@ require "./policy"
 require "../mpsh/block"
 
 module Liaison::Capability
-  # One algorithm, four declarations.
-  #
-  # The capability matrix in the specification is written as a table, but a
-  # hand-written table per protocol is four places to forget the same rule. The
-  # table is instead *derived* from each protocol's `Profile`, so the matrix a
-  # caller queries and the outcome a mapper acts on are guaranteed to be the
-  # same fact.
+  # Derives a block's outcome on a protocol from that protocol's `Profile`, so
+  # the matrix a caller queries and the branch a mapper takes are one fact.
   module Resolver
     extend self
 
@@ -35,49 +30,33 @@ module Liaison::Capability
       in MPSH::ReasoningBlock
         reasoning_outcome(block, profile, nesting)
       in MPSH::RefusalBlock
-        # Ruling: the session plays back as it happened. A past refusal is just
-        # history, and carrying its text to a provider with no refusal channel
-        # loses nothing. A refusal with no text has nothing to carry, and that
-        # is the case worth being told about.
+        # A past refusal is history: its text travels as text without loss. One
+        # with no text has nothing to carry, which is the loss worth reporting.
         return MPSH::Outcome::Exact if profile.refusal_channel?
         block.reason ? MPSH::Outcome::Restructured : MPSH::Outcome::Degraded
       end
     end
 
-    # Foreign reasoning is not a loss: MPSH keeps the block, and the opaque
-    # payload is shed by namespacing rather than by anyone deciding to shed it.
-    # Calling it Degraded would make `strict` refuse every cross-provider
-    # handoff of a reasoning-model session — precisely the move this shard
-    # exists to perform.
-    #
-    # The exception is real. Some providers require a reasoning item be replayed
-    # unmodified between a tool call and its result; dropping one there breaks
-    # the turn rather than trimming it.
+    # Reasoning that belongs to the target is `Exact`. Foreign reasoning is
+    # `Restructured`, not a loss: MPSH keeps the block and namespacing sheds
+    # the payload. As `Degraded` it would make `Strict` refuse every
+    # cross-provider handoff of a reasoning session. Mid-tool-call it is
+    # `Refused`, since some providers require it replayed unmodified there.
     private def reasoning_outcome(block : MPSH::ReasoningBlock, profile : Profile,
                                   nesting : Nesting) : MPSH::Outcome
-      # Ownership is necessary but not sufficient: a protocol with nowhere to
-      # put a reasoning item in a *request* cannot replay one, however plainly
-      # it belongs to that vendor. Implementing the mapper is what exposed this
-      # — the matrix had reasoning Exact for its own vendor on all four
-      # protocols, and Chat Completions has no standard field for it.
+      # Ownership is not enough: with nowhere to put reasoning in a request,
+      # nothing can be replayed.
       return degrade_or_refuse(nesting) if profile.reasoning.none?
 
-      # A protocol whose native reasoning form requires a replayable payload
-      # cannot accept text alone, whatever `own?` says. This is the case
-      # `own?`'s "empty metadata is portable" rule gets wrong: metadata this
-      # sparse is exactly what a reasoning block with nothing to replay looks
-      # like, on its own vendor's protocol or anyone else's. Confirmed by a
-      # live 400 — Anthropic's own schema requires the field, not merely
-      # validates it. See `Profile#reasoning_signature_required?`.
+      # Where the native form needs a vendor-issued payload, text alone will not
+      # do even when `own?` holds: empty metadata is exactly what reasoning with
+      # nothing to replay looks like.
       if profile.reasoning_signature_required? && !replayable?(block, profile)
         return degrade_or_refuse(nesting)
       end
 
-      # A message-level field carries text and nothing else. Redacted reasoning
-      # is precisely the case with no text — the content lives in
-      # `provider_metadata`, which the field cannot hold — so ownership does not
-      # save it. Found by round-tripping the fixture: the block vanished
-      # entirely while the matrix claimed Exact.
+      # A message-level field carries text only, and redacted reasoning has
+      # none; its content is in `provider_metadata`.
       if block.redacted? && block.text.nil? && profile.reasoning.field?
         return degrade_or_refuse(nesting)
       end
@@ -86,53 +65,29 @@ module Liaison::Capability
       nesting.mid_tool_call? ? MPSH::Outcome::Refused : MPSH::Outcome::Restructured
     end
 
-    # Shared by every branch above that cannot carry a reasoning block on this
-    # wire: the block is lost either way, and only whether it sits mid-tool-call
-    # decides whether that is recoverable. A dangling call with no reasoning
-    # ahead of it is not obviously wrong the way a dangling call with no result
-    # is, but some providers require the reasoning item replayed unmodified
-    # between a call and its result, and dropping one there breaks the turn
-    # rather than trimming it.
+    # For reasoning this wire cannot carry: a recorded loss, except mid-tool-
+    # call, where some providers require the item replayed unmodified and
+    # dropping it breaks the turn.
     private def degrade_or_refuse(nesting : Nesting) : MPSH::Outcome
       nesting.mid_tool_call? ? MPSH::Outcome::Refused : MPSH::Outcome::Degraded
     end
 
-    # Does this block belong to the protocol being mapped to?
-    #
-    # Declaring this on the `Profile` was wrong, and declaring the four profiles
-    # is what exposed it: "exact for its own tools, degraded for everyone
-    # else's" is not a fact about a protocol, it is a fact about a *block seen
-    # from* a protocol. The answer is already present in the data — an item that
-    # a provider issued and needs echoed back carries that provider's
-    # `provider_metadata` key, and nothing else does.
-    #
-    # A block with no provider metadata at all is portable by construction:
-    # plain reasoning text belongs to no one and maps exactly everywhere.
-    #
-    # Note this tests `metadata_key`, not `provider`. The vendor that can read
-    # an opaque payload back is not the same identity as the protocol carrying
-    # it — one vendor may offer two protocols, and one protocol may be served by
-    # many providers.
+    # Whether a block belongs to the target: it carries the target's
+    # `metadata_key`, or no provider metadata at all, since plain reasoning
+    # text belongs to no one. A property of the block seen from a profile, not
+    # of the profile. Keyed on `metadata_key` rather than `provider`, because
+    # one vendor may offer two protocols.
     private def own?(block, profile : Profile) : Bool
       metadata = block.provider_metadata
       return true if metadata.empty?
       metadata.has_key?(profile.metadata_key)
     end
 
-    # Does this block actually carry what this protocol's own
-    # signature-bearing form needs to replay it — a `signature` or an
-    # equivalent opaque payload such as `redacted_data` or Gemini's
-    # `thought_signature`? Deliberately looked up under `profile.metadata_key`
-    # rather than any key: metadata namespaced to a different vendor is
-    # exactly as unreplayable here as no metadata at all, which is why this
-    # subsumes `own?` rather than running alongside it.
-    #
-    # One predicate over a union of key spellings, rather than one per block
-    # kind. The spellings are disjoint in practice — each lives under exactly
-    # one vendor's `metadata_key`, so `thought_signature` can never be found
-    # under Anthropic's namespace — and the question being asked is identical
-    # in both callers: *is there an opaque payload here that this vendor
-    # issued and will accept back*.
+    # Whether a block carries a payload this vendor issued and will accept
+    # back: a `signature`, `redacted_data` or `thought_signature` under the
+    # profile's own `metadata_key`. A payload under another vendor's key is as
+    # unusable as none, so this subsumes `own?`. One predicate over all three
+    # spellings, since each lives under exactly one vendor's key.
     REPLAY_PAYLOAD_KEYS = {"signature", "redacted_data", "thought_signature"}
 
     private def replayable?(block : MPSH::Block, profile : Profile) : Bool
@@ -161,9 +116,9 @@ module Liaison::Capability
     end
 
     private def compensate_or_fall_back(block : MPSH::BinaryBlock, profile : Profile) : MPSH::Outcome
-      # The fixture that forced this whole model: a tool returning a screenshot.
-      # Chat Completions can only render it as a placeholder result plus a
-      # synthetic user message carrying the image.
+      # A tool returning a screenshot, on a protocol whose tool results are
+      # text only: a placeholder result plus a synthesized user message
+      # carrying the image.
       return MPSH::Outcome::Compensated if profile.can_synthesize_user_message? &&
                                            profile.accepts?(block.kind, block.media_type)
       block.text_fallback ? MPSH::Outcome::Degraded : MPSH::Outcome::Refused
@@ -173,28 +128,19 @@ module Liaison::Capability
       return MPSH::Outcome::Refused if profile.tool_calls.none?
 
       if block.server_executed?
-        # A provider-run call is never dispatched by a client, and it is exact
-        # only for the provider that ran it. Anthropic's web search is not
-        # Gemini's, however well both support the concept — so the profile's
-        # flag is necessary and not sufficient. Elsewhere the result survives as
-        # conversation and the tool framing does not.
+        # Exact only on the protocol of the provider that ran it. Elsewhere the
+        # result survives as conversation and the tool framing does not.
         return MPSH::Outcome::Exact if profile.server_executed? && own?(block, profile)
         return MPSH::Outcome::Degraded
       end
 
-      # A protocol that authenticates its own tool calls cannot accept one it
-      # never issued, whatever `own?` says — this is the same case, one block
-      # kind over, that `reasoning_signature_required` exists to catch, and it
-      # subsumes `own?` for the same reason: a signature under another
-      # vendor's `metadata_key` is as unusable here as none at all.
+      # A protocol that authenticates its tool calls cannot accept one it did
+      # not issue: `reasoning_signature_required`, one block kind over.
       #
-      # `Degraded`, not `Refused`. The call is lost and the mapper drops the
-      # part, which is a recorded loss a `strict` caller can still escalate to
-      # a refusal by policy — where `Refused` would hard-fail every
-      # cross-protocol handoff carrying a tool call, the exact move this shard
-      # exists to perform. A dangling result left behind by the dropped call
-      # is the pre-existing behaviour of every other `Degraded` tool call here
-      # and is not made worse by this branch.
+      # `Degraded`, not `Refused`: the mapper drops the call and records the
+      # loss, which a `Strict` caller escalates by policy, where `Refused`
+      # would fail every cross-protocol handoff carrying a tool call. The
+      # call's result is not dropped with it.
       if profile.tool_call_signature_required? && !replayable?(block, profile)
         return MPSH::Outcome::Degraded
       end
@@ -216,8 +162,8 @@ module Liaison::Capability
       worst
     end
 
-    # The queryable matrix: the same resolver, run over a representative block
-    # set, so a caller can know in advance what will degrade.
+    # The outcome of each block in a representative set, labelled by kind and
+    # media type, so a caller can see in advance what a profile will lose.
     def matrix(profile : Profile, blocks : Array(MPSH::Block)) : Hash(String, MPSH::Outcome)
       blocks.each_with_object({} of String => MPSH::Outcome) do |block, acc|
         label = case block
