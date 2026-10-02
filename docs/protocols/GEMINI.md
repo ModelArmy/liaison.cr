@@ -59,10 +59,9 @@ Two smaller divergences follow from it:
   omit both, silently. Sent whenever a budget or level is, since there is no
   reason to ask for reasoning and not want to see it.
 
-Unconfirmed, and flagged in `SCOPE.md`: whether a budget of 0 reliably disables
-thinking on the levels-preferring series, which has no `off` rung of its own.
-
-**Confirmed live, and the answer splits by tier, not by generation.** On
+Whether a budget of 0 disables thinking on the levels-preferring series, which
+has no `off` rung of its own, is **confirmed live, and the answer splits by
+tier, not by generation.** On
 `gemini-3.5-flash`, a budget of 0 reliably disables thinking —
 `usageMetadata` carries no `thoughtsTokenCount` at all, not zero, absent
 (`spec/live/gemini_spec.cr`). On `gemini-3.1-pro-preview`, the same budget is
@@ -198,8 +197,11 @@ and none to offer. That is the same shape of question the Anthropic
 `reasoning_signature_required` fix answered for reasoning blocks, and it now
 has the same shape of answer: `Profile#tool_call_signature_required?`, checked
 by `Resolver` ahead of `own?`, reporting `Degraded` rather than sending a
-request that cannot succeed. The call is dropped, the loss is annotated, and a
-`Strict` caller still gets a refusal.
+request that cannot succeed. Under `Strict` or the default `Compensating`
+policy that refuses the request; under `Lenient` the call is dropped and the
+loss annotated. Its result is not dropped with it, and goes out as a
+`functionResponse` named `unknown_function`, which `SCOPE.md` logs as a
+defect.
 
 The one thing that is *not* like the Anthropic fix is where the flag is
 declared. `reasoning_signature_required` sits on Anthropic's `PROFILE`, true
@@ -219,8 +221,8 @@ Catalog, on an unlisted 3 model|A 400 naming the missing field outright — the 
 expensive failure mode is the same judgement one level down, so the catalog
 default stays optimistic here even though the argument that justified optimism
 for `BUDGET_ONLY` — a closed, shrinking exception list — runs the other way on
-this axis. Both comments say so explicitly; read them together before adding a
-third axis.
+this axis. `DEVELOPMENT.md`'s *Three identities, kept apart* sets out both
+arguments; read it before adding a third axis.
 
 **Expect to add entries.** Only spellings this repository has actually
 observed are listed, because a wrong entry fails in the silent direction while
