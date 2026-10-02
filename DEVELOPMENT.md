@@ -39,14 +39,13 @@ Command         |Description
 `ops up`        |Sets everything up, including `crystal` via `apt` or `brew`
 `ops lint`      |Run `ameba`                                                
 `ops test_specs`|Run the specs                                              
-`ops test`      |Specs and linter                                           
+`ops test`      |Specs, a build of the samples, and the linter              
 
 Requires [`ops`](https://github.com/nickthecook/crops), via `gem install ops_team`
 or `brew tap nickthecook/crops && brew install ops`.
 
-**Tests never touch the network.** Conformance is structural: no API key, no
-running model, no HTTP object constructed. Live protocol acceptance is a
-separate, later layer using recorded transcripts.
+**Tests never touch the network.** Conformance is structural: no API key and no
+running model. Live specs replay recorded transcripts; see *Live specs*.
 
 ## What this shard is for
 
@@ -90,10 +89,10 @@ flowchart TB
         C2["responses"]
         C3["anthropic"]
         C4["gemini"]
-        W["each: capabilities · wire/request<br/>wire/response · mapper · export"]
+        W["each: capabilities · wire/request<br/>wire/response · mapper · export · stream"]
     end
 
-    subgraph STREAM["streaming/ — presentation, never state"]
+    subgraph STREAM["streaming/ — the shared vocabulary of a streamed turn"]
         SSE["Sse<br/>bytes → frames"]
         AS["Assembler<br/>frames → reply"]
         EV["Event union<br/>text · reasoning · tool_call_started<br/>annotation · provider"]
@@ -111,9 +110,15 @@ flowchart TB
         OP --> AD
     end
 
+    subgraph TOOLS["tool execution — caller-facing, independent of the live layer"]
+        TB["Toolbox · Function<br/>declarations out, results back"]
+    end
+
     AS -.exports through.-> PROTO
     CL -.drives.-> SSE
     TU -.answers.-> CL
+    TB -.declares through.-> OP
+    TB -.answers calls in.-> S
 
     B -.consumed by.-> R
     R -.governs.-> PROTO
@@ -122,22 +127,23 @@ flowchart TB
     PROTO -.driven by.-> AD
 
     classDef built stroke:#2e7d32,stroke-width:3px
-    class S,M,B,P,T,PR,R,ST,PO,RC,CT,C1,C2,C3,C4,W,SV,PV,AD,CL,OP,SSE,AS,EV,TU built
+    class S,M,B,P,T,PR,R,ST,PO,RC,CT,C1,C2,C3,C4,W,SV,PV,AD,CL,OP,SSE,AS,EV,TU,TB built
 ```
 
 ```
 src/liaison/
   mpsh/         canonical types — knows nothing of HTTP or any provider
   capability/   outcomes, profiles, policy — depends on mpsh, never the reverse
-  protocol/     one directory per protocol:
+  protocol/     errors.cr, then one directory per protocol:
                   capabilities.cr   declared Profile
                   wire/request.cr   serialize-only — what we build
                   wire/response.cr  parse-only — what we read
                   mapper.cr         MPSH → request
                   export.cr         request or response → MPSH
-  streaming/    the streamed turn — depends on mpsh and protocol, never the reverse:
+                  stream.cr         frames → a reply: the protocol's assembler
+  streaming/    the streamed turn's vocabulary — depends on mpsh only:
                   sse.cr        frame the byte stream, protocol-agnostic
-                  assembler.cr  frames → a reply, one implementation per protocol
+                  assembler.cr  the abstract assembler each protocol implements
                   event.cr      the closed union a caller may watch
                   turn.cr       the handle a caller stops a turn with
   adapters/     path, headers, prepare/read — one file per protocol adapter:
@@ -149,11 +155,13 @@ src/liaison/
   client.cr     send(session, model) → (Message, Report)
   options.cr    tools, output cap, reasoning — per call, never stored
   reasoning.cr  the caller's reasoning request: a rung, a budget, or off
+  function.cr   a tool the caller can declare and run
+  toolbox.cr    runs a reply's calls, returns their results
 ```
 
-`server.cr`, `provider.cr`, `client.cr`, `options.cr` and `reasoning.cr` stay
-flat files, because a directory here *is* a namespace and none of these five
-wants one yet. `adapters/` did, once there were enough concrete adapters to
+`server.cr`, `provider.cr`, `client.cr`, `options.cr`, `reasoning.cr`,
+`function.cr` and `toolbox.cr` stay flat files, because a directory here *is* a
+namespace and none of these wants one yet. `adapters/` did, once there were enough concrete adapters to
 share a vocabulary — six, two of them a deployment amending a protocol rather
 than declaring one — which is the condition worth watching for in whatever's
 still flat above. Group when it's met, not before.
@@ -266,7 +274,8 @@ natively.
 
 **Provider-specific data is namespaced, never special-cased.** Anything a
 provider needs echoed back but nobody else can read goes under
-`provider_metadata["<provider>"]`. A mapper reads only its own key, so
+`provider_metadata["<vendor>"]`, keyed by the profile's `metadata_key`. A mapper
+reads only its own key, so
 cross-provider drop happens with no drop logic to write or forget. Never add a
 canonical field for one provider's bookkeeping.
 
@@ -298,7 +307,7 @@ Outcome       |Means                                     |Silent?
 `Refused`     |Cannot map                                |Raises; nothing sent                   
 
 `Outcome` is ordered by fidelity, so a degradation policy is a comparison rather
-than a table. The full resolution path:
+than a table. Resolution starts from the block's kind:
 
 ```mermaid
 ---
@@ -306,45 +315,113 @@ config:
   layout: elk
 ---
 flowchart TD
-    A["Block + Profile + nesting"] --> B{{"Kind?"}}
+    A["Block + Profile + nesting"] --> K{{"Kind?"}}
 
-    B -->|text| X1["Exact"]
-    B -->|tool_call / tool_result| TC{{"server_executed<br/>and provider can't?"}}
-    B -->|reasoning / refusal| RR{{"Provider's own<br/>channel?"}}
-    B -->|image / audio / document| MT{{"media_type in<br/>accepted set?"}}
+    K -->|text| X1["Exact"]
+    K -->|refusal| RC{{"Refusal channel?"}}
+    K -->|reasoning| RS["Reasoning, below"]
+    K -->|tool call / tool result| TL["Tools, below"]
+    K -->|image / audio / document| BN["Binary, below"]
 
-    TC -->|yes| X4a["Degraded → text"]
-    TC -->|no| TF{{"Native block form?"}}
-    TF -->|yes| X1b["Exact"]
-    TF -->|no| X2["Restructured<br/>hoist to field or item"]
+    RC -->|yes| X2["Exact"]
+    RC -->|no| RT{{"Has a reason?"}}
+    RT -->|yes| X3["Restructured<br/>carried as text"]
+    RT -->|no| X4["Degraded"]
 
-    RR -->|yes| X1c["Exact"]
-    RR -->|no| X4b["Degraded<br/>structure kept in MPSH,<br/>payload shed on wire"]
+    X1 & X2 & X3 & X4 & RS & TL & BN --> POL{{"Policy permits?"}}
+    POL -->|yes| OUT["Map; annotate if lossy or synthesized"]
+    POL -->|no| ERR["RefusedError, nothing sent"]
 
+    classDef refused stroke:#c62828,stroke-width:3px
+    class ERR refused
+```
+
+Reasoning is the branch where ownership matters. Every path that cannot carry
+the block ends the same way: `Degraded`, or `Refused` between a tool call and its
+result, where some providers require the item replayed unmodified.
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TD
+    R["Reasoning block"] --> NONE{{"Profile has nowhere<br/>to put reasoning?"}}
+    NONE -->|yes| LOST["Cannot carry"]
+    NONE -->|no| SIG{{"Signature required<br/>and none from this vendor?"}}
+    SIG -->|yes| LOST
+    SIG -->|no| RED{{"Redacted, no text,<br/>and a text-only field?"}}
+    RED -->|yes| LOST
+    RED -->|no| OWN{{"Own metadata,<br/>or none at all?"}}
+    OWN -->|yes| X1["Exact"]
+    OWN -->|no| MID1{{"Mid tool call?"}}
+    MID1 -->|no| X2["Restructured<br/>payload shed by namespacing"]
+    MID1 -->|yes| X5["Refused"]
+
+    LOST --> MID2{{"Mid tool call?"}}
+    MID2 -->|no| X4["Degraded"]
+    MID2 -->|yes| X5
+
+    classDef refused stroke:#c62828,stroke-width:3px
+    class X5 refused
+```
+
+Tool calls and results:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TD
+    C["Tool call"] --> CN{{"Profile has<br/>tool calls?"}}
+    CN -->|no| CR["Refused"]
+    CN -->|yes| CS{{"Server-executed?"}}
+    CS -->|yes| CO{{"Profile has server tools<br/>and the call is its own?"}}
+    CO -->|yes| CX["Exact"]
+    CO -->|no| CD["Degraded"]
+    CS -->|no| CG{{"Signature required<br/>and none from this vendor?"}}
+    CG -->|yes| CD
+    CG -->|no| CF{{"Native block form?"}}
+    CF -->|yes| CX
+    CF -->|no| CH["Restructured<br/>hoisted to a field or item"]
+
+    T["Tool result"] --> TN{{"Profile has<br/>tool results?"}}
+    TN -->|no| TR["Refused"]
+    TN -->|yes| TS{{"Server-executed and<br/>not the profile's own?"}}
+    TS -->|yes| TD["Degraded"]
+    TS -->|no| TW["Worst of: Exact for block results,<br/>else Restructured, and each nested<br/>block resolved inside a tool result"]
+
+    classDef refused stroke:#c62828,stroke-width:3px
+    class CR,TR refused
+```
+
+Binary blocks, where the compensation carrier comes in:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TD
+    B["Image, audio or document"] --> MT{{"Media type accepted<br/>and a binary form?"}}
     MT -->|no| FB{{"text_fallback?"}}
-    MT -->|yes| NEST{{"Inside a<br/>tool_result?"}}
+    MT -->|yes| NEST{{"Inside a tool result?"}}
     NEST -->|no| FORM{{"Binary form?"}}
-    NEST -->|yes| TRF{{"tool_result takes<br/>nested blocks?"}}
-
-    FORM -->|native| X1d["Exact"]
-    FORM -->|data URI| X2b["Restructured"]
-
-    TRF -->|yes| X1e["Exact — Anthropic"]
-    TRF -->|no| SYN{{"Can synthesize<br/>a user message?"}}
+    FORM -->|native| X1["Exact"]
+    FORM -->|data URI| X2["Restructured"]
+    NEST -->|yes| TRB{{"Tool results take<br/>nested blocks?"}}
+    TRB -->|yes| FORM
+    TRB -->|no| SYN{{"Can synthesize<br/>a user message?"}}
     SYN -->|yes| X3["Compensated<br/>placeholder + synthetic message<br/><i>never stored</i>"]
     SYN -->|no| FB
-
-    FB -->|present| X4c["Degraded<br/>annotation recorded"]
-    FB -->|absent| X5["Refused<br/>raise, send nothing"]
-
-    X1 & X1b & X1c & X1d & X1e & X2 & X2b & X3 & X4a & X4b & X4c & X5 --> POL{{"Policy permits?"}}
-    POL -->|yes| OUT["Map, record annotation if lossy"]
-    POL -->|no| ERR["RefusedError"]
+    FB -->|present| X4["Degraded<br/>fallback text sent"]
+    FB -->|absent| X5["Refused"]
 
     classDef compensated stroke:#ef6c00,stroke-width:3px
     classDef refused stroke:#c62828,stroke-width:3px
     class X3 compensated
-    class X5,ERR refused
+    class X5 refused
 ```
 
 **The matrix is derived, not written.** Each protocol declares a `Profile`; the
@@ -426,7 +503,11 @@ filling the first one still open agrees with this only while every part
 converts, which is how the two quietly disagreed for three implementations.
 
 
-Annotations are a category borrowed from `docs/PSR_BRANCHING_AND_SCATTER_GATHER.md`, which is otherwise deferred: persisted, never on the linearization path, never sent to a provider. Degradation events are the first entries; branch rankings will share the channel later.
+Annotations are a category borrowed from `docs/PSR_BRANCHING_AND_SCATTER_GATHER.md`,
+which is otherwise deferred: never on the linearization path, never sent to a
+provider, and archived with a session that holds them. Each call's annotations
+arrive in its `Report`; `Client` does not copy them onto the session, so a
+caller keeping an audit trail calls `Session#annotate` (see `SCOPE.md`).
 
 **Annotations record loss the caller did not ask for.** Requested trimming — for
 instance `ReasoningRetention` — is counted, not annotated. Mixing the two makes
@@ -458,8 +539,8 @@ Two models were considered, and the difference is not stylistic.
 save points. **Model B** — MPSH *is* the working state, and a request is built
 from it every turn.
 
-**Model B is the design.** Every protocol here is stateless, so the full history
-crosses the wire each turn either way; a provider-held copy buys nothing and is
+**Model B is the design.** Every protocol here is used statelessly, so the full
+history crosses the wire each turn; a provider-held copy buys nothing and is
 a second copy in a lossier format. Under Model A a session is portable
 *sometimes*, at save points. Under Model B it is portable at every turn, because
 the canonical form is never stale. `Mapper#map` already takes a whole session
@@ -477,8 +558,8 @@ the client a translator.
 
 ```crystal
 loop do
-  reply, report = client.send(session) { |event, turn| present(event) }
-  session << reply
+  reply, report = client.send(session, model) { |event, turn| present(event) }
+  session << (MPSH::Repair.repaired(reply) || break)
 
   calls = reply.content.select(MPSH::ToolCallBlock).reject(&.server_executed?)
   break if calls.empty?
@@ -488,7 +569,7 @@ loop do
 end
 ```
 
-Four details there are load-bearing:
+Five details there are load-bearing:
 
 - **Tool calls are read off the reply, not accumulated from events.** The reply
   is the authoritative record; the event stream is not. This also removes any
@@ -502,6 +583,10 @@ Four details there are load-bearing:
   collapse adjacent results. Separate messages would round-trip as one anyway.
 - **No finish reason is consulted.** "Are there client-executed tool calls in
   the reply" is the whole condition.
+- **A cut reply is repaired before it is kept.** A stopped or interrupted turn
+  comes back with `ending` set and may hold calls that never finished planning;
+  `MPSH::Repair.repaired` drops them, and returns `nil` when nothing else is
+  left. `Toolbox#dispatch` repairs before it runs anything, too.
 
 ### Events are presentation; the session is state
 
@@ -526,7 +611,7 @@ Two consequences worth stating:
 
 Provider-specific values with no canonical equivalent travel as a namespaced
 event variant carrying vendor plus `MPSH::Object` — the same namespacing as
-`provider_metadata`, and unlike its predecessor it has an inverse.
+`provider_metadata`.
 
 ### API shape
 
@@ -591,7 +676,8 @@ abstraction is the first protocol from a different family.
    Then tool choice, which is the easy one and worth doing early for contrast:
    every protocol so far spells `auto` and `none`, means the same by them, and
    accepts both on every model — so it needs no `Profile` axis, no capability
-   module and no annotation. If a fifth protocol breaks that, the value it
+   module and no annotation. (Gemini accepts `NONE` and then disregards it once
+   the conversation holds a tool call; see `docs/protocols/GEMINI.md`.) If a fifth protocol breaks that, the value it
    cannot honour is the one that needs the machinery, not the option.
 
    Where the spelling goes is the rule worth taking from this. `ToolChoice`
@@ -615,8 +701,8 @@ abstraction is the first protocol from a different family.
    as capabilities do. See `spec/conformance/reasoning_controls_spec.cr`.
 
    **Absent must emit nothing.** A request that asks for no reasoning control
-   must be byte-identical to one built before the option existed, or every
-   committed transcript is re-cut.
+   must be byte-identical to one without the option, or every committed
+   transcript is re-cut.
 6. **Write an `Adapter`.** Path, headers, error-body decoding. This is the only
    place an endpoint is named, which is what keeps `Client` protocol-agnostic.
 7. **Run the shared conformance suite.** Same fixtures, every protocol.
@@ -653,8 +739,9 @@ capability, and to one that has it natively. Neither alone proves anything.
 
 ## Live specs
 
-`spec/live/` means *needs a transcript*; everything else is `spec/conformance/`
-and runs anywhere. The line is what a spec consumes, not what it is about —
+`spec/live/` and `spec/end_to_end/` need transcripts; everything else
+(`conformance/`, `mpsh/`, `capability/`, `streaming/`, `toolbox_spec.cr`) runs
+anywhere. The line is what a spec consumes, not what it is about —
 `layer_spec.cr` tests the live layer and needs no network, so it is conformance.
 
 `spec/end_to_end/` also needs transcripts, and is separate from `spec/live/`
@@ -676,10 +763,11 @@ makes the suite offline for everyone who did not record them.
 
 **Green is not the same as replayed.** Under `:once` a missing transcript is
 recorded rather than failed, so a suite can pass while asserting against a
-recording made seconds earlier by the code under test. Three tool specs did this
-for as long as anyone looked at them. Two guards, both in `spec_helper.cr`:
+recording made seconds earlier by the code under test. Two guards, both in
+`spec_helper.cr`:
 `record_mode` is `:none` when `CI` is set, and `Spec.after_suite` calls
-`Wiretap.verify!`, which raises if anything was recorded.
+`Wiretap.verify!`, which raises if anything was recorded unless `RECORD` is
+set.
 
 So a run that is *meant* to record needs `RECORD=1`:
 
@@ -692,7 +780,7 @@ crystal spec                                     # proves it replays
 The second command is the one that matters. It is the first time the new
 transcript is exercised as a recording rather than produced as one.
 
-Five things learned the hard way:
+Six things learned the hard way:
 
 - **Record, never hand-write.** Both times a transcript was guessed at rather
   than captured, the guess was wrong and cost a debugging round.
@@ -719,14 +807,12 @@ Five things learned the hard way:
 - **Anything minted at run time breaks matching.** Wiretap matches on a digest
   of the request body, and MPSH call identifiers embed a timestamp, so any
   transcript replaying one could never match. `spec_helper.cr` normalises them
-  for matching only; from wiretap 0.4.0 the transcript still stores what went
-  over the wire. Anything else non-deterministic in a request body needs the
+  for matching only; the transcript still stores what went over the wire. Anything else non-deterministic in a request body needs the
   same treatment, and the symptom is a miss reported as *matched method and URL,
   body differed*.
 
-Always cap output on a live request. An uncapped local model cost this suite a
-twelve-minute stall and a turn that spent 4,096 tokens reasoning without
-reaching an answer.
+Always cap output on a live request: an uncapped local model can stall a run
+for minutes, reasoning without reaching an answer.
 
 ## Contributing
 
