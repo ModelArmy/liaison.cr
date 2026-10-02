@@ -123,11 +123,12 @@ deployment-specific divergence appeared.
 
 ## What a green run here does not prove
 
-Two live calls, both plain text, both capped at 64 tokens, against one
-reasoning-capable deployment on one Azure resource. This proves path and auth
-are right and that the field-name fix works for a model that needed it. It
-does **not** exercise tools, reasoning control, compensation, or a
-non-reasoning deployment that still wants `max_tokens` — those remain
-protocol-level claims already covered by the Ollama and direct-vendor suites,
-or open items in `SCOPE.md`. Azure was sequenced to prove the adapter
+Six live calls against one reasoning-capable deployment on one Azure resource:
+per protocol, a plain exchange, a streamed one, and a request declaring tools
+with `tool_choice: none`. This proves path and auth are right, that the
+field-name fix works for a model that needed it, and that both surfaces stream
+and honour `none`. It does **not** exercise tool dispatch across turns,
+reasoning control, compensation, or a non-reasoning deployment that still wants
+`max_tokens` — those remain protocol-level claims already covered by the Ollama
+and direct-vendor suites, or open items in `SCOPE.md`. Azure was sequenced to prove the adapter
 amendment, not to re-prove the protocol underneath it.
