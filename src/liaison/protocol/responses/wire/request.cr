@@ -1,17 +1,9 @@
 require "json"
 
 module Liaison::Protocol::Responses
-  # The wire form for the Responses API.
-  #
-  # The structural difference from Chat Completions is worth stating plainly:
-  # there are no messages with sibling fields. There is one flat `input` array
-  # of **items**, and a message is merely one item type among several. A tool
-  # call is not a field on a message — it is an item in its own right, as is its
-  # output, and as is a reasoning trace.
-  #
-  # That shape is closer to MPSH's block list than Chat Completions is, which
-  # makes the mapping shallower in places and is the reason redacted reasoning
-  # survives here: an item can carry an opaque payload, a text field cannot.
+  # The request half of the Responses wire form: one flat `input` array of
+  # items, where a message, a tool call, its output and a reasoning trace are
+  # each an item.
   module Wire
     abstract struct Part
       abstract def to_json(json : JSON::Builder)
@@ -88,13 +80,13 @@ module Liaison::Protocol::Responses
       end
     end
 
-    # Every entry in `input` is an Item. This is the protocol's defining shape.
+    # An entry in `input`.
     abstract struct Item
       abstract def to_json(json : JSON::Builder)
 
       # Marks scaffolding invented to make a request legal. Never serialized;
-      # the export direction must discard it. A real export reading JSON has no
-      # such flag and recognises compensation structurally.
+      # export discards it. Export reading JSON from a server recognises it
+      # by its markers instead.
       def synthetic? : Bool
         false
       end
@@ -135,8 +127,8 @@ module Liaison::Protocol::Responses
       end
     end
 
-    # `output` is a string on this protocol too, which is why the compensation
-    # path is needed here exactly as it is on Chat Completions.
+    # `output` is a string, so non-text tool results need compensation, as on
+    # Chat Completions.
     struct FunctionCallOutputItem < Item
       getter call_id : String
       getter output : String
@@ -153,9 +145,8 @@ module Liaison::Protocol::Responses
       end
     end
 
-    # The item that Chat Completions has no equivalent of. `encrypted_content`
-    # is opaque and must be replayed unmodified, which is precisely what a text
-    # field cannot do and an item can.
+    # A reasoning trace. `encrypted_content` is opaque and must be replayed
+    # unmodified.
     struct ReasoningItem < Item
       getter id : String?
       getter summary : Array(String)
@@ -211,9 +202,7 @@ module Liaison::Protocol::Responses
       end
     end
 
-    # Flat, unlike Chat Completions' nested `function` object — the same
-    # flattening this protocol applies to tool calls, which are items in their
-    # own right here rather than a field hoisted onto a message.
+    # Flat, unlike Chat Completions' nested `function` object.
     struct ToolDeclaration
       getter name : String
       getter description : String?
@@ -238,18 +227,12 @@ module Liaison::Protocol::Responses
       getter input : Array(Item)
       getter tools : Array(ToolDeclaration)
       getter max_output_tokens : Int32?
-      # Nested under a `reasoning` object rather than sitting at the top level
-      # as on Chat Completions — the same value, one wrapper deeper, which is
-      # this protocol's habit throughout.
+      # Sent nested under a `reasoning` object.
       getter reasoning_effort : String?
-      # A bare string at the top level, spelled exactly as on Chat
-      # Completions — one of the few places these two agree without a wrapper
-      # between them.
+      # A bare string at the top level, as on Chat Completions.
       getter tool_choice : String?
-      # Asks for the reply as a frame stream rather than one body. Not set by
-      # the mapper: whether to stream is a fact about how this call is being
-      # made, not about what the session contains, and the mapper's whole job
-      # is the latter. `with_stream` is how the adapter says so.
+      # Asks for a frame stream. Set by the adapter through `with_stream`, not
+      # by the mapper: streaming is about the call, not the session.
       getter? stream : Bool
 
       def initialize(@model : String, @input : Array(Item), @instructions : String? = nil,
@@ -260,10 +243,8 @@ module Liaison::Protocol::Responses
                      @stream : Bool = false)
       end
 
-      # The same request, streamed. A copy rather than a setter, following
-      # `Profile#with_metadata_key`: these are value types and a mutating
-      # setter on a struct is a trap, since it silently edits whichever copy
-      # you happened to be holding.
+      # The same request, streamed. A copy rather than a setter, since a setter
+      # on a struct edits whichever copy the caller holds.
       def with_stream(value : Bool) : Request
         Request.new(@model, @input, @instructions, @tools,
           @max_output_tokens, @reasoning_effort, @tool_choice, value)
@@ -279,16 +260,13 @@ module Liaison::Protocol::Responses
           unless @tools.empty?
             json.field("tools") { json.array { @tools.each(&.to_json(json)) } }
           end
-          # `max_output_tokens` here, `max_tokens` on the other three. One idea,
-          # four spellings.
           @tool_choice.try { |value| json.field "tool_choice", value }
           @max_output_tokens.try { |value| json.field "max_output_tokens", value }
           @reasoning_effort.try do |value|
             json.field("reasoning") { json.object { json.field "effort", value } }
           end
-          # Emitted only when true, so a non-streamed body is byte-identical to
-          # what it was before streaming existed — which keeps every recorded
-          # transcript valid.
+          # Emitted only when true, so unstreamed bodies match their recorded
+          # transcripts.
           json.field "stream", true if @stream
         end
       end

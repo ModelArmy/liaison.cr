@@ -5,17 +5,10 @@ require "../../errors"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Responses
-  # The response half of the wire vocabulary.
-  #
-  # `output[]` is **not** the plural that `choices[]` is. It is the reply's own
-  # parts — a reasoning item, a message, one function_call per requested tool —
-  # and taking index 0 would throw away most of the answer. The array is walked
-  # entire, in order, and the order is the order the model produced them in.
-  #
-  # The items themselves are the request-side `Item` types, unchanged. That
-  # reuse is the whole reason this protocol was pleasant to add a reader for:
-  # the input and output vocabularies are the same vocabulary, which is the
-  # design's own claim about itself and turns out to be true.
+  # The response half of the wire form. `output[]` holds the reply's own
+  # parts (reasoning, a message, one `function_call` per call), not
+  # alternatives, so it is read entire and in order. Its items are the
+  # request-side `Item` types.
   module Wire
     struct Usage
       getter input_tokens : Int32?
@@ -27,14 +20,8 @@ module Liaison::Protocol::Responses
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a bare nil check. A streamed chunk carries
-        # `"usage": null` on every frame until the last one, so the key is
-        # *present* holding a JSON null — which is not Crystal's `nil`, passes
-        # a truthiness guard, and is then indexed into as a hash. Absent and
-        # explicitly null mean the same thing here, and now behave the same.
-        #
-        # Found against Azure and OpenAI, which both send it; Ollama omits the
-        # key entirely, so the emulator was the forgiving one.
+        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
+        # absent instead of being indexed as a hash.
         fields = any.try(&.as_h?)
         return unless fields
 
@@ -73,13 +60,8 @@ module Liaison::Protocol::Responses
         from_any(parsed)
       end
 
-      # The same reader, from an object someone else already parsed.
-      #
-      # Streaming needs this: a terminal frame carries the whole response
-      # nested under `response`, so the reader has a `JSON::Any` in hand and no
-      # body to hand back. Re-serializing it just to parse it again would be
-      # silly, and — worse — would make the streamed and non-streamed readers
-      # two different readers that happen to agree today.
+      # Reads a response already parsed, such as the one a terminal stream
+      # frame nests under `response`, by the same rules as a body.
       def self.from_any(parsed : JSON::Any) : Response
         raw = parsed["output"]?.try(&.as_a?)
         unless raw
@@ -93,22 +75,16 @@ module Liaison::Protocol::Responses
           usage: Usage.parse(parsed["usage"]?))
       end
 
-      # Item reading with no envelope around it.
-      #
-      # An assembler collecting `response.output_item.done` frames has items
-      # and never sees an envelope, so it needs the item half on its own. That
-      # it is the *same* half is the point: a partial reply and a complete one
-      # translate their items through identical code, so the two cannot drift.
+      # Reads items with no envelope, for an assembler collecting finished
+      # items; the same code as a full response.
       def self.from_items(raw : Array(JSON::Any)) : Array(Item)
         output = [] of Item
         raw.each { |entry| items(entry, output) }
         output
       end
 
-      # One wire item can yield more than one `Item`: a message whose content
-      # holds both output text and a refusal is two of ours, because the
-      # request vocabulary models a refusal as an item in its own right.
-      # Appending rather than returning is what lets that stay honest.
+      # One wire item may yield several `Item`s: a message holding output text
+      # and a refusal becomes a message and a refusal item.
       private def self.items(any : JSON::Any, into : Array(Item)) : Nil
         case any["type"]?.try(&.as_s?)
         when "message"
@@ -118,9 +94,8 @@ module Liaison::Protocol::Responses
         when "reasoning"
           into << reasoning(any)
         end
-        # Unknown item types are dropped rather than raised on. A provider
-        # adding a new one must not break a client that has no use for it —
-        # and anything we could not read, we could not have replayed.
+        # Unknown item types are dropped, not raised on, so a provider adding
+        # one does not break this reader.
       end
 
       private def self.message(any : JSON::Any, into : Array(Item)) : Nil
@@ -151,9 +126,8 @@ module Liaison::Protocol::Responses
           any["arguments"]?.try(&.as_s?) || "{}")
       end
 
-      # `encrypted_content` is opaque and must survive byte-identical. Reading
-      # it here rather than discarding it is what makes a reasoning trace
-      # replayable across the two OpenAI protocols.
+      # Keeps `encrypted_content` byte-identical, so the trace replays over
+      # either OpenAI protocol.
       private def self.reasoning(any : JSON::Any) : Item
         summary = [] of String
         any["summary"]?.try(&.as_a?).try &.each do |entry|

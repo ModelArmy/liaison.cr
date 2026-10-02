@@ -11,17 +11,12 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Responses
-  # Same marker as Chat Completions, and the same rules apply: it is a protocol
-  # marker rather than a note to a human, it must stay byte-identical in both
-  # directions, and improving the wording is a breaking change. "Same" is now
-  # literal — one definition in `Capability::Carrier`, named here.
+  # The protocol marker left where content was lifted out of a tool result;
+  # one definition, in `Capability::Carrier`.
   COMPENSATION_PLACEHOLDER = Capability::Carrier::PLACEHOLDER
 
-  # MPSH view in, request body out.
-  #
-  # Structurally shallower than the Chat Completions mapper: there is no
-  # hoisting, because there are no message-level fields to hoist into. A tool
-  # call is an item, which is nearly the block form MPSH already stores.
+  # MPSH view in, request body out. A tool call is an item, close to MPSH's
+  # block form, so nothing is hoisted.
   class Mapper
     getter profile : Capability::Profile
     getter calls : MPSH::CallIdTable
@@ -42,9 +37,7 @@ module Liaison::Protocol::Responses
       pending = [] of Wire::Part
 
       if session.system_prompt
-        # `Instructions` placement: a parameter rather than a message. The one
-        # structural difference from Chat Completions that shows up on every
-        # request.
+        # The system prompt goes in `instructions`: `Restructured`.
         report.record(Capability::Structural.outcome(
           Capability::Structural::Adaptation::MoveSystemPrompt), "system prompt to instructions")
       end
@@ -62,10 +55,7 @@ module Liaison::Protocol::Responses
         options.tool_choice.try(&.wire_name)), report}
     end
 
-    # Identical to Chat Completions in unit and vocabulary, differing only in
-    # where the value lands in the body — which is this family's pattern
-    # everywhere, and the reason passing both protocols proves less than it
-    # looks.
+    # The named rung, as on Chat Completions, sent under `reasoning`.
     private def reasoning_effort(options : Options,
                                  report : Capability::Report) : String?
       request = options.reasoning
@@ -91,22 +81,15 @@ module Liaison::Protocol::Responses
       end
     end
 
-    # Tool declarations and generation options, translated per protocol.
-    #
-    # Added as a trailing parameter rather than folded in with `policy` and
-    # `retention`: those govern what may be lost translating *history*, these
-    # govern what the model is asked to do *next*. Two questions that happen to
-    # ride on one call.
+    # Tool declarations from `Options`.
     private def declarations(options : Options) : Array(Wire::ToolDeclaration)
       options.tools.map do |tool|
         Wire::ToolDeclaration.new(tool.name, tool.description, tool.parameters)
       end
     end
 
-    # Deferred for the same reason as on Chat Completions — every
-    # `function_call_output` answering one assistant turn should precede
-    # anything else — which is now the same *code* as well as the same reason.
-    # Only the item this protocol spells a carrier with is local.
+    # Emits a buffered carrier as a synthetic user message item. The rule and
+    # flush points are `Capability::Carrier`'s.
     private def flush_compensation(items : Array(Wire::Item),
                                    pending : Array(Wire::Part),
                                    report : Capability::Report) : Nil
@@ -160,14 +143,13 @@ module Liaison::Protocol::Responses
         end
       end
 
-      # Emitted after any reasoning or call items, matching the order a provider
-      # returns them within a turn.
+      # After any reasoning or call items, the order a provider returns them
+      # in within a turn.
       items << Wire::MessageItem.new("assistant", parts) unless parts.empty?
     end
 
-    # A reasoning **item** rather than a text field, which is the one place the
-    # two OpenAI protocols genuinely differ: an item can carry the opaque
-    # payload a redacted trace consists of.
+    # A reasoning item, which can carry the opaque payload a redacted trace
+    # consists of.
     private def reasoning(block : MPSH::ReasoningBlock, index : Int32,
                           report : Capability::Report) : Wire::Item?
       outcome = Capability::Resolver.outcome(block, profile)
