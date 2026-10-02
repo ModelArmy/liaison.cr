@@ -26,9 +26,8 @@ module Liaison
       nested_error(body)
     end
 
-    # The one protocol with a required parameter the others do not have, which
-    # is why `max_tokens` is threaded through every `prepare` and ignored by
-    # three of them. Better a visible seam than a per-protocol options bag.
+    # `max_tokens` is required by this protocol alone; the other adapters
+    # ignore it.
     def prepare(session : MPSH::Session, model : String, policy : Capability::Policy,
                 retention : Capability::ReasoningRetention, max_tokens : Int32,
                 options : Options = Options.new) : Exchange
@@ -46,9 +45,8 @@ module Liaison
         Protocol::Anthropic::Assembler.new(exporter))
     end
 
-    # One mapping, whichever way the reply arrives. Shared because the exporter
-    # must be built from *this* mapper's `CallIdTable`, and two copies of that
-    # pairing is the mistake `Exchange` exists to make impossible.
+    # Maps once for both paths, so the exporter is built from this mapper's
+    # `CallIdTable`.
     private def build(session : MPSH::Session, model : String, policy : Capability::Policy,
                       retention : Capability::ReasoningRetention, max_tokens : Int32,
                       options : Options)

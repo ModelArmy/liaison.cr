@@ -23,17 +23,15 @@ module Liaison
       headers
     end
 
-    # Gemini wraps its error in the same envelope, but may also return a bare
-    # array of them. Best-effort, as above.
+    # The envelope the other protocols use. Gemini may also return a bare
+    # array of them, which `nested_error` does not handle.
     def error_detail(body : String) : String?
       nested_error(body)
     end
 
-    # Streaming is a different method on the URL here, not a flag in the body —
-    # the one protocol of the four where that is true, which is why
-    # `Adapter#stream_path` exists at all. `alt=sse` is required: without it
-    # this endpoint streams a JSON array in chunks rather than server-sent
-    # events, which is a second framing nobody wants to write.
+    # Streaming is a different method on the URL here, not a flag in the body.
+    # `alt=sse` is required: without it the endpoint streams a chunked JSON
+    # array instead of server-sent events.
     def stream_path(model : String) : String
       "/v1beta/models/#{URI.encode_path_segment(model)}:streamGenerateContent?alt=sse"
     end
@@ -46,9 +44,7 @@ module Liaison
       Exchange.new(request.to_json, report, ->(body : String) { exporter.export_reply(body) })
     end
 
-    # The body is identical to the non-streamed one; only the URL differs. So
-    # unlike the other adapters this has nothing to add to the request, and the
-    # whole difference is `stream_path` above.
+    # The body is the same as unstreamed; only `stream_path` differs.
     def prepare_stream(session : MPSH::Session, model : String, policy : Capability::Policy,
                        retention : Capability::ReasoningRetention, max_tokens : Int32,
                        options : Options = Options.new) : StreamExchange?

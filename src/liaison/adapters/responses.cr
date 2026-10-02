@@ -38,12 +38,8 @@ module Liaison
         Protocol::Responses::Assembler.new(exporter))
     end
 
-    # One mapping, whichever way the reply is going to arrive.
-    #
-    # Shared rather than duplicated because the exporter must be built from
-    # *this* mapper's `CallIdTable`, and two copies of that pairing is exactly
-    # the thing `Exchange`'s comment says the design exists to make impossible
-    # to get wrong.
+    # Maps once for both paths, so the exporter is built from this mapper's
+    # `CallIdTable`.
     private def build(session : MPSH::Session, model : String, policy : Capability::Policy,
                       retention : Capability::ReasoningRetention, max_tokens : Int32,
                       options : Options)
