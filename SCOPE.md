@@ -208,6 +208,13 @@ silence to disk. Two candidate fixes, and the choice is a design question:
 argument; or the documentation says the audit trail is the caller's to keep,
 with the one line that keeps it. Predicted by reading; no spec covers it.
 
+### `MalformedResponseError` is defined twice
+
+`src/liaison/protocol/errors.cr` declares `Liaison::Protocol::MalformedResponseError`
+in two identical `module Liaison::Protocol` blocks. Crystal reads the second
+as a reopening, so it compiles and behaves the same, but an edit to one copy
+alone would be silently overridden or duplicated. Fix: delete the first block.
+
 ### `Structural.required` predicts half the structural adaptations
 
 It answers from the profile alone, so it can report `PrependUserPlaceholder`,
