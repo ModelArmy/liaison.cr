@@ -1,14 +1,9 @@
 require "./session"
 
 module Liaison::MPSH
-  # `mpsh_call_id <-> provider_call_id`, one table per provider conversation.
-  #
-  # This is the one place the deferred binding layer pokes into Phase 0, and it
-  # is unavoidable: exporting a tool call from a wire form needs somewhere to
-  # remember that `call_abc` is `mc_17..._3`, or round-trip conformance fails on
-  # the very first tool fixture. The table is deliberately shaped as the thing a
-  # provider binding will later hold, alongside its session handle, under the
-  # same disposable-optimization lifecycle. Nothing else about bindings exists yet.
+  # Maps MPSH call ids to one provider's call ids and back, for one
+  # conversation. A mapper and its exporter share one, so a call read back from
+  # a reply recovers the MPSH id it was sent under.
   class CallIdTable
     getter provider : String
 
@@ -35,8 +30,8 @@ module Liaison::MPSH
       end
     end
 
-    # Gemini has no ids. The mapper pairs by name and ordering and registers the
-    # synthetic key it used, so the export side can find its way back.
+    # The key Gemini's mapper binds in place of a provider id, which Gemini
+    # lacks: the call's name and its ordinal.
     def positional_key(name : String, ordinal : Int32) : String
       "#{name}##{ordinal}"
     end

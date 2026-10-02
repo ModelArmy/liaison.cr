@@ -2,8 +2,8 @@ require "./meta"
 require "./payload"
 
 module Liaison::MPSH
-  # Discriminator. Exists for Archive and for capability lookup keyed by kind;
-  # mappers should branch on the union with `case ... in`, not on this.
+  # Discriminator for capability lookups, annotations and the archive. Branch
+  # on the `Block` union with `case ... in`, not on this.
   enum BlockKind
     Text
     Image
@@ -15,20 +15,16 @@ module Liaison::MPSH
     Refusal
   end
 
-  # The layering mechanism, chosen once and applied everywhere: **module with
-  # `abstract def`**. Crystal has no interfaces; a module that declares abstract
-  # methods is the only construct that both shares implementation and is checked
-  # at include time. No block has a common superclass, which is what allows
-  # `Block` below to be a union and therefore exhaustively matchable.
+  # Implemented by every block. Blocks share this module rather than a
+  # superclass; `Block` below is their closed union.
   module BlockRole
     include ProviderScoped
 
     abstract def kind : BlockKind
   end
 
-  # Blocks carrying binary payloads. `text_fallback` is the entire difference
-  # between *degrade* and *refuse* — the field exists on every one of them;
-  # whether it is populated decides the outcome.
+  # Blocks carrying binary payloads. Where a target cannot carry one, a
+  # `text_fallback` lets it degrade to text; without one it is refused.
   module BinaryBlock
     include BlockRole
 
@@ -95,12 +91,11 @@ module Liaison::MPSH
     end
   end
 
-  # Assistant-side. `call_id` is minted by MPSH; provider ids live in
-  # translation state (see `translation.cr`), never here.
+  # A tool call, assistant-side. `call_id` is minted by MPSH (`Ids.call_id`);
+  # provider ids live in a `CallIdTable`, never here.
   #
-  # `arguments` is stored structured, not as a JSON string, for the same reason
-  # base64 is stored unfused: object-to-string is serialization, string-to-object
-  # is parsing, and parsing is the direction that fails.
+  # `arguments` is stored parsed. Serializing an object cannot fail and parsing
+  # a string can, so parsing happens once, on export.
   class ToolCallBlock
     include BlockRole
     getter call_id : String
@@ -117,12 +112,12 @@ module Liaison::MPSH
     end
   end
 
-  # User-side. `content` is a nested block list — the single decision that makes
-  # an image-returning tool representable at all, including for the providers
-  # that support it natively.
+  # A tool's result, user-side. `content` is a block list, so a tool can return
+  # images.
   #
-  # `is_error` says the tool reported failure. `exception` says the dispatch
-  # itself blew up. They are different facts and conflating them loses one.
+  # `is_error` says the tool reported failure, and is sent to the provider.
+  # `exception` records that dispatch itself raised; only `Archive` stores it,
+  # so a result for a tool that raised sets both.
   class ToolResultBlock
     include BlockRole
     getter call_id : String
@@ -140,16 +135,15 @@ module Liaison::MPSH
       BlockKind::ToolResult
     end
 
-    # Cheap predicate the capability resolver leans on.
+    # Whether every content block is text.
     def text_only? : Bool
       content.all?(TextBlock)
     end
   end
 
-  # `redacted: true` with empty text records that reasoning happened and the
-  # provider withheld it. That is a fact about the conversation's structure and
-  # is retained on handoff; the opaque payload rides in `provider_metadata` and
-  # is shed automatically.
+  # `redacted: true` with no text records that reasoning happened and the
+  # provider withheld it, a fact kept across a handoff. The opaque payload
+  # lives in `provider_metadata`, which a foreign protocol does not read.
   class ReasoningBlock
     include BlockRole
     getter text : String?
@@ -176,10 +170,8 @@ module Liaison::MPSH
     end
   end
 
-  # The closed union. Being a union rather than an abstract base class is what
-  # gives mappers `case block; in TextBlock ...` with compiler-enforced
-  # exhaustiveness — the antidote to the stringly-typed neutral event that
-  # every consumer had to re-parse.
+  # The closed union of block types, so `case block; in TextBlock ...` is
+  # checked for exhaustiveness.
   alias Block = TextBlock | ImageBlock | AudioBlock | DocumentBlock |
                 ToolCallBlock | ToolResultBlock | ReasoningBlock | RefusalBlock
 end

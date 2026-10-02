@@ -1,8 +1,7 @@
 module Liaison::MPSH
-  # Binary content, in one of two forms. Both always carry `media_type` and
-  # `byte_size` — the parts stay separate, and a `data:` URI is synthesized at
-  # map time for the two protocols that want one. Concatenation is trivial;
-  # parsing a URI back out is not.
+  # Binary content, inline or by reference. Both keep `media_type` and
+  # `byte_size` separate; the two protocols that want a `data:` URI get one
+  # built at map time, since joining is trivial and parsing one back is not.
   abstract class Payload
     getter media_type : String
     getter byte_size : Int64
@@ -26,8 +25,8 @@ module Liaison::MPSH
     end
   end
 
-  # A content-addressed handle into a blob store the caller owns.
-  # Materialized at map time, never in storage.
+  # A content-addressed handle into a blob store the caller owns. No blob
+  # store can be supplied yet, so mapping one raises `RefusedError`.
   class ReferencePayload < Payload
     getter handle : String
 

@@ -1,11 +1,7 @@
 module Liaison::MPSH
-  # A real variant type, deliberately *not* `JSON::Any`.
-  #
-  # `JSON::Any` is a parse artifact: it carries the assumption that the value
-  # came off a wire, and it forces every consumer to re-inspect and re-cast.
-  # `Value` is the same shape with none of that history, and it is what lets
-  # `provider_metadata` and tool-call arguments be structured without dragging
-  # a serialization identity into the canonical types.
+  # JSON's value model as a plain union rather than `JSON::Any`, so
+  # `provider_metadata` and tool arguments are structured without carrying a
+  # parse type into the canonical types.
   alias Value = Bool | Int64 | Float64 | String | Array(Value) | Hash(String, Value)?
 
   # Structured object, e.g. tool-call arguments.
@@ -13,9 +9,8 @@ module Liaison::MPSH
 
   # Provider-namespaced side data: `{"openai" => {...}, "anthropic" => {...}}`.
   #
-  # The namespacing *is* the drop logic. A mapper reads only its own key, so
-  # foreign provider data is left behind without anyone writing (or forgetting)
-  # an explicit discard step.
+  # The namespacing is the drop logic: a mapper reads only its own key, so
+  # foreign data is left behind with no explicit discard step.
   alias Metadata = Hash(String, Object)
 
   # Mixed into every block and into `Message`.

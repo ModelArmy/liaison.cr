@@ -2,10 +2,9 @@ require "./message"
 require "./annotation"
 
 module Liaison::MPSH
-  # MPSH mints its own identifiers. Gemini pairs a call to its response by
-  # function name and ordering, with no id at all, so a stored OpenAI
-  # `call_...` cannot supply what a Gemini mapper needs — and a Gemini-born
-  # session has nothing to store in the first place.
+  # Mints MPSH call ids, `mc_<epoch-ms>_<counter>`. MPSH mints its own because
+  # Gemini has no call ids to store: it pairs a call and its response by name
+  # and order.
   module Ids
     @@counter = Atomic(Int64).new(0)
 
@@ -14,13 +13,11 @@ module Liaison::MPSH
     end
   end
 
-  # The canonical session. Flat by design: no tree, no branches, no bindings —
-  # those arrive later and must be able to change without touching a mapper.
+  # The canonical session: a system prompt, a flat list of messages, and
+  # annotations.
   #
-  # Note what is absent: any `to_json` that a provider could accept. Storage
-  # form is not wire form, and the surest way to keep it that way is for the
-  # canonical types to have no serialization identity of their own. Persistence
-  # is an explicit Archive, added beside these types, not mixed into them.
+  # It has no serialization of its own. `Archive` stores it and the mappers
+  # render it, both from outside, so storage form never becomes wire form.
   class Session
     property system_prompt : String?
     getter messages : Array(Message)
@@ -40,8 +37,8 @@ module Liaison::MPSH
       @annotations << note
     end
 
-    # A shallow copy sharing message objects — enough to hand the same history
-    # to a second provider without either mapper mutating the other's view.
+    # A copy of the lists that shares the message objects, for handing the same
+    # history to a second provider.
     def fork : Session
       Session.new(@system_prompt, @messages.dup, @annotations.dup)
     end
