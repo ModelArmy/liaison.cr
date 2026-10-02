@@ -180,9 +180,8 @@ describe "request options" do
         .as_s.should eq "AUTO"
     end
 
-    # The guarantee this option exists to keep: the tools are still declared.
-    # Emptying the array instead is what a caller had to do before, and it is a
-    # 400 on Anthropic for any session carrying tool history.
+    # The guarantee this option exists to keep: the tools are still declared,
+    # so the prefix that holds them is unchanged.
     it "keeps the declarations on the wire" do
       options = Liaison::Options.new(tools: [weather],
         tool_choice: Liaison::ToolChoice::None)

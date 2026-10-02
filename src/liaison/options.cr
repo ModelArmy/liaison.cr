@@ -70,10 +70,9 @@ module Liaison
 
     # The model may not call a tool on this turn.
     #
-    # What a tool loop ends with. The alternative available before this
-    # existed — sending the final request with no tools — is a 400 on
-    # Anthropic for any session whose history holds tool blocks, and a lost
-    # prefix cache on the rest.
+    # What a tool loop ends with. Sending the final request with no tools
+    # also prevents a call, but changes the definitions that render ahead of
+    # everything else, and so loses the prefix cache.
     None
 
     # Lowercase on both OpenAI protocols and on Anthropic, which wraps it in

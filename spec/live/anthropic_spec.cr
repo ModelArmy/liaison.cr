@@ -32,6 +32,20 @@ private def weather_tool : Liaison::Tool
     %({"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}))
 end
 
+# One completed `get_weather` call for Paris. The call is built by hand, which
+# this protocol accepts: it does not sign tool calls.
+private def paris_exchange : M::Session
+  call = M::ToolCallBlock.new("mc_live_weather", "get_weather",
+    M::Object{"city" => "Paris"})
+  session = M::Session.new("Use the supplied tools when they apply.")
+  session << M::Message.user("What is the weather in Paris?")
+  session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
+  session << M::Message.new(M::Role::User,
+    [M::ToolResultBlock.new(call.call_id,
+      [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+  session
+end
+
 # The signature waiver Anthropic's profile refuses, built by hand.
 #
 # **A configuration this library forbids.** `Profile`'s `with_*` helpers only
@@ -154,6 +168,34 @@ describe "Anthropic" do
     end
   end
 
+  # Tool history with no tools declared. Widely reported as a 400 (`Requests
+  # which include tool_use or tool_result blocks must define tools`), and
+  # accepted here: the model answers from the history and cannot call. So no
+  # guard exists for it. Asserted as observed: a replay cannot notice the rule
+  # returning, but a re-recording that disagrees goes red.
+  describe "tool history with no tools declared" do
+    it "is accepted, and answered from the history" do
+      Wiretap.intercept("anthropic_tool_history_no_tools") do
+        session = paris_exchange
+        options = Liaison::Options.new(max_output_tokens: 256)
+
+        # The shape under test, checked from the same mapping `Client` uses.
+        exchange = Liaison::AnthropicAdapter.new.prepare(session, MODEL,
+          C::Policy::Compensating, C::ReasoningRetention::All,
+          P::Anthropic::DEFAULT_MAX_TOKENS, options)
+        body = JSON.parse(exchange.body)
+        body["tools"]?.should be_nil
+        body["messages"][1]["content"][0]["type"].should eq "tool_use"
+
+        reply, report = client.send(session, MODEL, options: options)
+
+        report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
+        reply.content.select(M::ToolCallBlock).should be_empty
+        reply.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+  end
+
   # Ending a tool loop, on the protocol where nothing else can.
   #
   # These are the examples the option was built for, and the only ones that can
@@ -161,12 +203,9 @@ describe "Anthropic" do
   # cannot show the model withheld a call it would otherwise have made, because
   # they accept more than they enforce.
   #
-  # Note what both requests demonstrate in passing. The tools are still
-  # declared, which is not optional here: this endpoint rejects any request
-  # whose history holds `tool_use` or `tool_result` blocks and does not define
-  # tools, so emptying the array — the only guarantee available before this
-  # option existed — is a 400 rather than a fallback. See
-  # `docs/protocols/ANTHROPIC.md`.
+  # Both keep the tools declared. Withdrawing them also prevents a call (see
+  # the example above), at the cost of the prefix cache, since the definitions
+  # render ahead of everything else.
   describe "a turn that may not call a tool" do
     # The falsifying one, and deliberately the harshest arrangement available:
     # a completed exchange for one city, then a question about a second city
@@ -184,14 +223,7 @@ describe "Anthropic" do
     # avoid than to absorb — see the example below for the shape that does.
     it "withholds the call where a call is the obvious move" do
       Wiretap.intercept("anthropic_tool_choice_none") do
-        call = M::ToolCallBlock.new("mc_live_weather", "get_weather",
-          M::Object{"city" => "Paris"})
-        session = M::Session.new("Use the supplied tools when they apply.")
-        session << M::Message.user("What is the weather in Paris?")
-        session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
-        session << M::Message.new(M::Role::User,
-          [M::ToolResultBlock.new(call.call_id,
-            [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+        session = paris_exchange
         session << M::Message.user("And in Berlin?")
 
         reply, report = client.send(session, MODEL,
@@ -212,14 +244,7 @@ describe "Anthropic" do
     # returns prose.
     it "answers from what the history already holds" do
       Wiretap.intercept("anthropic_tool_choice_none_summary") do
-        call = M::ToolCallBlock.new("mc_live_weather", "get_weather",
-          M::Object{"city" => "Paris"})
-        session = M::Session.new("Use the supplied tools when they apply.")
-        session << M::Message.user("What is the weather in Paris?")
-        session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
-        session << M::Message.new(M::Role::User,
-          [M::ToolResultBlock.new(call.call_id,
-            [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)])
+        session = paris_exchange
 
         reply, report = client.send(session, MODEL,
           options: Liaison::Options.new(tools: [weather_tool],

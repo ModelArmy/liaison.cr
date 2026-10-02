@@ -220,10 +220,17 @@ lesson for a caller ending a loop is to ask for something the history can
 already answer.
 
 `Required` is deferred with its reasons written down — model-gated on Anthropic
-and in conflict with `reasoning` there — and so is a third thing found on the
-way: emptying `tools` is a 400 on Anthropic for any session with tool history,
-which is what made the previous workaround unavailable on that protocol rather
-than merely expensive. All in `SCOPE.md`.
+and in conflict with `reasoning` there. All in `SCOPE.md`.
+
+**Emptying `tools` is not a 400 on Anthropic**, despite being widely reported
+as one and stated as fact here until it was recorded
+(`spec/transcripts/anthropic_tool_history_no_tools.json`). Tool history with no
+`tools` key was accepted and answered from the history. So withdrawing the
+tools is a working way to end a loop everywhere observed; `None` is preferred
+because it keeps the prefix cache, not because the alternative fails. The other
+three protocols are unrecorded for this shape and nothing reported suggests a
+rule; a guard waits for a rejection. The lesson outlasts the finding: **an error
+message quoted secondhand is a claim, not a recording.**
 
 **A layering rule got corrected doing this, and it applies to every canonical
 type.** `ToolChoice` briefly carried a `gemini_mode` method — a protocol-named

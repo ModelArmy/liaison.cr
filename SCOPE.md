@@ -113,32 +113,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### Emptying `tools` is a 400 on Anthropic, and nothing catches it
-
-Found while building `tool_choice`, and separate from it. This endpoint rejects
-any request whose history holds `tool_use` or `tool_result` blocks and does not
-define tools:
-
-```
-Requests which include `tool_use` or `tool_result` blocks must define tools.
-```
-
-All four wire requests omit the `tools` key when the array is empty, so
-`Options.new(tools: [] of Tool)` against a session with tool history builds a
-request this shard knows will fail and sends it anyway.
-
-`tool_choice` makes this *avoidable* — a caller no longer has any reason to
-empty the array — but it does not make it impossible, and the failure is a
-rejected request rather than a recorded loss.
-
-The trap in fixing it: the constraint is documented by its error message rather
-than by a schema, and nothing here has observed it. A guard built on that alone
-would be the guessing this repo avoids, so this wants a recording first — which
-is awkward in the usual way, since the request it needs is one no caller should
-now be making. Worth checking whether the other three protocols have an
-equivalent rule before writing anything protocol-specific; the OpenAI pair
-rejects an *empty array* but the key's absence is a different question.
-
 ### Retention governs replay, not display and not storage
 
 Surfaced settling a streaming question, and recorded because the assumption is

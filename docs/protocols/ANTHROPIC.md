@@ -132,25 +132,32 @@ One consequence worth knowing before prompt caching arrives: **changing either
 control between turns invalidates cached prefixes**, because the value is
 rendered into the prompt.
 
-## Tool choice, and why emptying `tools` is not an alternative
+## Tool choice, and emptying `tools` instead
 
 `tool_choice` is an object here, where the OpenAI protocols take a bare string:
 `{"type": "auto"}` and `{"type": "none"}`. Both are accepted on every model.
 
-The interesting part is what happens without it. This endpoint rejects any
-request whose history holds `tool_use` or `tool_result` blocks and does not
-define tools:
+The other way to guarantee a turn makes no call is to send it with no tools.
+That is widely reported to fail on this endpoint:
 
 ```
 Requests which include `tool_use` or `tool_result` blocks must define tools.
 ```
 
-So the obvious way to guarantee a turn makes no call — send the final request
-with no tools — is a **400 on this protocol** for any session that has used a
-tool, which is every session where the question arises. On the OpenAI pair the
-same move merely costs the cached prefix. That asymmetry is why
-`Options#tool_choice` exists at all rather than being left to callers, and it
-is recorded in `docs/TOOL_EXECUTION.md` under *Ending the loop*.
+### Live finding: tool history without tools is accepted
+
+`spec/transcripts/anthropic_tool_history_no_tools.json` sends a completed
+weather exchange with no `tools` key on `claude-haiku-4-5`. It came back 200,
+answered from the tool result, with no call. The reported rule did not apply.
+
+So emptying `tools` works here. It costs what it would cost anywhere: the
+definitions render ahead of everything else, so withdrawing them invalidates
+the cached prefix on the turn carrying the most history. That cost is why
+`Options#tool_choice` is the recommended way to end a loop. See
+`docs/TOOL_EXECUTION.md` under *Ending the loop*.
+
+One model, one recording. If a rejection turns up on another model, it is a
+`Capability::Catalog` question, and it needs its own transcript.
 
 ### Live finding: `none` is honoured, and yields an empty turn where it binds
 

@@ -242,14 +242,13 @@ client.send(session, model, options: Liaison::Options.new(
 ```
 
 **The tools stay declared.** That is the whole point, and it is what separates
-this from the workaround it replaces. A caller could always send the final
-request with an empty `tools` array, and on two of the four protocols that
-works at the cost of the prefix cache — tool definitions sit ahead of
-everything else, so removing them invalidates from position zero on the turn
-carrying the most history. On Anthropic it does not work at all: that endpoint
-rejects any request whose history holds `tool_use` or `tool_result` blocks and
-does not define tools. The guarantee and the cache are both kept by
-constraining the tools rather than withdrawing them.
+this from the workaround it replaces. A caller can send the final request with
+an empty `tools` array, and where recorded that works — Anthropic accepts tool
+history with no tools declared, despite reports to the contrary
+(`docs/protocols/ANTHROPIC.md`). It costs the prefix cache: tool definitions
+sit ahead of everything else, so removing them invalidates from position zero
+on the turn carrying the most history. The guarantee and the cache are both
+kept by constraining the tools rather than withdrawing them.
 
 **Two values, and no capability machinery behind them — with one caveat that
 turned out to matter.** `Auto` and `None` mean the same thing on all four
