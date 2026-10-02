@@ -214,6 +214,16 @@ so an unknown model is far likelier to be new than ancient and the optimistic
 default is right by construction. Where that argument does not hold — every
 other axis so far — the pessimistic default stands.
 
+**Reasoning retention is not a catalog axis, though it is keyed on the model.**
+`ReasoningRetention::CompletedTurns` exists because one model family asks that
+past reasoning be dropped once a turn closes, yet it stays a preference the
+caller supplies per call. `Catalog` holds hard protocol facts: get one wrong and
+the request is rejected, and the vendor's API is the authority. Retention is a
+soft preference: get it wrong and the answers are merely worse, the source is a
+model card, and two operators may reasonably disagree. So it belongs in an
+application's configuration, where adding a model needs no release of this
+shard.
+
 ## Conventions
 
 **Layering is expressed with modules and `abstract def`.** Crystal has no

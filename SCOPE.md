@@ -114,6 +114,32 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
+### Nothing records a session's annotations
+
+`docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a
+session's fidelity history is auditable after the fact, and `Session` holds an
+`annotations` list for it. Nothing in `src/` writes to it: `Report` collects
+annotations per call, `Client#send` returns the report, and no code calls
+`Session#annotate`. A caller who appends the reply and drops the report keeps a
+session whose history says nothing was ever lost. Where: `src/liaison/client.cr`
+(`send`), `src/liaison/capability/policy.cr` (`Report`).
+
+It matters because a silent record of loss is the failure the capability model
+exists to prevent, and an archive written from such a session carries the
+silence to disk. Two candidate fixes, and the choice is a design question:
+`Client` annotates the session it was handed, which makes `send` mutate its
+argument; or the documentation says the audit trail is the caller's to keep,
+with the one line that keeps it. Predicted by reading; no spec covers it.
+
+### `Structural.required` predicts half the structural adaptations
+
+It answers from the profile alone, so it can report `PrependUserPlaceholder`,
+`MergeConsecutiveRoles` and `MoveSystemPrompt`, and never `DropEmptyMessage`,
+`DeferCompensationCarrier` or `CollapseAdjacentToolResults`. Nothing in `src/`
+calls it; only `spec/mpsh/capability_spec.cr` does. A caller using it as a
+preflight check is told less than mapping will report. Likely fix: delete it,
+or document it as partial (its comment now does). Predicted by reading.
+
 ### `Archive.read` raises more than `FormatError` on a malformed archive
 
 `FormatError` covers a missing or unrecognised `format`, and unrecognised block
