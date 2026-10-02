@@ -100,10 +100,11 @@ alone:
 - **It conflicts with an option this shard already has.** Forced tool use is
   incompatible with extended thinking on Anthropic, so `Required` plus a
   thinking budget is a request the mapper could build and the endpoint would
-  reject. Nothing in `Options` currently reasons about another of its own
-  fields, and the first rule that does is worth deciding rather than
-  assuming — including where it lives, since a conflict between two request
-  options is neither a `Profile` fact nor a block question.
+  reject. `Options` already refuses one combination of its own fields —
+  `tool_choice` with no tools — but that rule is protocol-independent, so it
+  can live in the constructor. This one holds on one protocol only, so where
+  it lives is worth deciding rather than assuming: a conflict between two
+  request options is neither a `Profile` fact nor a block question.
 
 Neither hazard touches `Auto` or `None`, which is why they shipped without
 waiting for this.

@@ -63,15 +63,6 @@ private def tool_question : M::Session
   session
 end
 
-# A completed tool exchange, then a question whose obvious answer is another
-# call, sent with `None`. Shared because the same arrangement runs against two
-# model generations and the model must be the only thing differing between
-# them.
-#
-# The first turn mints a real signed call rather than fabricating one, which
-# is not optional here: `Catalog` marks these models as signing their own
-# calls, so a hand-built block degrades out of the request entirely. Hence two
-# requests per recording.
 # As `tool_choice_loop`, but the follow-up text rides in the same message as
 # the tool result rather than in a message after it. The difference between
 # these two is the whole of what separates a liaison defect from a Gemini one.
@@ -95,6 +86,15 @@ private def tool_choice_merged_turn
     tool_choice: Liaison::ToolChoice::None))
 end
 
+# A completed tool exchange, then a question whose obvious answer is another
+# call, sent with `None`. Shared because the same arrangement runs against two
+# model generations and the model must be the only thing differing between
+# them.
+#
+# The first turn mints a real signed call rather than fabricating one, which
+# is not optional here: `Catalog` marks these models as signing their own
+# calls, so a hand-built block degrades out of the request entirely. Hence two
+# requests per recording.
 private def tool_choice_loop(model : String)
   session = tool_question
   first, _ = client.send(session, model, options: armed)
@@ -227,8 +227,8 @@ describe "Gemini" do
     # all — behaving as though no declarations were passed. This model
     # returned a `functionCall` for Berlin regardless, signature and all.
     #
-    # Asserted as-observed so that the day it changes, a spec goes red and
-    # somebody reads this. It is not an endorsement.
+    # Asserted as observed, not endorsed. A replay cannot notice Google
+    # changing this; a re-recording that disagrees goes red.
     it "sends `NONE` correctly and is ignored on 3.5 Flash" do
       Wiretap.intercept("gemini_tool_choice_none_35") do
         reply, report = tool_choice_loop(MODEL_35)
@@ -302,7 +302,7 @@ describe "Gemini" do
     # is unavailable for the one job it exists to do: ending a tool loop, whose
     # last turn has prior calls in context by definition.
     #
-    # Asserted as observed, so the day Google fixes it a spec goes red.
+    # Asserted as observed: a re-recording after Google fixes it goes red.
     it "is ignored once a call is in the history, however the result is carried" do
       Wiretap.intercept("gemini_tool_choice_none_merged") do
         reply, report = tool_choice_merged_turn
