@@ -23,12 +23,9 @@ require "./liaison/capability/retention"
 require "./liaison/capability/reasoning_control"
 require "./liaison/capability/catalog"
 
-# Streaming vocabulary. Sits between the capability and protocol layers: it
-# depends on the canonical types and on nothing below it, and both the protocol
-# assemblers and the live layer depend on it. A directory rather than a flat
-# file because the condition `DEVELOPMENT.md` sets for one is met — several
-# concrete things sharing a vocabulary — and because `Sse` in particular is the
-# one part of streaming all four protocols genuinely share.
+# Streaming vocabulary. Depends on the canonical types only; the protocol
+# assemblers and the live layer depend on it. `Sse` is the framing all four
+# protocols share.
 require "./liaison/streaming/sse"
 require "./liaison/streaming/event"
 require "./liaison/streaming/turn"
@@ -68,13 +65,8 @@ require "./liaison/protocol/gemini/export"
 require "./liaison/protocol/gemini/stream"
 
 # The live layer: a deployment, the protocol it speaks, and one request per
-# send. `Server`, `Provider` and `Client` stay flat files — none has grown
-# enough siblings to want a directory. `adapters/` did: six concrete adapters,
-# two of them a deployment amending a protocol rather than declaring one, is
-# the shared vocabulary `DEVELOPMENT.md` says a directory is for. One file per
-# adapter, `adapters/<deployment>/<protocol>.cr` for the ones that amend
-# rather than declare — see `adapters/adapter.cr` for the shape every adapter
-# is modeled on.
+# send. `adapters/<protocol>.cr` declares an adapter;
+# `adapters/<deployment>/<protocol>.cr` amends one for a deployment.
 require "./liaison/server"
 require "./liaison/adapters/adapter"
 require "./liaison/adapters/chat_completions"
@@ -87,9 +79,8 @@ require "./liaison/provider"
 require "./liaison/client"
 
 # Caller-facing tool execution. Depends on `mpsh/` and on `Tool` in
-# `options.cr`; depends on nothing in the live layer, which is why a `Toolbox`
-# can be built and tested without a `Client`. Required last because it is the
-# only place this shard runs code it did not write.
+# `options.cr`, not on the live layer, so a `Toolbox` can be tested without a
+# `Client`.
 require "./liaison/function"
 require "./liaison/toolbox"
 
