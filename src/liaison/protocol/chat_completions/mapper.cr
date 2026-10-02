@@ -10,24 +10,13 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::ChatCompletions
-  # MPSH view in, request body out.
-  #
-  # Every outcome passes through `Report#record`, which is where policy is
-  # enforced. A mapper that wants to lose something has to say so — there is no
-  # path from here to the wire that quietly drops content.
-  # Text standing in for content the protocol could not carry where it
-  # belonged. This is a **protocol marker, not a note to a human**: the export
-  # direction recognises compensation scaffolding by its shape, and this string
-  # is part of that shape. It must stay stable, stay identical in both
-  # directions, and stay distinctive enough not to collide with real tool
-  # output. Improving the wording is a breaking change.
-  #
-  # Now an alias for the one definition in `Capability::Carrier`, kept under
-  # the protocol's own name because that is how this file reads: three
-  # protocols share the marker precisely because a session mapped by one may
-  # be exported by another.
+  # Text left where content was lifted out of a tool result: a protocol
+  # marker that export matches exactly, not a note to a human. The single
+  # definition is `Capability::Carrier::PLACEHOLDER`.
   COMPENSATION_PLACEHOLDER = Capability::Carrier::PLACEHOLDER
 
+  # MPSH view in, request body out. Every outcome passes through
+  # `Report#record`, where policy is enforced.
   class Mapper
     getter profile : Capability::Profile
     getter calls : MPSH::CallIdTable
@@ -47,13 +36,11 @@ module Liaison::Protocol::ChatCompletions
       report.reasoning_dropped = plan.dropped
 
       wire = [] of Wire::Message
-      # Compensation carriers are buffered rather than emitted inline. See
-      # `flush_compensation`.
+      # Compensation carriers are buffered; see `flush_compensation`.
       pending = [] of Wire::Part
 
       if prompt = session.system_prompt
-        # `InMessages` placement: the prompt becomes a message rather than a
-        # parameter. Restructured, not a loss.
+        # The system prompt becomes a message: `Restructured`, not a loss.
         report.record(Capability::Structural.outcome(
           Capability::Structural::Adaptation::MoveSystemPrompt), "system prompt to messages array")
         wire << Wire::Message.new("system", prompt)
@@ -72,12 +59,8 @@ module Liaison::Protocol::ChatCompletions
         options.tool_choice.try(&.wire_name)), report}
     end
 
-    # The named rung, lowercase, or nothing at all.
-    #
-    # A caller who named a token budget gets it bucketed to the nearest rung
-    # and told so: the resolver classifies that direction Degraded, because the
-    # number cannot be recovered and a rung is a behavioural signal rather than
-    # a cap. `Off` is spelled `none` here.
+    # The named rung, lowercase, or nothing. A token budget is bucketed to a
+    # rung and reported `Degraded`. `Off` is spelled `none`.
     private def reasoning_effort(options : Options,
                                  report : Capability::Report) : String?
       request = options.reasoning
@@ -103,27 +86,17 @@ module Liaison::Protocol::ChatCompletions
       end
     end
 
-    # Tool declarations and generation options, translated per protocol.
-    #
-    # Added as a trailing parameter rather than folded in with `policy` and
-    # `retention`: those govern what may be lost translating *history*, these
-    # govern what the model is asked to do *next*. Two questions that happen to
-    # ride on one call.
+    # Tool declarations from `Options`.
     private def declarations(options : Options) : Array(Wire::ToolDeclaration)
       options.tools.map do |tool|
         Wire::ToolDeclaration.new(tool.name, tool.description, tool.parameters)
       end
     end
 
-    # The rule, the flush points and the reason they are what they are live in
-    # `Capability::Carrier`. What is left here is the one thing that is this
-    # protocol's own: the shape of the message that carries it.
-    #
-    # The synthetic turn exists so the request is legal, carries content the
-    # protocol could not put where it belonged, and is flagged so that an
-    # export in this same process discards it rather than re-importing an
-    # OpenAI workaround as conversation. A real export, reading JSON from a
-    # server, has no flag and must recognise it structurally.
+    # Emits a buffered carrier as a synthetic user message. The rule and flush
+    # points are `Capability::Carrier`'s; this supplies the message shape. The
+    # `synthetic` flag lets an export in the same process discard it; one
+    # reading JSON from a server recognises it by its markers.
     private def flush_compensation(wire : Array(Wire::Message),
                                    pending : Array(Wire::Part),
                                    report : Capability::Report) : Nil
@@ -151,8 +124,8 @@ module Liaison::Protocol::ChatCompletions
 
       return if parts.empty?
 
-      # Genuine user content ends the run of tool messages, so any carrier goes
-      # out first — it belongs to the results above it, not to this turn.
+      # Genuine user content ends the run of tool messages, so a pending
+      # carrier goes out first.
       flush_compensation(wire, pending, report)
       wire << Wire::Message.new("user", parts)
     end
@@ -161,7 +134,7 @@ module Liaison::Protocol::ChatCompletions
                               wire : Array(Wire::Message), report : Capability::Report,
                               plan : Capability::Retention::Plan,
                               pending : Array(Wire::Part)) : Nil
-      # An assistant turn definitively closes the preceding run of tool results.
+      # An assistant turn closes the preceding run of tool results.
       flush_compensation(wire, pending, report)
       parts = [] of Wire::Part
       calls = [] of Wire::ToolCall
@@ -194,11 +167,8 @@ module Liaison::Protocol::ChatCompletions
         reasoning_content: reasoning)
     end
 
-    # The compensation path, and the reason Phase 1 is this protocol.
-    #
-    # A tool result here can only be a string. Where the canonical result holds
-    # anything else, the non-text content is lifted into `compensation`, which
-    # the caller appends as a synthesized user message.
+    # A tool result here is a string. Non-text content is lifted into
+    # `compensation`, which goes out later in a synthesized user message.
     private def tool_result_message(block : MPSH::ToolResultBlock, index : Int32,
                                     report : Capability::Report,
                                     pending : Array(Wire::Part)) : Wire::Message
@@ -292,8 +262,8 @@ module Liaison::Protocol::ChatCompletions
       end
     end
 
-    # Reference payloads are resolved at map time and never stored inline.
-    # Without a blob store wired in, a reference cannot be sent.
+    # Raises `RefusedError` for a reference payload: no blob store can be
+    # supplied, so only inline payloads can be sent.
     private def materialize(payload : MPSH::Payload) : MPSH::InlinePayload
       case payload
       when MPSH::InlinePayload then payload

@@ -6,24 +6,15 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::ChatCompletions
-  # Wire in, MPSH out.
+  # Wire in, MPSH out, for a request body. Three signals, most reliable first:
   #
-  # This direction carries obligations the map direction does not, and all of
-  # them are the same shape: the wire form fuses or hoists things that MPSH
-  # keeps separate, and separating them again is the direction that can fail.
-  #
-  # Three signals are available, in descending reliability:
-  #
-  # 1. **`call_id` pairing** — explicit in the wire, exact. `assistant → tool →
-  #    tool` is never inferred from adjacency; each result names the call it
-  #    answers.
-  # 2. **Position plus the placeholder marker** — strong, because the
-  #    placeholder is our own constant. Distinguishes a compensation carrier
-  #    from genuine user input.
-  # 3. **Message boundaries between adjacent tool results** — *not recoverable*.
-  #    The wire cannot express whether two results arrived as one turn or two,
-  #    and renders both identically. A consecutive run collapses into one MPSH
-  #    user message, which is a declared adaptation rather than a bug.
+  # 1. `call_id` pairing, explicit on the wire. Results are never paired by
+  #    adjacency.
+  # 2. Position plus the placeholder marker, which tells a compensation
+  #    carrier from genuine user input.
+  # 3. Message boundaries between adjacent tool results, which the wire cannot
+  #    express. A run collapses into one MPSH user message, a declared
+  #    adaptation.
   class Exporter
     getter calls : MPSH::CallIdTable
 
@@ -34,18 +25,9 @@ module Liaison::Protocol::ChatCompletions
       export(request.messages)
     end
 
-    # The response direction.
-    #
-    # A request is a conversation; a response is one assistant turn. None of
-    # the machinery above applies — no system prompt to merge, no carrier to
-    # absorb, no placeholder to unpick, no run of tool results to collapse —
-    # because a reply cannot contain user content, and compensation
-    # scaffolding is something this client invents on the way out, never
-    # something a provider sends back.
-    #
-    # What remains is the un-hoisting: `tool_calls` is a message field here and
-    # blocks in MPSH, exactly as it is on the request side, so the same code
-    # does the job.
+    # Reads a reply body: one assistant turn, so there is no system prompt,
+    # carrier or tool-result run to handle. `tool_calls` is unhoisted into
+    # blocks by the same code as on the request side.
     def export_reply(body : String) : MPSH::Message
       export_reply(Wire::Response.from_json(body))
     end
@@ -60,13 +42,9 @@ module Liaison::Protocol::ChatCompletions
         assistant_blocks(choice.message),
         response.model.try { |model| MPSH::Provenance.new(NAME, model) })
 
-      # Namespaced, because none of it is canonical. A finish reason is still
-      # not consulted for control flow — "are there client-executed tool calls
-      # in the reply" is the whole condition — but one value of it now also
-      # sets `Message#ending`, which is canonical: `length` means the model was
-      # cut off by an output cap, and a session reloaded in another process has
-      # to know that without knowing this protocol's spelling of it. The
-      # namespaced copy stays, since normalising is not the same as discarding.
+      # Kept namespaced. `length` also sets `Message#ending` to `Truncated`, so
+      # a reloaded session knows the turn was cut without knowing this
+      # protocol's spelling.
       choice.finish_reason.try do |value|
         reply.put_meta(METADATA_KEY, "finish_reason", value)
         reply.ending = MPSH::Ending::Truncated if value == "length"
@@ -105,15 +83,10 @@ module Liaison::Protocol::ChatCompletions
       session
     end
 
-    # A trailing `user` message after tool results is ambiguous on the wire: it
-    # is either a compensation carrier belonging to the results above it, or
-    # genuine input opening a new turn. This is the same distinction
-    # `MPSH::Turns` draws for retention, approached from the other side. The
-    # signals, and the honest limits of all three, are in
-    # `Capability::Carrier`.
-    #
-    # Local to this protocol: content here may be a bare `String` rather than
-    # parts, in which case there is nothing to inspect and it is not a carrier.
+    # Whether a `user` message after tool results is a compensation carrier
+    # rather than genuine input; the signals and their limits are in
+    # `Capability::Carrier`. Content that is a bare `String` has no parts to
+    # inspect and is never a carrier.
     private def carrier?(message : Wire::Message, run : Array(MPSH::ToolResultBlock)) : Bool
       body = message.content
       parts = body.is_a?(Array(Wire::Part)) ? body : [] of Wire::Part
@@ -130,9 +103,8 @@ module Liaison::Protocol::ChatCompletions
       Capability::Carrier.absorb(run, body) { |part| part_to_block(part) }
     end
 
-    # A consecutive run of `role: "tool"` messages becomes one user message.
-    # The boundary between them is the one thing the wire genuinely cannot
-    # express, so a history that held them as separate turns comes back joined.
+    # A consecutive run of `role: "tool"` messages becomes one user message;
+    # separate turns come back joined.
     private def flush_run(session : MPSH::Session, run : Array(MPSH::ToolResultBlock)) : Nil
       return if run.empty?
       blocks = run.map(&.as(MPSH::Block))
@@ -153,9 +125,7 @@ module Liaison::Protocol::ChatCompletions
       session << MPSH::Message.new(MPSH::Role::Assistant, assistant_blocks(message))
     end
 
-    # Shared by both directions. A reply and an assistant message already in a
-    # request carry the same fields and mean the same things, so reading them
-    # twice would be two places to forget the same rule.
+    # Reads an assistant message, for both a reply and a request's history.
     private def assistant_blocks(message : Wire::Message) : Array(MPSH::Block)
       blocks = [] of MPSH::Block
 
@@ -170,9 +140,7 @@ module Liaison::Protocol::ChatCompletions
         blocks << MPSH::RefusalBlock.new(refusal)
       end
 
-      # Un-hoisting: a message-level field becomes blocks. This is the direction
-      # the specification calls invention, and the reason MPSH stores the block
-      # form in the first place.
+      # Unhoisting: the message-level field becomes blocks.
       message.tool_calls.try &.each do |call|
         blocks << MPSH::ToolCallBlock.new(
           calls.mpsh_id(call.id), call.name, parse_arguments(call.arguments))
@@ -186,9 +154,8 @@ module Liaison::Protocol::ChatCompletions
       in String
         body.empty? ? [] of MPSH::Block : [MPSH::TextBlock.new(body).as(MPSH::Block)]
       in Array(Wire::Part)
-        # `compact_map` infers the union of what `part_to_block` can actually
-        # return — four block kinds — which is narrower than `MPSH::Block`.
-        # Widen at the element, not the array.
+        # Widened per element: `compact_map` would otherwise infer a union
+        # narrower than `MPSH::Block`.
         body.compact_map { |part| part_to_block(part).as(MPSH::Block?) }
       in Nil
         [] of MPSH::Block
@@ -212,8 +179,7 @@ module Liaison::Protocol::ChatCompletions
       end
     end
 
-    # Splitting a fused representation. Synthesizing the URI was concatenation;
-    # this is parsing, which is why MPSH never stores the fused form.
+    # Splits a `data:` URI back into media type and base64.
     private def split_data_uri(url : String) : {String, String}
       unless url.starts_with?("data:") && url.includes?(";base64,")
         raise Capability::RefusedError.new(NAME, "image URL is not an inline data URI: #{url[0, 32]}")

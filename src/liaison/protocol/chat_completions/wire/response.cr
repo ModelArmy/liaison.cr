@@ -5,16 +5,9 @@ require "../../errors"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::ChatCompletions
-  # The response half of the wire vocabulary. Parse-only, as `request.cr` is
-  # serialize-only, and the asymmetry is the point: a request is something this
-  # shard *builds*, a response is something it *reads*, and the two directions
-  # fail in different ways.
-  #
-  # `choices` is plural in the alternatives sense — `n` requests several
-  # independent answers to one prompt. We never set `n`, so exactly one is
-  # expected, and taking index 0 is not a truncation. Contrast the Responses
-  # API's `output[]` and Anthropic's `content[]`, which are the parts of a
-  # single reply and must be walked entire.
+  # The response half of the wire form, parse-only. `choices` holds
+  # alternative answers (`n`); this shard never sets `n`, so it reads the
+  # first.
   module Wire
     struct Usage
       getter prompt_tokens : Int32?
@@ -26,14 +19,9 @@ module Liaison::Protocol::ChatCompletions
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a bare nil check. A streamed chunk carries
-        # `"usage": null` on every frame until the last one, so the key is
-        # *present* holding a JSON null — which is not Crystal's `nil`, passes
-        # a truthiness guard, and is then indexed into as a hash. Absent and
-        # explicitly null mean the same thing here, and now behave the same.
-        #
-        # Found against Azure and OpenAI, which both send it; Ollama omits the
-        # key entirely, so the emulator was the forgiving one.
+        # `as_h?` rather than a nil check: a streamed chunk carries
+        # `"usage": null` until the last one, and an explicit JSON `null` must
+        # read as absent instead of being indexed as a hash.
         fields = any.try(&.as_h?)
         return unless fields
 
@@ -70,7 +58,7 @@ module Liaison::Protocol::ChatCompletions
                      @model : String? = nil, @usage : Usage? = nil)
       end
 
-      # The reply we asked for. Implicit `n = 1`; see the note above.
+      # The one answer requested; see the note above.
       def choice : Choice?
         @choices.first?
       end
@@ -95,15 +83,9 @@ module Liaison::Protocol::ChatCompletions
           usage: Usage.parse(parsed["usage"]?))
       end
 
-      # One assistant message, from an object someone else assembled.
-      #
-      # Streaming needs it: this protocol never sends a whole message, so the
-      # assembler builds the object a non-streamed reply would have carried and
-      # reads it here. That matters more on this protocol than on the others,
-      # because `message` is where the two spellings of the reasoning field are
-      # reconciled — a streaming path with its own reader would have dropped
-      # the trace from whichever server chose the other spelling, silently, in
-      # exactly the way that was found by recording rather than by reasoning.
+      # One assistant message, from an object someone else assembled. The
+      # stream assembler rebuilds the message and reads it here, so both
+      # reasoning-field spellings are reconciled in one place.
       def self.from_message(any : JSON::Any) : Message
         message(any)
       end
@@ -119,25 +101,17 @@ module Liaison::Protocol::ChatCompletions
           any["finish_reason"]?.try(&.as_s?))
       end
 
-      # Reuses the request-side `Message`, which already has every field a
-      # reply can carry. Nothing is invented for the response direction that
-      # the request direction did not already need.
+      # Reuses the request-side `Message`, which has every field a reply
+      # carries.
       private def self.message(any : JSON::Any) : Message
         Message.new(
           role: any["role"]?.try(&.as_s?) || "assistant",
           content: any["content"]?.try(&.as_s?),
           tool_calls: tool_calls(any["tool_calls"]?),
           refusal: any["refusal"]?.try(&.as_s?),
-          # Not in OpenAI's own specification, and spelled differently by
-          # everyone who implements it. vLLM and DeepSeek emit
-          # `reasoning_content`; Ollama emits the bare `reasoning`. Both are
-          # read, for the same reason Gemini's reader takes `inlineData` and
-          # `inline_data`: insisting on one spelling silently drops the trace
-          # from every server that chose the other, with no error to notice.
-          #
-          # Found by recording against Ollama — the offline fixtures used the
-          # spelling this reader already expected, which is what a fixture
-          # written from the same assumption as the code will always do.
+          # Not in OpenAI's specification, and spelled two ways: vLLM and
+          # DeepSeek send `reasoning_content`, Ollama sends `reasoning`. Both
+          # are read; insisting on one would silently drop the other's trace.
           reasoning_content: any["reasoning_content"]?.try(&.as_s?) ||
                              any["reasoning"]?.try(&.as_s?))
       end
@@ -156,9 +130,8 @@ module Liaison::Protocol::ChatCompletions
           ToolCall.new(
             entry["id"]?.try(&.as_s?) || "",
             name,
-            # Arguments arrive as a JSON *string* on this protocol, which is
-            # the fused form. It stays fused here and is parsed at export,
-            # where the failure has somewhere to go.
+            # A JSON string on this protocol; kept as text and parsed at
+            # export.
             function["arguments"]?.try(&.as_s?) || "{}")
         end
       end
