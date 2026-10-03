@@ -5,9 +5,8 @@ require "../protocol/chat_completions/stream"
 
 module Liaison
   class ChatCompletionsAdapter < Adapter
-    # Which spelling of the output cap this deployment wants. See
-    # `Protocol::ChatCompletions::Wire::MaxTokensField` for why this defaults
-    # to the old spelling everywhere rather than the new one anywhere.
+    # Which spelling of the output cap this deployment wants; see
+    # `Protocol::ChatCompletions::Wire::MaxTokensField`.
     getter max_tokens_field : Protocol::ChatCompletions::Wire::MaxTokensField
 
     def initialize(vendor : String? = nil, reasoning_unit : Capability::ReasoningUnit? = nil,
@@ -48,9 +47,8 @@ module Liaison
         Protocol::ChatCompletions::Assembler.new(exporter))
     end
 
-    # One mapping, whichever way the reply arrives. Shared because the exporter
-    # must be built from *this* mapper's `CallIdTable`, and two copies of that
-    # pairing is the mistake `Exchange` exists to make impossible.
+    # Maps once for both paths, so the exporter is built from this mapper's
+    # `CallIdTable`.
     private def build(session : MPSH::Session, model : String, policy : Capability::Policy,
                       retention : Capability::ReasoningRetention, max_tokens : Int32,
                       options : Options)

@@ -1,21 +1,10 @@
 require "../chat_completions"
 
 module Liaison
-  # Azure OpenAI speaks Chat Completions over the same wire shape as
-  # `openai.chat_completions` — same `Profile`, same mapper, same exporter —
-  # but is neither the same *server* nor the same *deployment* concern.
-  # `api_version` is a required, dated query parameter Azure demands on every
-  # call, which is why it lives here rather than in `Options`: it is a fact
-  # about this deployment, not this request. See `Provider.for_azure`.
-  #
-  # Inherits `profile`, `error_detail` and `prepare` unchanged from
-  # `ChatCompletionsAdapter` — path and headers are the only two facts Azure
-  # actually amends. `max_tokens_field` is inherited too, not amended: which
-  # spelling a deployment wants is a fact about the model behind it, not
-  # about being Azure specifically. See `AzureResponsesAdapter` for the
-  # sibling that amends the same protocol family differently — the two
-  # disagree with each other on where the deployment goes, which is why
-  # each is its own file rather than one class with a protocol switch.
+  # Azure OpenAI's Chat Completions surface: `ChatCompletionsAdapter` with
+  # Azure's path (the deployment in the URL, a dated `api-version` query) and
+  # `api-key` header. Everything else is inherited. See
+  # `Provider.for_azure`.
   class AzureChatCompletionsAdapter < ChatCompletionsAdapter
     def initialize(@api_version : String, vendor : String? = nil,
                    reasoning_unit : Capability::ReasoningUnit? = nil,
@@ -23,10 +12,8 @@ module Liaison
       super(vendor, reasoning_unit, max_tokens_field)
     end
 
-    # `model` here is the deployment name — Azure conflates the two, so no
-    # separate parameter is needed. The deployment name still lands in the
-    # request body too (`Protocol::ChatCompletions::Mapper` writes `model`
-    # regardless); Azure ignores it there and only the path segment counts.
+    # `model` is the deployment name. It is also written into the body, where
+    # Azure ignores it.
     def path(model : String) : String
       "/openai/deployments/#{URI.encode_path_segment(model)}/chat/completions?api-version=#{@api_version}"
     end

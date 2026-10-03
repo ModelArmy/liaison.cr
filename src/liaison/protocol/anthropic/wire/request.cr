@@ -1,17 +1,9 @@
 require "json"
 
 module Liaison::Protocol::Anthropic
-  # The wire form for the Messages API.
-  #
-  # Closest of the four to MPSH, and not by coincidence: tool calls and results
-  # are content blocks here, as is thinking. Two of four protocols model them
-  # this way, which is what settled the field-vs-block rule in MPSH's favour.
-  #
-  # The decisive capability is `tool_result.content`: an array of blocks,
-  # including images. A tool returning a screenshot is natively expressible,
-  # which no OpenAI protocol can manage. That single fact is why MPSH is the
-  # union of provider capabilities rather than the intersection — an
-  # intersection format would have deleted a capability this protocol offers.
+  # The request half of the Messages API wire form. Tool calls, tool results
+  # and thinking are content blocks, as in MPSH, and `tool_result.content` is
+  # a block array that may include images.
   module Wire
     abstract struct Block
       abstract def to_json(json : JSON::Builder)
@@ -31,8 +23,7 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # Media type and base64 stay separate, exactly as MPSH stores them. No
-    # fusing, no `data:` URI, nothing to parse back apart.
+    # Media type and base64 kept separate, as MPSH stores them.
     struct ImageBlock < Block
       getter media_type : String
       getter base64 : String
@@ -92,16 +83,15 @@ module Liaison::Protocol::Anthropic
           json.field "type", "tool_use"
           json.field "id", @id
           json.field "name", @name
-          # `input` is a structured object here, not a JSON string as on the
-          # OpenAI protocols. MPSH stores it structured, so this is the
-          # direction that needs no parsing.
+          # A structured object here, not a JSON string as on the OpenAI
+          # protocols.
           json.field "input" { json.raw @input }
         end
       end
     end
 
-    # The block that forced the capability model. `content` is a nested block
-    # array, so `[text, image]` is expressible with no compensation at all.
+    # `content` is a nested block array, so `[text, image]` needs no
+    # compensation.
     struct ToolResultBlock < Block
       getter tool_use_id : String
       getter content : Array(Block)
@@ -120,10 +110,8 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # Provider-run tools are a distinct block type here, not a flag on an
-    # ordinary tool call. That distinction is the protocol agreeing with MPSH:
-    # a server-executed call is a different category, not a variation, and a
-    # client must never dispatch one.
+    # A provider-run tool call: its own block type here, not a flag, and
+    # never dispatched by a client.
     struct ServerToolUseBlock < Block
       getter id : String
       getter name : String
@@ -142,9 +130,9 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # The result block type is tool-specific — `web_search_tool_result` and
-    # friends — so it is carried rather than assumed, and preserved through
-    # `provider_metadata` on export.
+    # The result type is tool-specific (`web_search_tool_result` and the
+    # like), so it is carried as given and kept in `provider_metadata` on
+    # export.
     struct ServerToolResultBlock < Block
       getter tool_use_id : String
       getter content : Array(Block)
@@ -163,9 +151,7 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # Thinking carries a signature that must be replayed unmodified. Like the
-    # Responses API's reasoning item and unlike a text field, it can hold an
-    # opaque payload.
+    # Thinking, with a signature that must be replayed unmodified.
     struct ThinkingBlock < Block
       getter thinking : String?
       getter signature : String?
@@ -209,9 +195,7 @@ module Liaison::Protocol::Anthropic
       end
     end
 
-    # Flat, and the schema field is `input_schema` rather than `parameters` —
-    # the only protocol of the four to name it after what it constrains rather
-    # than what it is.
+    # Flat, with the schema under `input_schema` rather than `parameters`.
     struct ToolDeclaration
       getter name : String
       getter description : String?
@@ -235,23 +219,16 @@ module Liaison::Protocol::Anthropic
       getter messages : Array(Message)
       getter max_tokens : Int32
       getter tools : Array(ToolDeclaration)
-      # The only protocol here that spells reasoning control two ways, in two
-      # different places, and rejects the wrong one outright.
-      #
-      # A budget goes in `thinking`, and is the older mode: the only one on
-      # Claude 4.5 and earlier, deprecated on 4.6, and a 400 from 4.7 onward. A
-      # rung goes in `output_config`, alongside adaptive thinking. Which of the
-      # two a deployment wants is a fact about the model, resolved by
-      # `Capability::Catalog` before the mapper renders anything — so at most
-      # one of these is ever set.
+      # Reasoning control comes in two places: a budget in `thinking`, or a
+      # rung in `output_config`. The model accepts one or the other, resolved
+      # by `Capability::Catalog` before mapping, so at most one is set.
       getter thinking_budget : Int32?
       getter effort : String?
       getter? thinking_disabled : Bool
       # An object with a `type`, where the OpenAI protocols take a bare string.
       getter tool_choice : String?
-      # Asks for the reply as a frame stream. Not set by the mapper: whether to
-      # stream is a fact about how this call is made, not about what the
-      # session contains. `with_stream` is how the adapter says so.
+      # Asks for a frame stream. Set by the adapter through `with_stream`, not
+      # by the mapper: streaming is about the call, not the session.
       getter? stream : Bool
 
       def initialize(@model : String, @messages : Array(Message),
@@ -264,9 +241,8 @@ module Liaison::Protocol::Anthropic
                      @stream : Bool = false)
       end
 
-      # The same request, streamed. A copy rather than a setter, following
-      # `Profile#with_metadata_key`: these are value types, and a mutating
-      # setter on a struct edits whichever copy you happened to be holding.
+      # The same request, streamed. A copy rather than a setter, since a setter
+      # on a struct edits whichever copy the caller holds.
       def with_stream(value : Bool) : Request
         Request.new(@model, @messages, @max_tokens, @system, @tools,
           @thinking_budget, @effort, @thinking_disabled, @tool_choice, value)
@@ -275,16 +251,14 @@ module Liaison::Protocol::Anthropic
       def to_json(json : JSON::Builder)
         json.object do
           json.field "model", @model
-          # Required, with no default. The one parameter this protocol will
-          # reject a request for omitting.
+          # Required here, unlike on the other protocols.
           json.field "max_tokens", @max_tokens
           if text = @system
             json.field "system", text
           end
           json.field("messages") { json.array { @messages.each(&.to_json(json)) } }
-          # Emitted only when true, so a non-streamed body is byte-identical to
-          # what it was before streaming existed and every recorded transcript
-          # stays valid.
+          # Emitted only when true, so unstreamed bodies match their recorded
+          # transcripts.
           json.field "stream", true if @stream
           unless @tools.empty?
             json.field("tools") { json.array { @tools.each(&.to_json(json)) } }
@@ -303,9 +277,8 @@ module Liaison::Protocol::Anthropic
             json.field("thinking") { json.object { json.field "type", "disabled" } }
           end
           if level = @effort
-            # Not inside `thinking`: effort shapes the whole response — text,
-            # tool calls and thinking alike — which is why it has a home of its
-            # own and works whether or not thinking is on.
+            # Outside `thinking`: effort shapes the whole response, thinking or
+            # not.
             json.field("output_config") { json.object { json.field "effort", level } }
           end
         end

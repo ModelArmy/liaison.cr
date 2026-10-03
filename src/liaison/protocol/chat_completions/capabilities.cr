@@ -4,17 +4,14 @@ module Liaison::Protocol::ChatCompletions
   METADATA_KEY = "openai"
   NAME         = "openai.chat_completions"
 
-  # Declared capabilities. Confirmed against provider documentation at the time
-  # of writing and expected to drift — capabilities change faster than protocol
-  # shapes, so this is the first thing to re-check when something behaves oddly.
-  #
-  # The two decisive facts: binary content is fused into a `data:` URI, and a
-  # tool result is a string. The latter is why this protocol cannot express an
-  # image-returning tool and must compensate.
+  # Declared capabilities, confirmed against provider docs and expected to
+  # drift; re-check them first when something behaves oddly. Binary content
+  # is fused into a `data:` URI, and a tool result is a string, so an
+  # image-returning tool needs compensation.
   PROFILE = Capability::Profile.new(
     provider: NAME,
-    # Both OpenAI protocols share one metadata namespace: an encrypted
-    # reasoning item issued over either is replayable over the other.
+    # Shared by both OpenAI protocols, so an encrypted reasoning item issued
+    # over either replays over the other.
     metadata_key: METADATA_KEY,
     accepted_media: {
       MPSH::BlockKind::Image    => Set{"image/png", "image/jpeg", "image/gif", "image/webp"},
@@ -24,25 +21,15 @@ module Liaison::Protocol::ChatCompletions
     binary_form: Capability::BinaryForm::DataUri,
     tool_calls: Capability::ToolCallForm::Field,
     tool_results: Capability::ToolResultForm::TextOnly,
-    # `reasoning_content` is not in OpenAI's own specification — it is a
-    # de-facto extension implemented by vLLM, Ollama and others serving
-    # reasoning models over this protocol. Declared `Field` because that is what
-    # the servers this protocol actually reaches will accept; a profile
-    # targeting OpenAI's endpoint strictly would declare `None`, and reasoning
-    # would degrade rather than replay.
+    # `reasoning_content` is not in OpenAI's specification but is served by
+    # vLLM, Ollama and others, so it is declared `Field`. A profile for
+    # OpenAI's own endpoint would declare `None`, and reasoning would degrade
+    # rather than replay.
     reasoning: Capability::ReasoningForm::Field,
-    # `reasoning_effort` is a request-level control this protocol does spell,
-    # and it is a separate question from the `reasoning` form above: one asks
-    # the model to think, the other replays thinking it already did. A strict
-    # OpenAI-endpoint profile would declare `ReasoningForm::None` here and
-    # still declare `Effort`, which is the clearest evidence the two axes are
-    # independent.
-    #
-    # Accepted values are model-dependent — `none`, `minimal`, `low`, `medium`,
-    # `high`, `xhigh`, `max` — so a rung this protocol will happily serialize
-    # may still be rejected by the model behind it. Unlike Anthropic and
-    # Gemini, though, the *unit* never changes, so the declaration is not
-    # ambiguous and the catalog has nothing to narrow.
+    # `reasoning_effort` asks the model to think; `reasoning` above replays
+    # thinking it did. Independent: a strict OpenAI profile would declare
+    # `ReasoningForm::None` and still `Effort`. Accepted rungs vary by model,
+    # but the unit never does, so the catalog has nothing to narrow.
     reasoning_unit: Capability::ReasoningUnit::Effort,
     server_executed: false,
     refusal_channel: true,

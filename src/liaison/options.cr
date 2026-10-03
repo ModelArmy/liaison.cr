@@ -2,30 +2,21 @@ require "json"
 require "./reasoning"
 
 module Liaison
-  # A tool the model may call.
-  #
-  # `parameters` is a JSON Schema as **text**, not a parsed structure. That is
-  # deliberate: a schema's natural interchange form is JSON, it arrives that
-  # way from MCP servers and configuration files, and a caller who generates
-  # one from a Crystal type can hand over the result without this shard needing
-  # to know how it was produced.
-  #
-  # Callers wanting compile-time schemas can pair this with a generator — for
-  # example `spider-gazelle/json-schema`:
+  # A tool the model may call: a name, an optional description, and its
+  # parameters as a JSON Schema in **text**. Text because schemas usually
+  # arrive as JSON (MCP servers, configuration files), and so this shard takes
+  # no schema-generator dependency. A caller with a Crystal type can generate
+  # one, for example with `spider-gazelle/json-schema`:
   #
   # ```
   # Tool.new("get_weather", "Look up the weather",
   #   GetWeatherParams.json_schema.to_json)
   # ```
   #
-  # That shard stays *their* dependency, not ours. Taking it here would make
-  # every consumer carry it, and would force a Crystal type on callers whose
-  # schema arrives as text — the common case.
+  # Raises `ArgumentError` for an empty name.
   #
-  # Note that tools are not session history. They are what the caller offers on
-  # *this* call, which is why they live in `Options` and not in `Session`: a
-  # stored conversation that carried its own tool list would have acquired a
-  # home, and portability is exactly the thing this shard refuses to give up.
+  # Tools are what the caller offers on one call, not session history, so they
+  # live in `Options` rather than `Session`.
   struct Tool
     getter name : String
     getter description : String?
@@ -39,45 +30,29 @@ module Liaison
     end
   end
 
-  # How the model may use the tools it was offered.
+  # How the model may use the tools it was offered. Every protocol spells both
+  # values and means the same by them, so every mapping is `Exact`.
   #
-  # Two values, because two is what every protocol here agrees about. `Auto`
-  # and `None` mean the same thing on all four and are accepted by all four,
-  # so nothing in `Capability` mediates this: unlike `reasoning`, there is no
-  # disagreement to reconcile and every mapping is `Exact`.
-  #
-  # **Accepted is not honoured.** Gemini disregards `None` once the
-  # conversation contains a tool call — proven across two model generations,
-  # with this shard's mapping ruled out as the cause; see
-  # `docs/protocols/GEMINI.md`. The other three enforce it. A caller ending a
-  # tool loop on Gemini must therefore check the reply rather than trust the
-  # request, because a completed turn holding unasked-for calls is the one
-  # shape `MPSH::Repair.sendable?` forbids and `Repair` will not mend.
-  #
-  # The missing third value is `Required` — "call something" — and it is
-  # missing deliberately rather than by oversight. It is model-gated on at
-  # least one protocol and conflicts with `reasoning` on the same one, so it
-  # needs a `Capability::Catalog` axis and a cross-option rule that neither
-  # value here does. `SCOPE.md` carries both traps. The fourth form, naming a
-  # specific tool, would carry an argument and turn this into a union.
-  #
-  # Expect the vocabulary to grow. A `case` over it is exhaustive today, not
-  # closed forever.
+  # `Required` (call something) and naming a specific tool are not offered. A
+  # `case` over this enum is exhaustive today; more values may be added.
   enum ToolChoice
     # The model decides. This is every protocol's own default, so asking for
     # it explicitly matters only when overriding an earlier choice.
     Auto
 
-    # The model may not call a tool on this turn.
+    # The model may not call a tool on this turn: what a tool loop ends with.
+    # Preferred over sending no tools, which also prevents a call but changes
+    # the definitions that render ahead of everything else, losing the prefix
+    # cache.
     #
-    # What a tool loop ends with. Sending the final request with no tools
-    # also prevents a call, but changes the definitions that render ahead of
-    # everything else, and so loses the prefix cache.
+    # Gemini disregards this once the conversation holds a tool call, so a
+    # caller ending a loop there must check the reply for calls. A completed
+    # turn with unanswered calls fails `MPSH::Repair.sendable?`, and `Repair`
+    # does not mend it, since it only repairs cut turns.
     None
 
-    # Lowercase on both OpenAI protocols and on Anthropic, which wraps it in
-    # an object but spells the value the same. Gemini shouts its modes; see
-    # that protocol's capabilities.
+    # The spelling shared by both OpenAI protocols and Anthropic. Gemini's
+    # uppercase modes are in `Protocol::Gemini::TOOL_MODES`.
     def wire_name : String
       case self
       in ToolChoice::Auto then "auto"
@@ -86,44 +61,33 @@ module Liaison
     end
   end
 
-  # What the caller wants of *this* request, as opposed to what the session
-  # remembers.
-  #
-  # Kept apart from `policy` and `retention`, which are fidelity controls —
-  # they govern what may be lost in translating history. These govern what the
-  # model is asked to do next. Two different questions that happen to travel on
-  # the same call.
-  #
+  # What the caller wants of this request, as opposed to what the session
+  # holds. Separate from `Client`'s `policy` and `retention`, which govern what
+  # may be lost translating history; these govern what the model is asked to
+  # do next.
   struct Options
+    # Tools offered on this call. Empty means no `tools` key is sent.
     getter tools : Array(Tool)
 
-    # The one generation parameter every protocol can express, in four
-    # spellings. Absent means "whatever the provider defaults to", which on a
-    # local endpoint can mean a model reasoning until something gives — a
-    # failure this suite has already met.
+    # The output cap, which every protocol can express. `nil` leaves the
+    # provider's default, which on a local endpoint may be unbounded.
     getter max_output_tokens : Int32?
 
-    # How hard to think, in whichever of two units the caller prefers. Unlike
-    # the output cap, this is the one request option no two protocols agree
-    # about: three take a named rung, two take a token budget, and the ones
-    # that take both reject being given both.
+    # How hard to think, as a named rung or a token budget. Both OpenAI
+    # protocols take a rung; Anthropic and Gemini take either, depending on the
+    # model, and reject being given both.
     #
-    # **Absent means absent.** Nothing is emitted on any protocol, and the
-    # provider's own default stands. That is load-bearing rather than tidy: it
-    # keeps every request body that does not ask for reasoning byte-identical
-    # to what it was before this option existed, so no recorded transcript is
-    # re-cut by adding it.
+    # `nil` emits nothing on any protocol, leaving the provider's default.
+    # Keep it that way: emitting a default would change every request body
+    # that does not ask for reasoning, and invalidate their transcripts.
     getter reasoning : Reasoning::Request?
 
-    # How the offered tools may be used. The tools are still declared and
-    # still emitted; this only constrains what the model may do with them.
-    #
-    # **Absent means absent**, on `reasoning`'s terms and for the same reason:
-    # nothing is emitted on any protocol, the provider's own default stands,
-    # and a request that does not ask for a choice is byte-identical to one
-    # built before this option existed.
+    # How the offered tools may be used; the tools are still declared. `nil`
+    # emits nothing, for the same reason as `reasoning`.
     getter tool_choice : ToolChoice?
 
+    # Raises `ArgumentError` if `tool_choice` is set with no tools, which the
+    # OpenAI protocols reject.
     def initialize(@tools : Array(Tool) = [] of Tool,
                    @max_output_tokens : Int32? = nil,
                    @reasoning : Reasoning::Request? = nil,

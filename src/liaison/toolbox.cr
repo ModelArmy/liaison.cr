@@ -20,14 +20,14 @@ module Liaison
   # end
   # ```
   #
-  # It holds functions and pairs results to calls. It does not own the session,
-  # does not decide when a conversation is finished, and does not loop —
-  # `Client#send`'s turn loop stays caller-owned, as `client.cr` says.
+  # It holds functions and pairs results with calls. It does not own the
+  # session, decide when a conversation ends, or loop: the turn loop stays the
+  # caller's.
   class Toolbox
     getter functions : Array(Function)
 
-    # Raises if two functions answer to the same name, since a call names one
-    # tool and silently preferring either is worse than refusing to start.
+    # Raises `ArgumentError` if two functions share a name, since a call names
+    # one tool.
     def initialize(@functions : Array(Function))
       @by_name = {} of String => Function
       @functions.each do |function|
@@ -43,23 +43,14 @@ module Liaison
       @functions.map(&.to_tool)
     end
 
-    # Runs every call in `reply` and returns one user-role message of results,
-    # or `nil` when there is nothing to run — which is also a turn loop's exit
-    # condition.
+    # Runs every call in `reply`, in order and one at a time, and returns one
+    # user-role message of results, or `nil` when there is nothing to run
+    # (a turn loop's exit condition).
     #
-    # Calls are run in the order they arrive, one at a time. No protocol here
-    # expresses a dependency between parallel calls — they are a batch issued
-    # from one plan, not a sequence — so running them in order is a superset of
-    # what any of them guarantees.
-    #
-    # **Dispatch reads the repaired reply**, which is why this repairs rather
-    # than trusting its argument. A cut turn's calls are dropped from the
-    # session, and dispatching one that was dropped appends a result whose call
-    # is missing, breaking `Repair.sendable?` from the other direction. Repair
-    # is idempotent, so passing an already-repaired message is free.
-    #
-    # Server-executed calls are skipped: the provider ran them and the reply
-    # already carries their results.
+    # Reads the repaired reply, so a cut turn's calls are not run: their
+    # results would answer calls the repaired session no longer holds.
+    # Server-executed calls are skipped, since the reply already carries their
+    # results.
     def dispatch(reply : MPSH::Message) : MPSH::Message?
       repaired = MPSH::Repair.repaired(reply)
       return unless repaired
@@ -70,10 +61,8 @@ module Liaison
       MPSH::Message.new(MPSH::Role::User, calls.map { |call| run(call).as(MPSH::Block) })
     end
 
-    # Every call gets a result, including a call naming a tool this toolbox does
-    # not hold and a call whose tool raised. Skipping either would leave a
-    # dangling call and an unsendable session — the one shape the archive exists
-    # to prevent — so a failure is reported rather than omitted.
+    # Every call gets a result, including one naming a tool this toolbox lacks
+    # and one whose tool raised, so the session stays `Repair.sendable?`.
     private def run(call : MPSH::ToolCallBlock) : MPSH::ToolResultBlock
       function = @by_name[call.name]?
       return failed(call, "no tool named #{call.name} is available") unless function
@@ -82,12 +71,9 @@ module Liaison
     rescue error : Function::Failure
       failed(call, error.message || "the tool reported a failure")
     rescue error : Exception
-      # `is_error` is set as well as `exception` deliberately. They are
-      # different facts — reported failure against dispatch blowing up — but no
-      # mapper carries `exception` onto the wire; it is written by `Archive` and
-      # read back, and nowhere else. So `exception` is what a later reader sees
-      # and `is_error` is what the model sees, and an unexpected raise needs
-      # both to be true of it.
+      # Sets `is_error` as well as `exception`: no mapper sends `exception`, so
+      # `is_error` is what the model sees and `exception` what an archive
+      # keeps.
       failed(call, "the tool raised: #{error.message}", exception: error.inspect)
     end
 

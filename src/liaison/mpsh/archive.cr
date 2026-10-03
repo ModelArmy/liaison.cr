@@ -2,27 +2,16 @@ require "json"
 require "./session"
 
 module Liaison::MPSH
-  # `Session` in, JSON out, and back — the only place a canonical type meets a
-  # serialization format. Deliberately external rather than a `to_json` on
-  # `Message`/`Block`/`Session` themselves: `DEVELOPMENT.md` rule 2 forbids
-  # canonical types a serialization identity of their own, precisely so
-  # nothing under `mpsh/` can be handed to an HTTP client by accident. This
-  # module is the one place storage form is allowed to exist, and it walks
-  # the canonical types from outside them, the same way a mapper does.
+  # Writes a `Session` to JSON and reads it back: the one place a canonical
+  # type meets a serialization format. It walks the types from outside, so no
+  # canonical type has a serialization of its own (`DEVELOPMENT.md`, rule 2).
   #
-  # Not wire form. A provider never sees this shape, and this shape never
-  # narrows for a provider's capabilities — an archived session is meant to
-  # be loaded back exactly as it was, then mapped fresh against whichever
-  # deployment `continue` is aimed at. Losslessness here is the whole point;
-  # `Conformance.compare` on a written-then-read session should never report
-  # a divergence, for any fixture, ever.
+  # Lossless, and never narrowed for a provider. A loaded session is mapped
+  # afresh for whichever deployment it goes to next.
   #
-  # That gate is necessary and not sufficient, which matters when adding a
-  # field here. `compare` answers a *protocol* question — what survived a round
-  # trip through a wire shape — so it walks only what a wire can carry, and is
-  # silent on `Message#ending`, `Provenance` and `Session#annotations` alike.
-  # Each of those needs an assertion of its own in `spec/mpsh/archive_spec.cr`,
-  # or this module can drop it and every fixture still passes.
+  # `Conformance.compare` checks only what a wire can carry, so it misses
+  # `Message#ending`, `Provenance` and `Session#annotations`. A field added
+  # here needs its own assertion in `spec/mpsh/archive_spec.cr`.
   module Archive
     extend self
 
@@ -42,6 +31,8 @@ module Liaison::MPSH
       end
     end
 
+    # Raises `FormatError` for a missing or unrecognised format, and for an
+    # unrecognised block kind, ending or outcome.
     def read(source : String) : Session
       root = JSON.parse(source)
       format = root["format"]?.try(&.as_s?)
@@ -85,10 +76,8 @@ module Liaison::MPSH
       message
     end
 
-    # Written only when it is not `Complete`, and read as `Complete` when
-    # absent. An archive predating this field is a session whose turns all
-    # finished, which is what it meant when it was written, so the format
-    # version does not move.
+    # Written only when not `Complete`, and read as `Complete` when absent, so
+    # archives without the field stay valid under the same format.
     private def ending_name(ending : Ending) : String
       case ending
       in .complete?    then "complete"
@@ -110,13 +99,9 @@ module Liaison::MPSH
 
     # -- Block --------------------------------------------------------------
     #
-    # One case per `BlockKind`, exhaustive by hand rather than by the
-    # compiler — a `String` discriminator can't give `case ... in` checking
-    # the way the mapper/exporter pairs get it. A ninth block kind added
-    # later and not extended here fails loudly on `read` (an unrecognised
-    # `kind` raises) rather than silently dropping content on `write` (the
-    # `case block; in ...` below is exhaustive over the `Block` union, so the
-    # compiler catches that half).
+    # The string `kind` cannot be checked for exhaustiveness, so a block kind
+    # missing here raises on `read`. `write` is checked by the compiler through
+    # the `Block` union.
 
     private def block_kind_name(kind : BlockKind) : String
       case kind
@@ -290,11 +275,9 @@ module Liaison::MPSH
 
     # -- Metadata / Value -------------------------------------------------
     #
-    # `Value` mirrors JSON's own value model exactly, but generic type
-    # parameters are invariant in Crystal — `Object` (`Hash(String, Value)`)
-    # being a member of the `Value` union doesn't make `Hash(String, Object)`
-    # the same type as `Hash(String, Value)`. So this is a per-value
-    # widen-then-narrow, not a direct cast of the outer `Hash`.
+    # Generics are invariant in Crystal: `Hash(String, Object)` is not a
+    # `Hash(String, Value)`, though `Object` is a `Value`. So values are
+    # widened and narrowed one at a time.
 
     private def write_metadata(json : JSON::Builder, metadata : Metadata) : Nil
       return if metadata.empty?

@@ -4,15 +4,8 @@ require "../capability/catalog"
 require "../streaming/assembler"
 
 module Liaison
-  # Everything a protocol knows about being spoken over a wire: where to post,
-  # what headers to send, and how to read what comes back.
-  #
-  # It exists so `Client` knows nothing about any protocol. A fifth protocol
-  # adds a file under `adapters/` and touches no client code — which is the
-  # same reason the `protocol/` directories exist, applied one layer up.
-  # Which protocol a provider speaks. Named `ProtocolKind` rather than
-  # `Protocol` because the latter is already the namespace holding the four
-  # implementations, and a nested enum of that name would shadow it.
+  # Which protocol a provider speaks. Not named `Protocol`, which is the
+  # namespace holding the four implementations.
   enum ProtocolKind
     ChatCompletions
     Responses
@@ -20,28 +13,24 @@ module Liaison
     Gemini
   end
 
+  # How one protocol is spoken over HTTP: where to post, which headers, how to
+  # prepare a request and read its reply. `Client` knows no protocol; a new
+  # one adds an adapter and touches no client code.
   abstract class Adapter
     # The vendor this deployment honours opaque data for. See `narrowed`.
     getter vendor : String?
 
-    # Which reasoning unit this deployment wants, where the protocol spells
-    # both. Set only to overrule the catalog — see `narrowed(model)`.
+    # The reasoning unit this deployment wants, overriding the catalog; see
+    # `narrowed(model)`.
     getter reasoning_unit : Capability::ReasoningUnit?
 
-    # Declared once here; every adapter inherits it, since the vendor question
-    # is the same one for all four protocols.
     def initialize(@vendor : String? = nil,
                    @reasoning_unit : Capability::ReasoningUnit? = nil)
     end
 
-    # A prepared request and the means to read its reply.
-    #
-    # The split is deliberate. `prepare` builds a body, `Server#post` sends it,
-    # `read` turns the result into a message — three steps rather than one, so
-    # streaming can later slot between the second and third without rewriting
-    # either. It also makes the mapper/exporter pairing structural: `read`
-    # closes over an exporter built from the mapper's own `CallIdTable`, so
-    # there is no way to forget to share it.
+    # A prepared request: its body, its report, and the reader for its reply.
+    # The reader closes over an exporter built from the mapper's own
+    # `CallIdTable`, so the two always share it.
     struct Exchange
       getter body : String
       getter report : Capability::Report
@@ -55,13 +44,8 @@ module Liaison
       end
     end
 
-    # The streamed counterpart of `Exchange`.
-    #
-    # A separate struct rather than a nullable field on `Exchange`, because the
-    # two states an `Exchange?` with an `Assembler?` inside it can be in that
-    # nobody wants — a streamed exchange with no assembler, an unstreamed one
-    # with — do not exist here at all. One nullable, at one level, meaning one
-    # thing.
+    # The streamed counterpart of `Exchange`, with an assembler in place of a
+    # reader.
     struct StreamExchange
       getter body : String
       getter report : Capability::Report
@@ -75,16 +59,8 @@ module Liaison
     abstract def profile : Capability::Profile
     abstract def path(model : String) : String
 
-    # Where a *streamed* request goes, when that is somewhere else.
-    #
-    # Only Gemini needs this, and it needs it badly: streaming there is not a
-    # flag in the body but a different method on the URL —
-    # `:streamGenerateContent?alt=sse` in place of `:generateContent`. The
-    # other three ask for a stream in the body and post to the same place.
-    #
-    # A method here rather than a path on `StreamExchange`, so that both URLs
-    # can be read side by side in the adapter that owns them, instead of one
-    # being visible and the other buried in whatever `prepare_stream` returns.
+    # Where a streamed request goes. The same as `path`, except on Gemini,
+    # where streaming is a different method on the URL.
     def stream_path(model : String) : String
       path(model)
     end
@@ -95,22 +71,8 @@ module Liaison
                          max_tokens : Int32,
                          options : Options) : Exchange
 
-    # The same, asking for a stream. `nil` means this adapter cannot yet.
-    #
-    # **Concrete rather than abstract, defaulting to `nil`**, which is what
-    # lets streaming arrive one protocol at a time: an adapter that has not
-    # grown an assembler says nothing, `Client` quietly sends one body instead,
-    # and `Report#streamed` is how a caller finds out. The alternative — a
-    # `streaming` flag threaded through `prepare` — would have made every
-    # adapter accept an argument three of them had no answer for, and would
-    # have had them silently prepare an unstreamable body for a client about to
-    # read frames.
-    #
-    # This is also the seam a *deployment* refusing to stream will use when one
-    # turns up. `docs/STREAMING_DESIGN.md` declines to guess at that ahead of
-    # evidence; when the evidence arrives it belongs in an override here, not
-    # in `Capability::Profile`, since all four protocols stream and only
-    # deployments vary.
+    # `prepare`, asking for a stream, or `nil` if this adapter cannot stream;
+    # `Client` then sends one body and `Report#streamed` stays false.
     def prepare_stream(session : MPSH::Session, model : String,
                        policy : Capability::Policy,
                        retention : Capability::ReasoningRetention,
@@ -125,45 +87,29 @@ module Liaison
       HTTP::Headers{"content-type" => "application/json"}
     end
 
-    # Pulled out of a non-2xx body so a caller sees the provider's own words.
-    # Best-effort by design: an error object is the least standardized thing
-    # any of these protocols returns, and a compatibility layer returning a
-    # plausible status with an implausible body must not turn into a parse
-    # crash on top of the original failure.
+    # The provider's own message from a non-2xx body, or `nil`. Best-effort,
+    # and meant never to raise, so a strange error body cannot replace the
+    # original failure.
     def error_detail(body : String) : String?
       nil
     end
 
-    # Narrowing only.
-    #
-    # A profile says what the *protocol* can express. A deployment may honour
-    # less — Ollama's Anthropic-compatible endpoint ignores thinking
-    # signatures rather than validating them — and may never honour more. The
-    # asymmetry is why this direction is the only one offered: being wrongly
-    # pessimistic costs fidelity and says so in an annotation, while being
-    # wrongly optimistic sends a signature that a real endpoint rejects, and
-    # breaks the turn.
-    #
-    # Implemented by reassigning `metadata_key`, so `Resolver#own?` stops
-    # recognising the vendor's opaque data and the existing degradation path
-    # handles the rest. No new machinery, and nothing to keep in step.
+    # The protocol's profile, narrowed for this deployment's vendor. When
+    # `vendor` differs from the profile's `metadata_key`, the key is
+    # reassigned, so `Resolver#own?` stops recognising the vendor's opaque
+    # data and it degrades. Narrowing only: a deployment may honour less than
+    # its protocol (Ollama's Anthropic endpoint ignores thinking signatures),
+    # never more.
     def narrowed : Capability::Profile
       key = @vendor
       return profile unless key && key != profile.metadata_key
       profile.with_metadata_key(key)
     end
 
-    # The same profile, narrowed for one model.
-    #
-    # Two protocols spell reasoning control both ways and reject being handed
-    # both, and which unit a deployment wants is a fact about the model rather
-    # than the protocol. So the last narrowing happens here, per call, because
-    # here is the first place the model name is known.
-    #
-    # Precedence: an explicit unit on the provider wins, since it is a claim
-    # the operator made deliberately; otherwise the catalog answers; otherwise
-    # the optimistic default stands. A no-op on the two protocols whose unit
-    # was never ambiguous.
+    # `narrowed`, then narrowed for one model. An explicit `reasoning_unit`
+    # resolves an `Either` unit and is otherwise ignored; without one,
+    # `Catalog.narrow` applies. The override replaces the catalog entirely, so
+    # the catalog's signed-tool-call axis is not applied either.
     def narrowed(model : String) : Capability::Profile
       base = narrowed
       if unit = @reasoning_unit
@@ -178,16 +124,17 @@ module Liaison
       headers
     end
 
-    # Azure's spelling, shared by every Azure adapter regardless of which
-    # protocol it carries: the credential is a plain header value, never a
-    # bearer token.
+    # Azure's auth: the credential as a plain `api-key` header, not a bearer
+    # token.
     private def api_key(credential : String?) : HTTP::Headers
       headers = HTTP::Headers{"content-type" => "application/json"}
       credential.try { |value| headers["api-key"] = value }
       headers
     end
 
-    # Both OpenAI protocols and Anthropic nest the message the same way.
+    # Reads `{"error": {"message": ...}}`, the envelope both OpenAI protocols,
+    # Anthropic and Gemini use. Rescues unparseable JSON only, so it raises
+    # if the body or its `error` is not an object.
     private def nested_error(body : String) : String?
       JSON.parse(body)["error"]?.try(&.["message"]?).try(&.as_s?)
     rescue JSON::ParseException

@@ -6,17 +6,9 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Responses
-  # Wire in, MPSH out.
-  #
-  # Shallower than the Chat Completions exporter, and the reason is structural
-  # rather than incidental: there are no message-level fields here, so there is
-  # nothing to un-hoist. An item maps almost one-to-one onto a block.
-  #
-  # The two hard parts are the same as before, because they arise from the
-  # protocol's *constraints* rather than its shape: a tool output is a string,
-  # so compensation must be recognised and absorbed; and adjacent outputs
-  # collapse, because the wire cannot say whether they arrived as one turn or
-  # several.
+  # Wire in, MPSH out, for a request body. Items map almost one-to-one onto
+  # blocks. A tool output is a string, so compensation carriers are recognised
+  # and absorbed, and adjacent outputs collapse into one user message.
   class Exporter
     getter calls : MPSH::CallIdTable
 
@@ -26,9 +18,8 @@ module Liaison::Protocol::Responses
     def export(request : Wire::Request) : MPSH::Session
       session = MPSH::Session.new(request.instructions)
       run = [] of MPSH::ToolResultBlock
-      # Assistant items arrive separately — reasoning, then calls, then a
-      # message — but describe one MPSH message. They are gathered rather than
-      # emitted one per item.
+      # Assistant items arrive separately (reasoning, calls, a message) and are
+      # gathered into one MPSH message.
       assistant = [] of MPSH::Block
 
       request.input.each do |item|
@@ -57,12 +48,8 @@ module Liaison::Protocol::Responses
       session
     end
 
-    # The response direction.
-    #
-    # `output[]` is walked entire — it is the reply's parts, not a list of
-    # alternatives — and every item type it can hold is an assistant item, so
-    # the gathering that `export` does across a whole conversation collapses
-    # into a single pass with no flushing at all.
+    # Reads a reply body. Every item in `output[]` is an assistant item, so
+    # they are gathered in one pass.
     def export_reply(body : String) : MPSH::Message
       export_reply(Wire::Response.from_json(body))
     end
@@ -82,9 +69,8 @@ module Liaison::Protocol::Responses
         when Wire::MessageItem
           blocks.concat(parts_to_blocks(item.content))
         when Wire::FunctionCallOutputItem
-          # A tool output is something the caller sends; a provider never
-          # returns one. Ignored rather than raised on, since a compatibility
-          # server echoing input back is odd but not fatal.
+          # A tool output in a reply is ignored: a server echoing input back
+          # is odd, not fatal.
           nil
         end
       end
@@ -92,10 +78,9 @@ module Liaison::Protocol::Responses
       reply = MPSH::Message.new(MPSH::Role::Assistant, blocks,
         response.model.try { |model| MPSH::Provenance.new(NAME, model) })
 
-      # This protocol says it with a status rather than a reason, and
-      # `incomplete` covers both an output cap and the assembler's own verdict
-      # on a cut stream — `Client` overwrites the latter with `Interrupted`,
-      # since only it knows whether a stream reached its terminal frame.
+      # `incomplete` sets `Message#ending` to `Truncated`. It covers both an
+      # output cap and a cut stream; for a cut stream, `Client` then sets
+      # `Interrupted` or `Stopped`.
       response.status.try do |value|
         reply.put_meta(METADATA_KEY, "status", value)
         reply.ending = MPSH::Ending::Truncated if value == "incomplete"
@@ -125,10 +110,9 @@ module Liaison::Protocol::Responses
       session << MPSH::Message.new(MPSH::Role::User, parts_to_blocks(item.content))
     end
 
-    # Same ambiguity as on Chat Completions, the same three signals, and the
-    # same limits — all of them in `Capability::Carrier` now. Unlike Chat
-    # Completions, an item's content is always parts, so there is no local
-    # precondition and nothing to pass as `nil`.
+    # Whether a user message item after tool outputs is a carrier; see
+    # `Capability::Carrier`. Item content is always parts, so there is no
+    # local precondition.
     private def carrier?(item : Wire::MessageItem, run : Array(MPSH::ToolResultBlock)) : Bool
       Capability::Carrier.carrier?(run, item.synthetic?, item.content) do |part|
         part.is_a?(Wire::TextPart)
@@ -151,9 +135,9 @@ module Liaison::Protocol::Responses
       assistant.clear
     end
 
-    # Adjacent tool outputs become one user message. Declared as
-    # `CollapseAdjacentToolResults`: pairing survives via `call_id`, only the
-    # message boundary is lost.
+    # Adjacent tool outputs become one user message
+    # (`CollapseAdjacentToolResults`): pairing survives through `call_id`,
+    # only the message boundary is lost.
     private def flush_run(session : MPSH::Session,
                           run : Array(MPSH::ToolResultBlock)) : Nil
       return if run.empty?
@@ -161,8 +145,7 @@ module Liaison::Protocol::Responses
       run.clear
     end
 
-    # An item can carry the opaque payload a text field could not, so this is
-    # where the two OpenAI protocols part company.
+    # Keeps the opaque payload a text field could not.
     private def reasoning(item : Wire::ReasoningItem) : MPSH::ReasoningBlock
       text = item.summary.empty? ? nil : item.summary.join("\n")
       block = MPSH::ReasoningBlock.new(text, redacted: text.nil?)

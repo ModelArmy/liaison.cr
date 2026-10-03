@@ -14,7 +14,73 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 
 ## MUST FIX
 
-Nothing open.
+### A raise mid-stream leaves the shared connection mid-body
+
+`Server#stream` closes the connection when its block returns `false`, because
+the keep-alive socket is left part-way through a response body. When the block
+*raises* instead, `close if stopped` is never reached. The stdlib does not cover
+it: `HTTP::Client#handle_response` closes the body IO in an `ensure`, but
+closing an `HTTP::ChunkedContent` or `FixedLengthContent` does not skip to its
+end, and the socket is closed only when the response is not keep-alive. The
+next request on that `Server` reads the remainder of the old body as its
+response. Where: `src/liaison/server.cr`, `stream`.
+
+The block raises whenever the caller's event handler does, or an assembler
+rejects a frame (`Protocol::MalformedResponseError`, an in-band
+`Protocol::StreamError`). Every `Provider` on the server shares the socket, so
+the failure surfaces on an unrelated later call. Likely fix: close on any
+non-normal exit (`rescue` then re-raise, or `ensure` with a completion flag).
+Predicted by reading the stdlib (`src/http/client.cr`, `src/http/content.cr`);
+no spec covers it.
+
+Why MUST FIX: the fix is a few lines, and the cost of leaving it grows, since
+the failure surfaces on a later, unrelated call (possibly through another
+`Provider` on the same server) and is debugged on the wrong request first.
+
+### Unreadable tool-call arguments become an empty object
+
+A tool call whose arguments do not parse, or parse to something other than a
+JSON object, is read as a call with no arguments (`{}`) instead of failing. The
+call then reaches `Toolbox#dispatch`, which runs the tool with arguments the
+model never sent. Where, one per protocol:
+
+- `src/liaison/protocol/anthropic/stream.cr`, `Assembler#arguments`: a closed
+  `tool_use` block's accumulated `partial_json`
+- `src/liaison/protocol/anthropic/export.cr`, `parse_input`
+- `src/liaison/protocol/chat_completions/export.cr`, `parse_arguments`
+- `src/liaison/protocol/responses/export.cr`, `parse_arguments`
+- `src/liaison/protocol/gemini/export.cr`, `parse_object`
+
+The four exporters run on both buffered and streamed replies. A blank string is
+a legitimate empty argument list and should stay `{}`; anything else that does
+not parse to an object is a malformed response. Likely fix: raise
+`Protocol::MalformedResponseError` there, as the readers do for a body missing
+its required shape. Predicted by reading; no spec covers it.
+
+Why MUST FIX: it does not lose information quietly, it invents some. A tool with
+side effects runs on arguments the model never sent, and nothing records it.
+
+### Nothing records a session's annotations
+
+`docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a
+session's fidelity history is auditable after the fact, and `Session` holds an
+`annotations` list for it. Nothing in `src/` writes to it: `Report` collects
+annotations per call, `Client#send` returns the report, and no code calls
+`Session#annotate`. A caller who appends the reply and drops the report keeps a
+session whose history says nothing was ever lost. Where: `src/liaison/client.cr`
+(`send`), `src/liaison/capability/policy.cr` (`Report`).
+
+It matters because a silent record of loss is the failure the capability model
+exists to prevent, and an archive written from such a session carries the
+silence to disk. Two candidate fixes, and the choice is a design question:
+`Client` annotates the session it was handed, which makes `send` mutate its
+argument; or the documentation says the audit trail is the caller's to keep,
+with the one line that keeps it. Predicted by reading; no spec covers it.
+
+Why MUST FIX: deciding is cheap now and expensive later. Every archive written
+before this is settled has lost its fidelity history permanently, and no later
+fix can recover annotations that were never stored. Decide, then either
+implement the chosen fix or document the caller's line.
 
 ---
 
@@ -113,6 +179,94 @@ Also still out, and more cheaply: the fourth form, naming a specific tool the
 model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
+
+### `error_detail` raises on a JSON error body that is not an object
+
+`Adapter#nested_error` reads `JSON.parse(body)["error"]?.try(&.["message"]?)`
+and rescues only `JSON::ParseException`. `JSON::Any#[]?(String)` raises a plain
+`Exception` on anything but a hash, so `{"error": "text"}` (a string `error`, as
+some OpenAI-compatible servers send) or a top-level array (which the Gemini
+adapter's own comment says Gemini may return) raises from inside
+`Server#post`. The `TransportError` with the status is replaced by an
+unrelated exception. Where: `src/liaison/adapters/adapter.cr`, `nested_error`,
+used by all four adapters. Likely fix: rescue broadly there and return `nil`,
+or check `as_h?` at each step. Predicted by reading the stdlib
+(`src/json/any.cr`); no spec covers it.
+
+### A `reasoning_unit` override bypasses the signed-tool-call axis
+
+`Adapter#narrowed(model)` returns early when a `reasoning_unit` override is
+set, and so never calls `Catalog.narrow`, which applies both catalog axes. On a
+Gemini 3 model with an explicit unit, `tool_call_signature_required` is never
+switched on, so a foreign unsigned tool call maps `Exact` and draws the 400
+the catalog entry exists to prevent. Where: `src/liaison/adapters/adapter.cr`,
+`narrowed(model)`. Likely fix: let the override replace only the unit axis, then
+apply the rest of the catalog. Predicted by reading.
+
+### `Provider.for_azure` accepts any `reasoning_unit` and ignores it
+
+`Provider.for` raises `ArgumentError` for a unit the protocol does not spell;
+`for_azure` has no such check. Both Azure protocols declare `Effort`, so a
+`Budget` override is accepted and then silently ignored by `narrowed(model)`,
+which applies an override only to an `Either` unit. Where:
+`src/liaison/provider.cr`, `for_azure`. Likely fix: the same guard as `for`.
+Predicted by reading.
+
+### A degraded tool call leaves its result behind as `unknown_function`
+
+When `Resolver` degrades a tool call because the target requires a signature it
+does not carry (any foreign call sent to a Gemini 3 model), the Gemini mapper
+drops the call but still maps its result. With no binding in the `CallIdTable`,
+`function_name` falls back to `"unknown_function"`, so the request carries a
+`functionResponse` answering a call that is not there, under a name the model
+never used. Where: `src/liaison/protocol/gemini/mapper.cr`, `function_call`
+and `function_response`.
+
+Bounded by policy: `Degraded` exceeds the default `Compensating`, so this is
+sent only under `Lenient`. But `Lenient` is what a caller picks to hand a
+tool-using session to Gemini 3, which is this shard's defining move. Whether
+Gemini rejects the orphan or the model is merely confused is unrecorded.
+Likely fix: degrade the result with its call, rendering both as text, as a
+server-executed call is elsewhere. Predicted by reading; no spec covers it.
+
+### `SIGNED_TOOL_CALLS` lags its own criterion
+
+The set admits Gemini 3 spellings this repository has used or seen named by the
+API. `gemini-3.8-flash` is used in `spec/live/gemini_spec.cr` (`MODEL_CURRENT`)
+and is not listed, so a foreign tool call sent to it maps `Exact` and draws the
+400. Its replays pass only because every call they send was minted by the model
+itself. Where: `src/liaison/capability/catalog.cr`. Fix: add the spelling, once
+a recording shows the 400 on that model.
+
+### `MalformedResponseError` is defined twice
+
+`src/liaison/protocol/errors.cr` declares `Liaison::Protocol::MalformedResponseError`
+in two identical `module Liaison::Protocol` blocks. Crystal reads the second
+as a reopening, so it compiles and behaves the same, but an edit to one copy
+alone would be silently overridden or duplicated. Fix: delete the first block.
+
+### `Structural.required` predicts half the structural adaptations
+
+It answers from the profile alone, so it can report `PrependUserPlaceholder`,
+`MergeConsecutiveRoles` and `MoveSystemPrompt`, and never `DropEmptyMessage`,
+`DeferCompensationCarrier` or `CollapseAdjacentToolResults`. Nothing in `src/`
+calls it; only `spec/mpsh/capability_spec.cr` does. A caller using it as a
+preflight check is told less than mapping will report. Likely fix: delete it,
+or document it as partial (its comment now does). Predicted by reading.
+
+### `Archive.read` raises more than `FormatError` on a malformed archive
+
+`FormatError` covers a missing or unrecognised `format`, and unrecognised block
+kinds, endings and outcomes. Anything else structurally wrong escapes as
+whatever the JSON accessor raises: a missing `messages` key is a `KeyError`
+(`root["messages"]`), a `messages` that is not an array a `TypeCastError`
+(`.as_a`), and unparseable text a `JSON::ParseException`. Where:
+`src/liaison/mpsh/archive.cr`, `read` and the `read_*` helpers.
+
+It matters to an application loading archives from disk: a corrupt file
+should be one rescuable error, not four. Likely fix: wrap the body of `read` and
+re-raise the accessor exceptions as `FormatError` with the original as
+`cause`. Predicted by reading; no spec covers it.
 
 ### Retention governs replay, not display and not storage
 

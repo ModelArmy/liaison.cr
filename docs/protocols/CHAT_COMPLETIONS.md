@@ -237,15 +237,12 @@ anywhere in this shard: **a tool call is materialised only once a
 `finish_reason` has arrived.** Content and reasoning are kept from a cut
 stream, as everywhere; calls are not, even calls whose arguments look whole.
 
-The reasoning inverts the obvious intuition, so it is worth stating directly:
-**arguments that parse are the dangerous case, not the reassuring one.**
-`{"city":"Par` is visibly incomplete and no one would be fooled. But
-`{"city":"Paris"}` may be a prefix of `{"city":"Paris","unit":"c"}`, and a call
-released on the strength of parseable JSON would be a fabrication that looks
-perfect — dispatched against the wrong arguments, with nothing anywhere to
-suggest a problem. Both sides are pinned in
-`spec/streaming/chat_completions_assembler_spec.cr`: the same fragments
-withheld without a finish reason and released with one.
+Withholding a call whose arguments already parse costs nothing. Nothing on the
+wire marks the call as finished, so releasing it would mean inferring
+completion from the arguments; and on a cut turn `MPSH::Repair` drops every
+call anyway, since a complete-looking set may be half of a parallel plan. Both
+sides are pinned in `spec/streaming/chat_completions_assembler_spec.cr`: the
+same fragments withheld without a finish reason and released with one.
 
 ### Two shapes that exist only here
 
@@ -284,8 +281,8 @@ easy one for a compatibility port to skip.
 Azure and OpenAI both send the `usage` key on *every* streamed chunk, holding
 a JSON null until the final one fills it in. Ollama omits the key entirely.
 
-That difference broke this shard, on all four protocols simultaneously. Every
-`Usage.parse` guarded against an absent key and none against a present null,
+That difference broke this shard's readers. Every `Usage.parse`, on all four
+protocols, guarded against an absent key and none against a present null,
 which passes a truthiness check — `JSON::Any` wrapping nil is not Crystal's
 `nil` — and is then indexed into as a hash. Fixed in all four readers and
 pinned by `spec/streaming/null_usage_spec.cr`; the reasoning lives in

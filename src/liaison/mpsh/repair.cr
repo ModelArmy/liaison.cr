@@ -2,45 +2,30 @@ require "./message"
 require "./session"
 
 module Liaison::MPSH
-  # Makes a cut turn safe to build on.
+  # Makes a cut turn safe to build on, so the session holds no tool call
+  # without its result. A dangling call is rejected outright by some
+  # protocols, so a session carrying one is not portable.
   #
-  # **The invariant**: no `ToolCallBlock` without a matching `ToolResultBlock`.
-  # A dangling call is the one shape Anthropic rejects outright and the others
-  # merely tolerate, so a session carrying one is not portable — which is the
-  # single property this format exists to keep.
+  # Pure MPSH, with no protocol, provider or transport, so a session reloaded
+  # from an archive can be repaired without any.
   #
-  # Pure MPSH, and deliberately so. Repair reads and rewrites canonical types
-  # and nothing else; it has no protocol, no provider and no transport, so a
-  # session reloaded from an archive can be repaired without any of them being
-  # available.
-  #
-  # ## Why the calls go and the text stays
-  #
-  # Text's partial form is valid text: a prefix is a legitimate short answer.
-  # A tool call's is not — half an arguments blob cannot be dispatched. Worse
-  # than being unusable, a *complete-looking* partial set may be half a parallel
-  # plan, and nothing in the reply says whether another call was about to
-  # arrive. So every call goes, whether or not it parses.
-  #
-  # The four assemblers already reach this outcome for a cut stream, each by
-  # refusing to emit a call it cannot vouch for. What is left for this module is
-  # the non-streamed case, where a complete 200 body legitimately carries a call
-  # set the model never finished planning.
+  # Calls are dropped and text is kept. A text prefix is a valid short answer;
+  # a partial call cannot be dispatched, and a complete-looking set may be half
+  # of a parallel plan. The streaming assemblers already omit calls they
+  # cannot vouch for, so this mostly serves a non-streamed reply truncated
+  # mid-plan.
   module Repair
     extend self
 
-    # Whether the message holds anything the invariant forbids.
+    # Whether the message is cut and holds tool calls. A complete message with
+    # unanswered calls is not this module's to mend; see `sendable?`.
     def needed?(message : Message) : Bool
       message.ending.cut? && message.content.any?(ToolCallBlock)
     end
 
-    # The same turn, made sendable — or `nil` when nothing survives, which is a
-    # cut that produced only tool calls. An empty message is content removed to
-    # satisfy a validator, so the caller appends nothing rather than appending a
-    # message that says nothing.
-    #
-    # A new `Message`; the original is untouched, so a caller holding one for
-    # display keeps what actually arrived.
+    # The message without its tool calls, as a new `Message`, or `nil` when
+    # nothing else survives. The original is untouched, so a caller can still
+    # display what arrived.
     def repaired(message : Message) : Message?
       return message unless needed?(message)
 
@@ -54,16 +39,9 @@ module Liaison::MPSH
       repaired
     end
 
-    # Repairs a session in place, returning whether anything changed.
-    #
-    # For the reload path: an archive may hold a turn that was never repaired
-    # before it was written, since the exporter is honest and repair is the
-    # caller's to invoke.
-    #
-    # Only messages this method emptied are removed. A message that arrived
-    # empty is left alone — divergent provider handling of empty messages is
-    # its own fixture, and quietly deleting one here would change what a
-    # session says while claiming to repair it.
+    # Repairs a session in place, returning whether anything changed. For
+    # archives written before repair ran. Removes only messages it emptied; a
+    # message that arrived empty is left as it was.
     def repair!(session : Session) : Bool
       emptied = [] of Int32
       changed = false
@@ -82,11 +60,8 @@ module Liaison::MPSH
       changed
     end
 
-    # The acceptance test, expressed once: every tool call has its result.
-    #
-    # Server-executed calls are included. Their result arrives with them, so a
-    # missing one is as dangling as any other — and it is the target protocol's
-    # validator that decides, not the flag.
+    # Whether every tool call has a result in the session, server-executed
+    # calls included.
     def sendable?(session : Session) : Bool
       answered = Set(String).new
       session.messages.each do |message|

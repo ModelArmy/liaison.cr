@@ -11,24 +11,14 @@ require "../../mpsh/session"
 require "../../mpsh/translation"
 
 module Liaison::Protocol::Gemini
-  # The same marker the other two protocols use, and for the same reasons —
+  # The protocol marker left where content was lifted out of a tool result;
   # one definition, in `Capability::Carrier`.
   COMPENSATION_PLACEHOLDER = Capability::Carrier::PLACEHOLDER
 
-  # MPSH view in, request body out.
-  #
-  # The mapping is mostly mechanical wrapping — roles renamed, everything into
-  # `parts` — with one genuinely different problem: **there is nowhere to put a
-  # tool call identifier.**
-  #
-  # MPSH mints `call_id` and the other three protocols carry it under some name.
-  # Here the wire has no field for it and inventing one risks rejection, so the
-  # pairing must be reconstructible from what the wire *does* carry: the
-  # function name, and the order calls appear in. The mapper records that
-  # correspondence in the translation table so export can rebuild it.
-  #
-  # This is the fixture the `CallIdTable` design exists for, and the first time
-  # it has had to work without a provider id to lean on.
+  # MPSH view in, request body out. Roles are renamed and everything is
+  # wrapped in `parts`. The wire has no field for a call identifier, so each
+  # call is bound in the `CallIdTable` as `name#ordinal`, which export uses to
+  # pair responses with calls.
   class Mapper
     getter profile : Capability::Profile
     getter calls : MPSH::CallIdTable
@@ -53,19 +43,16 @@ module Liaison::Protocol::Gemini
 
       contents = [] of Wire::Content
       pending = [] of Wire::Part
-      # How many times each function name has been called so far. The ordinal
-      # plus the name *is* the identifier on this protocol.
+      # Calls so far per function name; with the name, the ordinal is the
+      # identifier.
       ordinals = Hash(String, Int32).new(0)
 
       session.messages.each_with_index do |message, index|
         parts = parts_for(message, index, report, plan, pending, ordinals)
         next if parts.empty?
 
-        # Anything that is not itself a tool response ends the run and the
-        # carrier goes out first — including a model turn. Flushing only before
-        # user messages puts the carrier *after* the model's reply, where the
-        # results it belongs to are no longer in view and export cannot absorb
-        # it.
+        # Anything that is not a tool response ends the run, a model turn
+        # included, so a pending carrier goes out first.
         unless parts.any?(Wire::FunctionResponsePart)
           flush_compensation(contents, pending, report)
         end
@@ -81,14 +68,10 @@ module Liaison::Protocol::Gemini
         tool_mode: options.tool_choice.try { |choice| TOOL_MODES[choice] }), report}
     end
 
-    # At most one of the two is ever returned. Setting both in one
-    # `thinkingConfig` is a 400 here, not a precedence rule, so the deployment's
-    # unit is resolved before this runs and the other stays `nil`.
-    #
-    # No clamp against the output cap, unlike Anthropic: this protocol
-    # documents no relationship between a thinking budget and
-    # `maxOutputTokens`, and inventing one would be a rule of ours dressed up as
-    # a rule of theirs. Worth revisiting the first time a live call disagrees.
+    # The thinking budget or level; at most one, since both in one
+    # `thinkingConfig` is a 400 and the unit was resolved before mapping. The
+    # budget is not clamped against `maxOutputTokens`: the protocol documents
+    # no relationship between them.
     private def reasoning(options : Options, model : String,
                           report : Capability::Report) : {Int32?, String?}
       request = options.reasoning
@@ -97,17 +80,9 @@ module Liaison::Protocol::Gemini
       unit = profile.reasoning_unit
       rendering, outcome = Capability::ReasoningControl.resolve(request, unit)
 
-      # Confirmed live by a 400, not documentation: `thinkingBudget: 0` — this
-      # rendering's compatibility fallback for a levels-preferring model — is
-      # `Budget 0 is invalid. This model only works in thinking mode.` on some
-      # models, not a silent accept. A tier-specific fact
-      # (`CANNOT_DISABLE_THINKING`, `capabilities.cr`), not a generation-wide
-      # one — Flash honours a budget of 0 correctly
-      # (`spec/live/gemini_spec.cr`). The lowest rung this protocol spells is
-      # the closest honest substitute, and it is a real loss: the caller
-      # asked for no thinking and gets some regardless, so it is `Degraded`
-      # and recorded rather than sent as the silent `Exact` `resolve()`
-      # would otherwise claim for this rendering.
+      # These models reject `thinkingBudget: 0`, which is how `Disable` is
+      # rendered, so the lowest rung is sent instead and recorded as
+      # `Degraded`: the caller asked for no thinking and gets some.
       if rendering.disable? && CANNOT_DISABLE_THINKING.includes?(model)
         report.record(MPSH::Outcome::Degraded,
           "reasoning control: reasoning off not supported on #{model}, sent as the lowest rung instead")
@@ -133,8 +108,7 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # Three rungs where the caller has five. Clamping down is a loss the caller
-    # did not ask for, so it is recorded rather than done quietly.
+    # Three rungs where the caller has five; clamping down is recorded.
     private def level_for(request : Reasoning::Request,
                           report : Capability::Report) : String?
       asked = case request
@@ -150,26 +124,20 @@ module Liaison::Protocol::Gemini
       REASONING_LEVELS[asked]
     end
 
-    # `model`, not `assistant`. The single most common source of a silently
-    # wrong mapping on this protocol.
-    # Tool declarations and generation options, translated per protocol.
-    #
-    # Added as a trailing parameter rather than folded in with `policy` and
-    # `retention`: those govern what may be lost translating *history*, these
-    # govern what the model is asked to do *next*. Two questions that happen to
-    # ride on one call.
+    # Tool declarations from `Options`.
     private def declarations(options : Options) : Array(Wire::ToolDeclaration)
       options.tools.map do |tool|
         Wire::ToolDeclaration.new(tool.name, tool.description, tool.parameters)
       end
     end
 
+    # `model`, not `assistant`.
     private def role_of(message : MPSH::Message) : String
       message.role.user? ? "user" : "model"
     end
 
-    # This is the protocol whose flush points were wrong — see the caller in
-    # `map`, and `Capability::Carrier` for the rule it now shares.
+    # Emits a buffered carrier as a user content. The rule and flush points
+    # are `Capability::Carrier`'s.
     private def flush_compensation(contents : Array(Wire::Content),
                                    pending : Array(Wire::Part),
                                    report : Capability::Report) : Nil
@@ -223,23 +191,15 @@ module Liaison::Protocol::Gemini
       ordinals[block.name] = ordinal + 1
       calls.bind(block.call_id, calls.positional_key(block.name, ordinal))
 
-      # The signature is replayed when we have one, same as `thinking()` does
-      # for Anthropic. When we don't, whether we reach here depends on the
-      # model: `Capability::Catalog` sets `tool_call_signature_required` for
-      # the Gemini 3 series and `Resolver` then checks it ahead of `own?`, so
-      # the unsigned foreign call that used to reach the wire and 400 is now
-      # `Degraded` and dropped before this point. On a 2.5 deployment there is
-      # no such requirement, nothing is set, and an unsigned call maps and
-      # sends exactly as it always did.
-      #
-      # Which means `signature` below is legitimately nil in one live case —
-      # an unsigned call bound for 2.5 — and that is correct, not a gap.
+      # The signature is replayed when present. An unsigned call reaches here
+      # only where none is required: on Gemini 3, `Resolver` degrades it
+      # first, through `Catalog::SIGNED_TOOL_CALLS`.
       signature = block.meta_for(profile.metadata_key).try(&.["thought_signature"]?).try(&.as?(String))
       Wire::FunctionCallPart.new(block.name, block.arguments.to_json, signature)
     end
 
-    # A response names the function it answers. The name is recovered from the
-    # translation table, since MPSH's `call_id` says nothing about it.
+    # A response names the function it answers, recovered from the
+    # translation table, or `unknown_function` when its call was not mapped.
     private def function_response(block : MPSH::ToolResultBlock, index : Int32,
                                   report : Capability::Report,
                                   pending : Array(Wire::Part)) : Wire::Part?

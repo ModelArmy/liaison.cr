@@ -7,41 +7,18 @@ require "../errors"
 module Liaison::Protocol::ChatCompletions
   # Chunks from a Chat Completions stream, assembled into a `Wire::Response`.
   #
-  # ## Left until last, for the reason that shows up here
+  # Nothing marks a tool call as finished: its arguments just stop growing.
+  # So calls are materialised only once a `finish_reason` arrives, and a cut
+  # stream yields its text and reasoning and no calls, even calls whose
+  # arguments already parse: without a completion signal, the assembler does
+  # not guess. Text and reasoning are kept: a prefix of prose is prose.
   #
-  # This protocol streams with the least structure of the four. There are no
-  # frame names, no block boundaries, and **no signal that a tool call has
-  # finished arriving** — Anthropic closes a block with `content_block_stop`
-  # and Responses hands over a finished item, but here a call's arguments
-  # simply stop growing, and nothing says so.
-  #
-  # That has a consequence worth stating plainly, because it is the strictest
-  # reading of `Streaming::Assembler`'s rule anywhere in this shard: **a tool
-  # call is materialised only once a `finish_reason` has arrived.** Until then
-  # nothing distinguishes arguments that are complete from arguments that are
-  # merely complete *so far*, and a JSON fragment that happens to parse is the
-  # most dangerous case rather than the reassuring one — `{"city":"Par` does
-  # not parse, but `{"city":"Paris"` followed by more is a call that would look
-  # finished and be wrong. So a stream cut mid-generation yields its text and
-  # its reasoning and no calls at all, even calls whose arguments look whole.
-  #
-  # Content and reasoning are kept, as everywhere else: a prefix of prose is
-  # prose.
-  #
-  # ## Two shapes that exist only here
-  #
-  # **`[DONE]` is not JSON.** It is why `Sse::Frame#data` is a `String` rather
-  # than a parsed object — a parser in the shared framing layer would have had
-  # to fail on it or special-case one protocol.
-  #
-  # **Usage has to be asked for.** `stream_options.include_usage` is set by the
-  # request; without it a streamed reply reports no token count at all. The
-  # final chunk carrying it has an empty `choices` array, so a reader that
-  # required a choice would throw the usage away.
+  # The terminal `[DONE]` frame is not JSON. Usage arrives only when the
+  # request sets `stream_options.include_usage`, in a final chunk with an
+  # empty `choices` array.
   class Assembler < ::Liaison::Streaming::Assembler
-    # One tool call being built. `id` and `name` arrive once, on the fragment
-    # that introduces the call; `arguments` accumulates across every fragment
-    # sharing an index.
+    # One tool call being built. `id` and `name` arrive on the first fragment;
+    # `arguments` accumulates across every fragment with the same index.
     class Pending
       property id : String?
       property name : String?
@@ -87,10 +64,7 @@ module Liaison::Protocol::ChatCompletions
         yield Streaming::TextDelta.new(text)
       end
 
-      # Both spellings, for the reason `Wire::Response.message` gives: vLLM and
-      # DeepSeek emit `reasoning_content`, Ollama emits the bare `reasoning`,
-      # and insisting on one silently drops the trace from servers that chose
-      # the other.
+      # Both spellings; see `Wire::Response.message`.
       reasoning = delta["reasoning_content"]?.try(&.as_s?) || delta["reasoning"]?.try(&.as_s?)
       reasoning.try do |text|
         next if text.empty?
@@ -106,8 +80,8 @@ module Liaison::Protocol::ChatCompletions
       end
     end
 
-    # A `finish_reason` or a `[DONE]`, either of which means generation ended
-    # rather than the connection did.
+    # Whether a `finish_reason` or `[DONE]` arrived: generation ended, not
+    # just the connection.
     def complete? : Bool
       @done || !@finish_reason.nil?
     end
@@ -126,12 +100,6 @@ module Liaison::Protocol::ChatCompletions
 
     # Folds a chunk's per-stream metadata into the assembler and returns the
     # delta left to absorb, or `nil` when the chunk carried no choice.
-    #
-    # Extracted from `absorb` to keep it under the complexity limit, and this
-    # part rather than any other because none of it yields. `absorb`'s three
-    # delta branches each emit an event, and a `yield` cannot cross into a
-    # helper — so moving one of those would mean threading the block through
-    # and reopening the question `accumulate` below already settled.
     private def absorb_metadata(payload : JSON::Any) : JSON::Any?
       @id = payload["id"]?.try(&.as_s?) || @id
       @model = payload["model"]?.try(&.as_s?) || @model
@@ -145,11 +113,8 @@ module Liaison::Protocol::ChatCompletions
     end
 
     # Folds one tool-call fragment into the call at its index, returning the
-    # tool's name if this fragment is the one that introduced it.
-    #
-    # The name comes back rather than the event being yielded here, because a
-    # `yield` cannot cross into a helper — and announcing a call twice, once
-    # per fragment, would be worse than the small awkwardness of returning it.
+    # name when this fragment introduced the call, so `absorb` announces each
+    # call once.
     private def accumulate(fragment : JSON::Any) : String?
       index = fragment["index"]?.try(&.as_i?) || 0
       pending = @calls[index] ||= Pending.new
@@ -182,12 +147,7 @@ module Liaison::Protocol::ChatCompletions
       JSON::Any.new(fields)
     end
 
-    # Calls, but only if generation finished.
-    #
-    # See the note at the top of this class. Without a per-call completion
-    # signal there is nothing to distinguish finished arguments from arguments
-    # that are merely finished so far, so a cut stream contributes no calls at
-    # all rather than a call that might be a fabrication.
+    # The calls, only if generation finished; see the class note.
     private def tool_calls : Array(JSON::Any)
       return [] of JSON::Any unless complete?
 

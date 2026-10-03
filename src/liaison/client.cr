@@ -1,10 +1,9 @@
 require "./provider"
 
 module Liaison
-  # One request per `send`. No loop, no tool dispatch, no retries.
-  #
-  # The turn loop belongs to the caller, which is what keeps this a translator
-  # rather than an agent framework:
+  # Sends one request per `send`: no loop, no tool dispatch, no retries. The
+  # turn loop and the session stay the caller's, so the session is portable
+  # at every turn:
   #
   # ```
   # loop do
@@ -17,10 +16,6 @@ module Liaison
   #   session << MPSH::Message.new(MPSH::Role::User, calls.map { |call| dispatch(call) })
   # end
   # ```
-  #
-  # The session stays the caller's throughout. A client-owned session would be
-  # the provider-owns-history model by another route, and that model is
-  # portable only at save points — this one is portable at every turn.
   class Client
     getter provider : Provider
     getter policy : Capability::Policy
@@ -31,13 +26,14 @@ module Liaison
                    @retention : Capability::ReasoningRetention = Capability::ReasoningRetention::All)
     end
 
-    # Returns the reply and what it cost to get there. Both matter: a caller
-    # that ignores the report is a caller that will not notice a silent
-    # degradation, which is the failure this whole design is arranged against.
+    # Sends the session and returns the reply with its `Report`; a caller that
+    # ignores the report will not notice a degradation. `policy` and
+    # `retention` override the client's for this call. `max_tokens` defaults
+    # per provider; only the Anthropic protocol requires it.
     #
-    # `max_tokens` defaults per provider and is overridable per call, because
-    # it is mostly a deployment fact and occasionally a request one. Only the
-    # Anthropic protocol requires it; the others ignore it.
+    # Raises `Capability::RefusedError` before sending, a `TransportError` for
+    # a failed request, and `Protocol::MalformedResponseError` for an
+    # unreadable reply.
     def send(session : MPSH::Session, model : String,
              policy : Capability::Policy? = nil,
              retention : Capability::ReasoningRetention? = nil,
@@ -46,7 +42,8 @@ module Liaison
       once(session, model, policy, retention, max_tokens, options)
     end
 
-    # The same turn, watched while it happens.
+    # The same turn, streamed: passing a block is the request to stream. The
+    # block receives each event and the `Streaming::Turn`, which it can stop.
     #
     # ```
     # reply, report = client.send(session, "gpt-5") do |event, turn|
@@ -55,27 +52,13 @@ module Liaison
     # end
     # ```
     #
-    # **Passing a block is the request to stream; there is no flag.** An
-    # earlier draft of the design called for one, and once the block signature
-    # was settled it had nothing left to mean: "stream without watching" is
-    # served by an empty block, and "ignore the block I passed" is a trap
-    # rather than a feature. A caller who wants the connection kept warm
-    # through a long generation writes `send(session, model) { }`.
+    # The reply is the same `MPSH::Message` a body would give. A stream cut
+    # short returns its partial reply with `ending` set to `Stopped` or
+    # `Interrupted`; repair it with `MPSH::Repair` before building on it. An
+    # adapter that cannot stream sends one body, and `Report#streamed` says so.
     #
-    # **The reply is the same `MPSH::Message` either way**, which is the whole
-    # point of the arrangement and not a claim this method has to uphold by
-    # care: frames become the protocol's own `Wire::Response` and take the same
-    # `export_reply` a body would have taken.
-    #
-    # Adapters that have not grown an assembler yet fall through to one body.
-    # Silent in the events — there are none — but not silent in the result:
-    # `Report#streamed` says what happened.
-    # **The event block is captured rather than yielded to**, which is why it
-    # is named. It is called from inside `Server#stream`, which is itself
-    # inside `HTTP::Client#post`'s block, and the standard library captures
-    # that one — `yield` is illegal anywhere within a captured block, while
-    # calling a proc is fine. Nothing about the caller's side changes; it is
-    # still an ordinary block.
+    # The block is captured, since it is called inside the block
+    # `Server#stream` captures. To the caller it is an ordinary block.
     def send(session : MPSH::Session, model : String,
              policy : Capability::Policy? = nil,
              retention : Capability::ReasoningRetention? = nil,
@@ -95,15 +78,8 @@ module Liaison
       assembler = streamed.assembler
       report = streamed.report
 
-      # Every annotation already exists: mapping happened in `prepare_stream`,
-      # before anything was sent. Emitting them at the head of the stream is
-      # what "the request was degraded before it left" honestly looks like on a
-      # timeline — holding them back to the end would be the misleading
-      # version.
-      #
-      # `raised` rather than `annotation` for the block parameter, because
-      # `annotation` is a keyword and the parser reads a bare one in expression
-      # position as the start of a definition.
+      # Annotations come from mapping, before sending, so they open the stream.
+      # The parameter is `raised` because `annotation` is a keyword.
       report.annotations.each do |raised|
         block.call(Streaming::AnnotationRaised.new(raised), turn)
       end
@@ -118,21 +94,9 @@ module Liaison
       report.streamed = true
       reply = assembler.finish
 
-      # How the turn ended is recorded, not raised on. This used to raise
-      # `Protocol::StreamError` on a stream that stopped short with nobody
-      # asking, which kept the session clean by giving the caller nothing to
-      # append — the honest behaviour while there was nowhere to record *why* a
-      # reply was partial. `MPSH::Ending` is that somewhere, so the partial
-      # reply is returned with its cause attached and `MPSH::Repair` decides
-      # what the session may keep.
-      #
-      # Only this layer can tell the two cases apart. To an assembler a stopped
-      # turn and a cut one are identical — `complete?` is false for both,
-      # because neither knows whether anybody asked — and `turn.stopped?` is
-      # the whole difference.
-      #
-      # An in-band error frame still raises, from the assembler that read it.
-      # That is a failure the server described; this is one it never mentioned.
+      # A stream that ended without its terminal frame returns its partial
+      # reply rather than raising; only this layer knows whether the caller
+      # stopped it. An in-band error frame still raises, from the assembler.
       unless assembler.complete?
         reply.ending = turn.stopped? ? MPSH::Ending::Stopped : MPSH::Ending::Interrupted
       end
@@ -155,10 +119,7 @@ module Liaison
       {reply, exchange.report}
     end
 
-    # Kept separate from `prepare` and `read` so a streaming implementation has
-    # a seam to occupy without disturbing either. It is also the only method
-    # here that touches a network, which makes everything else testable
-    # offline.
+    # The only method here that touches the network.
     private def transmit(model : String, body : String) : String
       adapter = provider.adapter
       server = provider.server

@@ -29,18 +29,14 @@ module Liaison::Capability
     None  # no home at all; replaying reasoning is impossible
   end
 
-  # Which unit a *request* may use to ask for reasoning. A different question
-  # from `ReasoningForm`, which asks where a reasoning item from a past turn can
-  # be replayed. The two are independent: a profile targeting OpenAI's endpoint
-  # strictly carries no past reasoning at all (`ReasoningForm::None`) while
-  # accepting `reasoning_effort` on the same request.
+  # Which unit a request may use to ask for reasoning. Independent of
+  # `ReasoningForm`, which says where a past reasoning item can be replayed: a
+  # profile may carry no past reasoning yet accept `reasoning_effort`.
   #
-  # `Either` is not indecision. Two protocols genuinely accept both units and
-  # reject being handed both at once, and which one a given deployment wants is
-  # a fact about the *model*, not the protocol — Claude 4.7 rejects a budget,
-  # Claude Sonnet 4.5 has no effort parameter, and Gemini splits at the 2.5/3
-  # line. `Either` is the honest protocol-level declaration, narrowed per call
-  # by `Catalog`.
+  # `Either` means the protocol spells both units and rejects being given both.
+  # Which one a deployment wants depends on the model (Claude 4.7 rejects a
+  # budget; Claude Sonnet 4.5 has no effort parameter), so `Catalog` narrows
+  # it per call.
   enum ReasoningUnit
     None   # no control at all; a request cannot ask
     Effort # a named rung
@@ -56,34 +52,28 @@ module Liaison::Capability
   end
 
   # A protocol's declaration of what it can express. Values are a starting
-  # point, never a source of truth: capabilities drift faster than protocol
-  # shapes do, so each implementation confirms its own against live docs.
-  #
-  # Capability is declared **per media type**, not per block kind. "Supports
-  # images" is too coarse for a model that takes PNG but not WEBP.
+  # point, confirmed against each vendor's live docs rather than trusted.
+  # Media support is declared per media type: a model may take PNG and not
+  # WEBP.
   struct Profile
-    # Identifies the *protocol*, e.g. `openai.chat_completions`. Many providers
-    # may speak one protocol — Ollama, LM Studio and vLLM all serve Chat
-    # Completions — so this names the wire shape, never an endpoint.
+    # Names the protocol, e.g. `openai.chat_completions`: a wire shape, never an
+    # endpoint, since Ollama, LM Studio and vLLM all serve one protocol.
     getter provider : String
 
-    # Identifies whoever issues opaque data that must be echoed back, e.g.
-    # `openai`. Distinct from `provider` on purpose: an encrypted reasoning item
-    # is replayable over either OpenAI protocol, because the vendor that can
-    # read it is the same either way. Defaults to `provider` where the two
-    # coincide.
+    # Names whoever issues opaque data that must be echoed back, e.g. `openai`.
+    # Separate from `provider` because both OpenAI protocols replay the same
+    # vendor's data. Defaults to `provider`.
     getter metadata_key : String
     getter accepted_media : Hash(MPSH::BlockKind, Set(String))
     getter binary_form : BinaryForm
     getter tool_calls : ToolCallForm
     getter tool_results : ToolResultForm
     getter reasoning : ReasoningForm
-    # What a request may ask of the model's reasoning. Distinct from
-    # `reasoning` above, which governs replaying a past reasoning item.
+    # What a request may ask of the model's reasoning; `reasoning` above
+    # governs replaying a past item.
     getter reasoning_unit : ReasoningUnit
-    # Whether the protocol has a notion of provider-run tools at all. Whether a
-    # *given* call is one of this provider's own is a property of the block, not
-    # of the profile — see `Resolver#own?`.
+    # Whether the protocol has provider-run tools at all. Whether a given call
+    # is this provider's own is decided per block, by `Resolver#own?`.
     getter? server_executed : Bool
     getter? refusal_channel : Bool
     getter? can_synthesize_user_message : Bool
@@ -91,41 +81,21 @@ module Liaison::Capability
     getter? first_message_must_be_user : Bool
     getter system_placement : SystemPlacement
     getter? string_shorthand : Bool
-    # Whether this protocol's native reasoning form is only valid carrying a
-    # replayable payload the vendor itself issued — a `signature` or
-    # equivalent opaque field — rather than text alone.
-    #
-    # Declared false everywhere except Anthropic, and declared from a live
-    # 400 rather than documentation: a `thinking` block with no `signature`
-    # is not merely unauthenticated, it fails Anthropic's own request schema
-    # (`messages.N.content.M.thinking.signature: Field required`). Without
-    # this flag, `Resolver#own?`'s "empty metadata is portable by
-    # construction" rule — correct for a protocol with no signature concept
-    # — calls this block `Exact` and sends an invalid request. Recorded in
-    # `spec/live/anthropic_spec.cr`.
+    # Whether this protocol's reasoning blocks are valid only with a payload the
+    # vendor issued, such as a signature. True only for Anthropic, where a
+    # `thinking` block without `signature` fails the request schema (recorded
+    # in `spec/live/anthropic_spec.cr`). `Resolver` checks it ahead of its rule
+    # that empty metadata is portable.
     getter? reasoning_signature_required : Bool
 
-    # Whether this protocol's tool calls are only valid carrying a replayable
-    # payload the vendor itself issued, the same way `thinking` blocks are on
-    # Anthropic. Separate flag rather than a reuse of the one above, because
-    # the two are genuinely independent: Gemini requires a signature on a
-    # `functionCall` part and requires nothing of the sort on a plain-text
-    # `thought` part, so one protocol needs to answer the two questions
-    # differently.
+    # Whether tool calls are valid only with a vendor-issued payload. Separate
+    # from `reasoning_signature_required` because Gemini requires one on a
+    # `functionCall` and not on a `thought`.
     #
-    # Declared from a live 400 rather than documentation (`Function call is
-    # missing a thought_signature in functionCall parts`). Without it,
-    # `Resolver#own?`'s "empty metadata is portable by construction" rule
-    # calls a foreign tool call `Exact` and sends an invalid request —
-    # precisely the shape this shard exists to produce, since a tool call
-    # minted on another protocol never carries a Gemini signature.
-    #
-    # Defaults false on every protocol *including Gemini*, and is switched on
-    # per model by `Catalog`, because the requirement arrived with Gemini 3
-    # and the 2.5 series genuinely does not have it. Declaring it protocol-wide
-    # was tried first and rejected: it would drop every tool call handed to a
-    # 2.5 deployment, silently and permanently, to avoid a 400 that names the
-    # missing field outright. See `Catalog::SIGNED_TOOL_CALLS`.
+    # False on every protocol, Gemini included, and switched on per model by
+    # `Catalog::SIGNED_TOOL_CALLS`: Gemini 3 requires it and 2.5 does not.
+    # Declared protocol-wide, it would drop every tool call sent to a 2.5
+    # deployment.
     getter? tool_call_signature_required : Bool
 
     def initialize(
@@ -154,14 +124,10 @@ module Liaison::Capability
       (set = @accepted_media[kind]?) ? set.includes?(media_type) : false
     end
 
-    # The same protocol, told that this deployment does not issue or honour the
-    # vendor's opaque data.
-    #
-    # Narrowing only, and only along this axis. `Resolver#own?` compares a
-    # block's `provider_metadata` against `metadata_key`, so reassigning the
-    # key is enough to make a foreign signature stop counting as native — the
-    # existing degradation path then reports it. Nothing else about the
-    # protocol changes, because nothing else about it has.
+    # The same profile with another `metadata_key`, for a deployment that does
+    # not honour the vendor's opaque data. `Resolver#own?` compares block
+    # metadata against the key, so foreign signatures stop counting as native
+    # and degrade.
     def with_metadata_key(metadata_key : String) : Profile
       Profile.new(
         @provider,
@@ -183,16 +149,10 @@ module Liaison::Capability
         tool_call_signature_required: @tool_call_signature_required)
     end
 
-    # The same protocol, told which of its two reasoning units this deployment
-    # wants.
-    #
-    # Narrowing only, along the same lines as `with_metadata_key` and for the
-    # same reason: only `Either` may be resolved, and only into one of the two
-    # units it already spelled. Widening `None` into a control the wire does not
-    # have, or swapping a declared unit for the other one, would be a profile
-    # claiming a capability the protocol lacks — the one direction this model
-    # does not offer, because being wrongly optimistic here is a 400 rather than
-    # a recorded loss.
+    # The same profile with `Either` resolved to `Effort` or `Budget`. Raises
+    # `ArgumentError` for anything else: widening `None`, or swapping one
+    # declared unit for the other, would claim a control the wire lacks, which
+    # fails as a 400 rather than a recorded loss.
     def with_reasoning_unit(unit : ReasoningUnit) : Profile
       return self if unit == @reasoning_unit
 
@@ -222,16 +182,10 @@ module Liaison::Capability
         tool_call_signature_required: @tool_call_signature_required)
     end
 
-    # The same protocol, told that this deployment's model authenticates its
-    # own tool calls.
-    #
-    # Narrowing only, like its two siblings above, though the direction reads
-    # backwards at first glance: turning this *on* asks the protocol to accept
-    # **less** than it declared, since a call that would otherwise have mapped
-    # `Exact` now has a condition to meet. `false` is the permissive value
-    # here, which is why only `false -> true` is allowed and the reverse
-    # raises — a catalog entry may add the requirement, never waive one a
-    # protocol declared for itself.
+    # The same profile, requiring signed tool calls. This narrows: a call that
+    # would have mapped `Exact` now has a condition to meet. Raises
+    # `ArgumentError` when asked to waive a requirement the profile already
+    # has, since a catalog may add one, never remove it.
     def with_tool_call_signature_required(required : Bool) : Profile
       return self if required == @tool_call_signature_required
 

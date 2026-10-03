@@ -67,7 +67,7 @@ byte-identical, and a foreign session using different wording is undetectable.
 
 Dropping an empty message is **recorded**, not done quietly. It is easy to reach
 for `reject` and lose a message silently — which is the failure this whole
-design objects to, and it happened once here before being caught.
+design objects to.
 
 ## Server-executed tools
 
@@ -103,10 +103,10 @@ universal fact. Read declarations, not fixture names.
 This protocol asks for reasoning in two units, and which one it accepts depends
 on the **model**, not the protocol.
 
-Mode                                       |Where            |Accepted on                           
--------------------------------------------|-----------------|--------------------------------------
-`thinking: {type: enabled, budget_tokens:}`|`thinking`       |4.5 and earlier only; **400 from 4.7**
-`output_config: {effort:}`                 |its own parameter|4.5 onward, and the current default   
+Mode                                       |Where            |Accepted on                                                    
+-------------------------------------------|-----------------|---------------------------------------------------------------
+`thinking: {type: enabled, budget_tokens:}`|`thinking`       |Up to Sonnet and Haiku 4.5; deprecated on 4.6; **400 from 4.7**
+`output_config: {effort:}`                 |its own parameter|Opus 4.5 (which takes both), and 4.6 onward                    
 
 So `reasoning_unit` is declared `Either` and `Capability::Catalog` resolves it
 per call. Declaring whichever unit today's models want would be a profile

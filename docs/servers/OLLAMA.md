@@ -183,13 +183,11 @@ done.**
 Gemini, which Ollama has never served at all, so this server can say nothing
 about it.
 
-And the reverse gaps are worth naming, since they are the mirror image:
-**Anthropic's own API and OpenAI's own Chat Completions endpoint have never
-been streamed by this shard.** Those two protocols are proven against an
-emulator and not their vendors, while Gemini is proven against its vendor and
-no emulator. Azure is unstreamed on both counts, and is the more interesting
-of them — `max_tokens` versus `max_completion_tokens` already differs there
-per deployment.
+The reverse gap is worth naming, since it is the mirror image: **OpenAI's own
+endpoints have never been recorded by this shard.** Both OpenAI protocols are
+proven against this emulator and against Azure's deployment of them, streamed
+and not, but not against OpenAI itself. Anthropic's API has been recorded,
+streamed included, and Gemini is proven against its vendor and no emulator.
 
 ## Operational notes
 
@@ -214,7 +212,7 @@ A compatibility layer proves the shape is *accepted*, not that the vendor whose
 protocol it imitates would accept it. Reasoning controls are the clearest case:
 `output_config` is accepted here and ignored, which says nothing about whether
 Anthropic would accept it, and a budget — which this server never sees, because
-no Ollama model is in the catalog — is untested entirely. Ollama is permissive about alternation,
+no Ollama model is in the catalog — is untested here. Ollama is permissive about alternation,
 first-user ordering and required parameters where a real endpoint may not be.
 And a non-Claude model behind an Anthropic-shaped API inherits none of Claude's
 capabilities.
@@ -234,9 +232,10 @@ do something, a green run here is close to no evidence at all: the null result
 it produces is the result a broken implementation produces too. Test those
 against a vendor or accept that they are untested.
 
-The next servers are chosen to close exactly these gaps: **Anthropic** because
-it validates signatures, **Gemini** because nothing else will ever exercise that
-protocol live, and **Azure** because it will amend the design — it speaks Chat
-Completions but puts a deployment name and `api-version` in the path and
-authenticates with `api-key`, proving that path and auth are
-protocol-*plus*-deployment facts rather than protocol facts alone.
+The servers recorded since were chosen to close exactly these gaps:
+**Anthropic** because it validates signatures, **Gemini** because nothing else
+will ever exercise that protocol live, and **Azure** because it amended the
+design — it speaks Chat Completions but puts a deployment name and
+`api-version` in the path and authenticates with `api-key`, proving that path
+and auth are protocol-*plus*-deployment facts rather than protocol facts alone.
+See `AZURE.md`.

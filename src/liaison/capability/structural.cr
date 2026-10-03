@@ -3,16 +3,11 @@ require "./policy"
 require "../mpsh/message"
 
 module Liaison::Capability
-  # The specification's capability matrix is block-centric. Some adaptations are
-  # not: merging consecutive same-role messages for Anthropic, or prepending a
-  # placeholder when history starts with the assistant, happen at the level of
-  # the message sequence and have outcomes of their own.
-  #
-  # This matters for conformance rather than aesthetics. Merging two user
-  # messages into one is *not* round-trippable — the export side gets one
-  # message where MPSH held two, and cannot know where to cut. Classified as
-  # Compensated, the divergence is predicted by the matrix and the fixture
-  # passes; left undeclared, it reads as a mapper bug forever.
+  # Adaptations to the message sequence rather than to a block, such as
+  # merging consecutive same-role messages for Anthropic, each with its own
+  # outcome. Merging is not round-trippable, since export cannot know where to
+  # cut, so it is declared `Compensated` and the conformance gate expects the
+  # divergence.
   module Structural
     extend self
 
@@ -43,8 +38,9 @@ module Liaison::Capability
       end
     end
 
-    # Which adaptations a given history will need for a given profile, computed
-    # before anything is sent so a caller can be told in advance.
+    # Predicts, from the profile alone, which of `PrependUserPlaceholder`,
+    # `MergeConsecutiveRoles` and `MoveSystemPrompt` a history will need. The
+    # other adaptations depend on block mapping and appear only in a `Report`.
     def required(messages : Array(MPSH::Message), profile : Profile) : Array(Adaptation)
       needed = [] of Adaptation
 

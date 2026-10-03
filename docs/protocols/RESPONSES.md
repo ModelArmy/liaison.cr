@@ -139,9 +139,10 @@ protocol's declared placement, so it was never going to differ by server.
 ## Streaming
 
 The assembler is `Protocol::Responses::Assembler`. It follows the rule every
-protocol's does — **assemble from complete units; deltas are for events** —
+protocol's does — **never stitch anything whose partial form is invalid** —
 which here means collecting `response.output_item.done` frames, each carrying
-one finished item in the shape `Wire::Response.from_items` already reads.
+one finished item in the shape `Wire::Response.from_items` already reads, and
+leaving deltas to events.
 
 ### Live finding: the frame vocabulary is OpenAI's, unchanged
 

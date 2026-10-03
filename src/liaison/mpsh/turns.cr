@@ -2,13 +2,9 @@ require "./message"
 require "./block"
 
 module Liaison::MPSH
-  # A turn runs from one genuine user input to the next.
-  #
-  # The subtlety worth spelling out: a tool result is a *user-role message* but
-  # is not user input. A single turn may therefore contain several messages —
-  # call, result, call, result — before the human speaks again. Any rule phrased
-  # as "per turn" that segments on role instead of on input will cut a
-  # tool-calling exchange in half.
+  # A turn runs from one genuine user input to the next. A tool result is a
+  # user-role message but not input, so one turn may hold call, result, call,
+  # result. Segmenting on role instead would cut a tool exchange in half.
   struct Turn
     # Inclusive range of message indices.
     getter first : Int32
@@ -38,10 +34,9 @@ module Liaison::MPSH
       message.content.any? { |block| !block.is_a?(ToolResultBlock) }
     end
 
-    # Every turn but the last is completed. The turn in progress is never
-    # subject to retention rules — which is what stops a reasoning block being
-    # dropped from between a tool call and its result, where some providers
-    # require it replayed unmodified.
+    # Splits messages into turns. Every turn but the last is completed.
+    # Retention rules skip the last, which keeps a reasoning block between a
+    # tool call and its result, where some providers require it replayed.
     def segment(messages : Array(Message)) : Array(Turn)
       starts = [] of Int32
       messages.each_with_index do |message, index|

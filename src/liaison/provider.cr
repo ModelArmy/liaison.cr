@@ -8,42 +8,25 @@ require "./adapters/azure/chat_completions"
 require "./adapters/azure/responses"
 
 module Liaison
-  # A server speaking one protocol.
-  #
-  # Three axes meet here and none collapses into another:
-  #
-  # - **protocol** — the wire shape, described by a `Capability::Profile`
-  # - **server** — the deployment, which owns the host and the connection
-  # - **vendor** — whose opaque data this endpoint actually honours
-  #
-  # Ollama is the case that forces them apart: one server, three protocols,
-  # none of them its own vendor. A gateway forces them apart the other way —
-  # OpenRouter fronting Claude is `server: openrouter, vendor: anthropic`,
-  # because the opaque data really is Anthropic's and really does replay.
+  # A server speaking one protocol, and the vendor whose opaque data it
+  # honours. The three are separate: Ollama is one server with three
+  # protocols, none its own vendor; OpenRouter fronting Claude is another
+  # server whose vendor is Anthropic.
   class Provider
     getter server : Server
     getter adapter : Adapter
     getter default_max_tokens : Int32
 
-    # `vendor` answers "will this endpoint honour opaque data", which is a
-    # different question from "what is this protocol called".
+    # `vendor` defaults to the protocol's vendor only when the server's name
+    # matches it (`anthropic` speaking Anthropic), and otherwise to the
+    # server's name, so the profile is narrowed and foreign signatures
+    # degrade rather than replay. Set it for a gateway that passes opaque data
+    # through untouched; set wrongly, it costs a rejected turn.
     #
-    # The default is pessimistic and falls out of comparing names rather than
-    # needing a flag: a server called `anthropic` speaking the Anthropic
-    # protocol is Anthropic and inherits its vendor identity; a server called
-    # `ollama` speaking the same protocol does not, so its profile is narrowed
-    # and a Claude-issued thinking signature degrades rather than being
-    # replayed to an endpoint that cannot validate it.
-    #
-    # Overriding is for gateways that pass opaque data through untouched. It is
-    # a claim about someone else's infrastructure, so it is deliberate — and
-    # the cost of being wrong is a rejected turn, where the cost of being
-    # needlessly cautious is only a recorded loss.
-    # `reasoning_unit` overrules the model catalog, and exists for the case the
-    # catalog cannot answer: a deployment name that carries no model identity.
-    # Azure is the example — `prod-reasoning-2` says nothing about which model
-    # answers — and it is the same fact that will later prove path and auth are
-    # protocol-*plus*-deployment concerns.
+    # `reasoning_unit` overrides the catalog, for a deployment name that
+    # carries no model identity. `max_tokens_field` applies to Chat
+    # Completions only. Raises `ArgumentError` for a field or unit the
+    # protocol cannot use.
     def self.for(server : Server, protocol : ProtocolKind, vendor : String? = nil,
                  default_max_tokens : Int32 = Liaison::Protocol::Anthropic::DEFAULT_MAX_TOKENS,
                  reasoning_unit : Capability::ReasoningUnit? = nil,
@@ -57,12 +40,6 @@ module Liaison
 
       resolved = vendor || (server.name == canonical ? canonical : server.name)
 
-      # `max_tokens_field` only means anything to Chat Completions — it is not
-      # a `Capability::Profile` fact, it is a deployment's own spelling
-      # preference for one field. Loud at construction if named for a
-      # protocol that has no such field, same reasoning as the
-      # `reasoning_unit` guard below: a claim about the wire the wire cannot
-      # back.
       if max_tokens_field && !protocol.chat_completions?
         raise ArgumentError.new("max_tokens_field only applies to ChatCompletions, not #{protocol}")
       end
@@ -76,9 +53,6 @@ module Liaison
                 in ProtocolKind::Gemini    then GeminiAdapter.new(resolved, reasoning_unit)
                 end
 
-      # Loud, and at construction rather than at request time: an override
-      # naming a unit the protocol never spelled is a claim about the wire that
-      # the wire does not support, which is the direction narrowing refuses.
       if unit = reasoning_unit
         declared = adapter.profile.reasoning_unit
         unless declared.either? || declared == unit
@@ -91,23 +65,11 @@ module Liaison
       new(server, adapter, default_max_tokens)
     end
 
-    # Azure OpenAI: same wire shape as `openai.chat_completions` or
-    # `openai.responses`, a different path and a different auth header. Kept
-    # apart from `.for` rather than folded into `ProtocolKind`, because Azure
-    # amends *where this deployment lives*, not *what the protocol can
-    # express* — `Capability::Profile` is unchanged, so there is nothing here
-    # for the shared conformance suite's exhaustive `case ProtocolKind` to
-    # gain by knowing Azure exists as a fifth member.
-    #
-    # `protocol` is restricted to the two Azure actually serves. Anthropic and
-    # Gemini shape are refused rather than silently building an adapter that
-    # would misrepresent what the deployment can do — the same asymmetry
-    # narrowing observes everywhere else: refuse a claim the wire cannot back,
-    # never fabricate one.
-    #
-    # `api_version` is required and undefaulted on purpose. Azure's dated
-    # versions drift, and a stale default here would be exactly the kind of
-    # silently-wrong constant this shard has already been burned by twice.
+    # Azure OpenAI's Chat Completions or Responses surface: OpenAI's wire shape
+    # and `Profile`, with Azure's path and `api-key` header. Raises
+    # `ArgumentError` for Anthropic or Gemini, which Azure does not serve, or
+    # for `max_tokens_field` on Responses. `api_version` has no default, since
+    # Azure's dated versions drift.
     def self.for_azure(server : Server, protocol : ProtocolKind, api_version : String,
                        vendor : String? = nil,
                        default_max_tokens : Int32 = Liaison::Protocol::Anthropic::DEFAULT_MAX_TOKENS,
@@ -142,15 +104,14 @@ module Liaison
                    @default_max_tokens : Int32 = Liaison::Protocol::Anthropic::DEFAULT_MAX_TOKENS)
     end
 
-    # What this deployment can express, after any narrowing. Worth inspecting
-    # before a handoff: it is the honest answer to "what will I lose".
+    # What this deployment can express after vendor narrowing: what a handoff
+    # to it will lose.
     def profile : Capability::Profile
       @adapter.narrowed
     end
 
-    # The same answer for one model, which is the form worth asking before a
-    # handoff: on two protocols the reasoning unit is not settled until a model
-    # is named.
+    # The same, narrowed for one model, which settles the reasoning unit on
+    # the two protocols that spell both.
     def profile(model : String) : Capability::Profile
       @adapter.narrowed(model)
     end

@@ -4,8 +4,8 @@
 and interrupted-turn repair is built on top of them.
 
 This document was written before the code, so the reasoning below is the
-reasoning that produced it rather than a tidy-up afterwards — including the two
-places the design was wrong and had to be corrected mid-build, both marked.
+reasoning that produced it rather than a tidy-up afterwards — including the three
+places the design was wrong and had to be corrected mid-build, all marked.
 The two questions it originally ended with are answered under *Settled before
 the first assembler*.
 
@@ -14,7 +14,7 @@ seam, per-protocol frame assembly, the event stream, and where the streaming
 preference lives. Does not cover tool execution, retries, or session branching,
 all of which stay out (see *Deliberately out of scope*).
 
-**Why now**: three items are queued behind it. `SCOPE.md`'s last `MUST FIX`,
+**Why now** (as written): three items were queued behind it. `SCOPE.md`'s last `MUST FIX`,
 interrupted-turn repair, is held until streaming lands, because the case that
 decides its design — a stream ending without its terminal frame — cannot exist
 without one. Tool support sits behind that in turn.
@@ -25,11 +25,10 @@ without one. Tool support sits behind that in turn.
 
 This was designed for, twice over, before there was anything to put in it.
 
-`Adapter::Exchange` splits a call into three steps rather than one, and says
-why: *"`prepare` builds a body, `Server#post` sends it, `read` turns the result
-into a message — three steps rather than one, so streaming can later slot
-between the second and third without rewriting either."* `Server#post` and
-`Client#transmit` each carry the same note.
+`Adapter::Exchange` split a call into three steps rather than one — `prepare`
+builds a body, `Server#post` sends it, `read` turns the result into a message —
+so that streaming could slot between the second and third without rewriting
+either.
 
 The more valuable piece is quieter. Every exporter already has two entry
 points:
@@ -217,17 +216,19 @@ governs this and is not restated here. Two of its rules bite immediately:
 
 ## Where the streaming preference lives
 
-**On `Client`, with a per-call override**, exactly like `policy` and
-`retention`:
+**Corrected mid-build: there is no flag.** This section first put a `streaming:`
+flag on `Client` with a per-call override. Once the event block's signature was
+settled the flag had nothing left to mean: passing a block *is* the request to
+stream, "stream without watching" is an empty block, and "ignore the block I
+passed" is a trap rather than a feature.
 
 ```crystal
-client = Client.new(provider, streaming: true)
-reply, report = client.send(session, model, streaming: false)
+reply, report = client.send(session, model) { |event, turn| present(event) }  # streamed
+reply, report = client.send(session, model)                                    # one body
 ```
 
-An application's configuration — a `session: { streaming: true }` block or
-similar — becomes a constructor argument, and per-call override is free rather
-than designed.
+An application's configuration decides which call it makes. The placements
+argued against below still hold.
 
 **Not on `MPSH::Session`.** The session is the portable archive. Whether frames
 or one body arrived is not a fact about the conversation, and writing a
@@ -300,8 +301,7 @@ who just set `max_tokens` to 64,000 is the one who needs it.
 
 ## Errors arrive three different ways
 
-The classes are set out in full in `SCOPE.md`'s interrupted-turn entry. What
-streaming adds is the second and third.
+Streaming adds the second and third.
 
 1. **Pre-request rejection** — 429, 400, 413. Arrives as a status before any
    frame. `Server#error_for` classifies it unchanged.
@@ -446,5 +446,9 @@ frames at the next frame boundary, and finalisation proceeds normally — same
 assembler, same `export_reply`, same `MPSH::Message`. A deliberately stopped
 turn is therefore indistinguishable from a silently truncated one at this
 stage, which is correct: both are a stream that ended early, and *what that
-should mean* for a session carrying a half-finished tool call is exactly the
-question `SCOPE.md`'s MUST FIX exists to answer. It is not answered here.
+should mean* for a session carrying a half-finished tool call was left to
+interrupted-turn repair.
+
+**Since answered.** `Client` tells the two apart, because only it knows whether
+the caller asked: the reply's `MPSH::Ending` is `Stopped` or `Interrupted`, and
+`MPSH::Repair` mends either the same way.

@@ -8,19 +8,15 @@ module Liaison::MPSH
     Assistant
   end
 
-  # How a turn finished. Canonical, because a session reloaded in another
-  # process must still know its last turn was cut — a `Capability::Report` is
-  # per-call and is never archived.
+  # How a turn finished. Stored on the message because a reloaded session must
+  # know its last turn was cut, and a `Capability::Report` is never archived.
   #
-  # Deliberately *settable* rather than derived. Three of the four causes have a
-  # vendor field behind them and could be normalised from `provider_metadata`;
-  # the fourth has nothing to read at all, since a dropped stream carries the
-  # fact as the *absence* of a terminal frame. A design that could only derive
-  # could not express it.
+  # Settable rather than derived from `provider_metadata`: `Interrupted` has no
+  # vendor field to derive from, since a dropped stream is known only by its
+  # missing terminal frame.
   #
-  # The cause is kept because it decides the caller's next move — await input,
-  # back off, retry — not because repair differs. Repair is identical for all
-  # three non-`Complete` members.
+  # The cause tells the caller what to do next (await input, back off, retry).
+  # `Repair` treats every value but `Complete` alike.
   enum Ending
     Complete    # the model finished
     Truncated   # the model stopped short: an output cap, a resource limit
@@ -33,7 +29,7 @@ module Liaison::MPSH
     end
   end
 
-  # Who produced an assistant turn. Historical only — it never influences mapping.
+  # Who produced an assistant turn. Archived; mapping never reads it.
   struct Provenance
     getter provider : String
     getter model : String

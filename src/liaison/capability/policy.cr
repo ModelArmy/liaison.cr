@@ -1,8 +1,8 @@
 require "../mpsh/annotation"
 
 module Liaison::Capability
-  # Which outcomes a session is willing to accept. A session-level policy, never
-  # a mapper's judgement call.
+  # Which outcomes a caller accepts, set per `Client` and overridable per
+  # call. Mappers never decide this.
   enum Policy
     Strict       # nothing worse than Restructured
     Compensating # Compensated allowed; Degraded is not
@@ -21,9 +21,8 @@ module Liaison::Capability
     end
   end
 
-  # Refusal is a real outcome and it is loud. The alternative to explicit
-  # outcomes is not refusal — it is silence, and silence is a model answering
-  # confidently about content it never received.
+  # Raised when an outcome exceeds the policy, or a block cannot be mapped at
+  # all. Nothing is sent.
   class RefusedError < Exception
     getter outcome : MPSH::Outcome
     getter provider : String
@@ -36,9 +35,12 @@ module Liaison::Capability
     end
   end
 
-  # Accompanies every mapping. Annotations collected here are copied onto the
-  # session by the client layer; synthesized content is *not* here, because
-  # synthesized content is not anywhere except the outgoing request.
+  # What one mapping cost: every lossy or synthesized outcome as an
+  # annotation, and the worst outcome seen. Synthesized content itself exists
+  # only in the outgoing request.
+  #
+  # `Client` does not copy annotations onto the session; a caller keeping an
+  # audit trail calls `Session#annotate`.
   class Report
     getter provider : String
     getter policy : Policy
@@ -52,31 +54,19 @@ module Liaison::Capability
 
     getter worst : MPSH::Outcome
 
-    # Reasoning blocks omitted because the caller asked for it. A plain count,
-    # deliberately *not* an annotation: this is requested trimming, not damage,
-    # and the annotation channel is only useful while it means the latter.
+    # Reasoning blocks omitted at the caller's request (`ReasoningRetention`).
+    # A count rather than annotations, since requested trimming is not loss.
     property reasoning_dropped : Int32
 
-    # Whether the reply actually arrived as a stream.
-    #
-    # A plain fact for the same reason `reasoning_dropped` is a plain count,
-    # and the reasoning is worth spelling out because the obvious alternative
-    # is actively broken. Annotating a fallback would call `record`, `record`
-    # raises on anything the policy disallows, and `Degraded` is disallowed
-    # under both `Strict` and the default `Compensating` — so "this deployment
-    # did not stream" would refuse the request outright.
-    #
-    # It would also be a category error. Streaming is not a fidelity axis at
-    # all: a streamed reply and a non-streamed one are the *same*
-    # `MPSH::Message` by construction, since they meet at `export_reply` having
-    # differed only as far as the wire type. Nothing is lost by not streaming,
-    # so there is nothing for the annotation channel to record — and putting a
-    # transport preference in the channel that means silent damage is precisely
-    # what `ReasoningRetention`'s own comment warns against.
+    # Whether the reply arrived as a stream. A plain fact rather than an
+    # annotation: a streamed and a buffered reply are the same message, so
+    # nothing is lost by not streaming, and `record` would raise on a
+    # `Degraded` fallback under the default policy.
     property? streamed : Bool = false
 
-    # Single funnel: every mapper reports every outcome here, and this is where
-    # policy is enforced. A mapper that wants to lose something has to say so.
+    # Records an outcome: raises `RefusedError` if the policy does not permit
+    # it, and annotates it if lossy or synthesized. Every mapper reports every
+    # outcome here.
     def record(outcome : MPSH::Outcome, detail : String,
                message_index : Int32? = nil, block_kind : MPSH::BlockKind? = nil) : MPSH::Outcome
       @worst = outcome if outcome > @worst

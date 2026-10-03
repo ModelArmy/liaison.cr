@@ -1,19 +1,11 @@
 require "json"
 
 module Liaison::Protocol::Gemini
-  # The wire form for `generateContent`.
-  #
-  # Structurally the most divergent of the four, and the divergences compound:
-  # the assistant role is spelled `model`, every message is a `{role, parts}`
-  # object with no string shorthand anywhere, the model name lives in the URL
-  # path rather than the body, and generation settings sit inside a nested
-  # `generationConfig`.
-  #
-  # The consequential one is none of those. **A function call carries no
-  # identifier.** Calls are paired to responses by function name and ordering
-  # alone, which is why MPSH mints its own `call_id` and keeps provider ids in
-  # translation state — a stored OpenAI id cannot supply what this mapper needs,
-  # and a Gemini-originated session has no id to store in the first place.
+  # The request half of the `generateContent` wire form. The assistant role
+  # is `model`, every message is a `{role, parts}` object with no string
+  # shorthand, the model goes in the URL path, and generation settings nest
+  # in `generationConfig`. A function call carries no identifier; calls and
+  # responses pair by name and order.
   module Wire
     abstract struct Part
       abstract def to_json(json : JSON::Builder)
@@ -50,14 +42,10 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # No id field exists on this part, and none may be invented: an unexpected
-    # key is a request the provider can reject.
-    #
-    # `thought_signature` is the exception, and arrived after the rest of this
-    # struct did: Gemini 3 attaches it as a sibling of `functionCall` on the
-    # same part, and enforces it strictly (mandatory on Gemini 3, optional on
-    # 2.5) — confirmed live by a 400, not documentation. See
-    # `spec/live/gemini_spec.cr` and `docs/protocols/GEMINI.md`.
+    # Carries no id, and none may be invented: an unknown key may be
+    # rejected. `thought_signature` sits beside `functionCall` on the same
+    # part; Gemini 3 requires it on replay and 2.5 does not (recorded in
+    # `spec/live/gemini_spec.cr`).
     struct FunctionCallPart < Part
       getter name : String
       getter args : String
@@ -99,8 +87,8 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # A thought part. Gemini omits these unless thought inclusion is requested,
-    # and may return a signature that must be replayed unmodified.
+    # A thought part. Returned only when thoughts are requested, possibly with
+    # a signature that must be replayed unmodified.
     struct ThoughtPart < Part
       getter text : String?
       getter signature : String?
@@ -119,9 +107,7 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # The assistant role is literally the string `model`. Nothing else in the
-    # four protocols spells it that way, which is the single most common source
-    # of a silently wrong mapping.
+    # The assistant role is the string `model`.
     struct Content
       getter role : String
       getter parts : Array(Part)
@@ -138,14 +124,9 @@ module Liaison::Protocol::Gemini
       end
     end
 
-    # The model is *not* a body field here — it goes in the URL path. `model` is
-    # carried so a client can build `.../models/{model}:generateContent`, and is
-    # deliberately excluded from `to_json`.
-    # Doubly nested: declarations sit inside `functionDeclarations`, which sits
-    # inside an entry of `tools`. The outer array exists because this protocol
-    # groups function declarations alongside provider-run tools like code
-    # execution — a distinction the other three draw with a block type rather
-    # than with request structure.
+    # Doubly nested: declarations sit in `functionDeclarations`, inside an
+    # entry of `tools`, which also holds provider-run tools such as code
+    # execution.
     struct ToolDeclaration
       getter name : String
       getter description : String?
@@ -158,34 +139,27 @@ module Liaison::Protocol::Gemini
         json.object do
           json.field "name", @name
           @description.try { |text| json.field "description", text }
-          # Gemini accepts a restricted OpenAPI subset rather than full JSON
-          # Schema, so a schema this protocol rejects may be valid elsewhere.
-          # Emitted as given: silently rewriting a caller's schema would be a
-          # worse failure than the provider's own error message.
+          # Emitted as given. Gemini accepts a subset of OpenAPI schema, so a
+          # schema valid elsewhere may be rejected here; it is not rewritten.
           json.field("parameters") { json.raw @parameters }
         end
       end
     end
 
+    # The model is carried for the URL path and is not written by `to_json`.
     struct Request
       getter model : String
       getter contents : Array(Content)
       getter system_instruction : String?
       getter tools : Array(ToolDeclaration)
       getter max_output_tokens : Int32?
-      # `thinkingConfig`, inside `generationConfig`. Both units live in the
-      # same object and **must not both be set** — that is a 400, not a
-      # precedence rule — so the unit is resolved per model by
-      # `Capability::Catalog` before anything is rendered. A budget of 0
-      # disables thinking; -1 asks for dynamic thinking, which is what an
-      # unconstrained request means here.
+      # Under `generationConfig.thinkingConfig`. Budget and level must not
+      # both be set, so the unit is resolved per model before mapping. A budget
+      # of 0 disables thinking; -1 asks for dynamic thinking.
       getter thinking_budget : Int32?
       getter thinking_level : String?
-      # `toolConfig.functionCallingConfig.mode`, and the only one of the four
-      # that nests this rather than putting it at the top level. A placement
-      # difference, not a semantic one — the modes mean what the other three
-      # mean. Top-level all the same: `toolConfig` is a sibling of `tools`,
-      # not a member of `generationConfig`.
+      # Sent as `toolConfig.functionCallingConfig.mode`, top-level beside
+      # `tools`.
       getter tool_mode : String?
 
       def initialize(@model : String, @contents : Array(Content),
@@ -204,7 +178,7 @@ module Liaison::Protocol::Gemini
       def to_json(json : JSON::Builder)
         json.object do
           if text = @system_instruction
-            # Structured like any other content object, not a bare string.
+            # A content object, not a bare string.
             json.field "systemInstruction" do
               json.object do
                 json.field("parts") do
@@ -232,10 +206,8 @@ module Liaison::Protocol::Gemini
               end
             end
           end
-          # The only protocol to put generation parameters in their own object
-          # rather than at the top level — so the object appears once and every
-          # generation setting has to be written inside it, rather than each
-          # being emitted independently as on the other three.
+          # Generation settings share one `generationConfig` object, written
+          # once.
           cap = @max_output_tokens
           budget = @thinking_budget
           level = @thinking_level
@@ -248,12 +220,9 @@ module Liaison::Protocol::Gemini
                     json.object do
                       budget.try { |value| json.field "thinkingBudget", value }
                       level.try { |value| json.field "thinkingLevel", value }
-                      # Without this, thinking still happens (and is billed)
-                      # but neither thought text nor the signature a later
-                      # turn needs to replay comes back — the API's default is
-                      # to omit both, silently. Tied to asking for thinking at
-                      # all rather than a separate `Options` field: there is
-                      # no reason to request reasoning and not want to see it.
+                      # Without it, thinking happens and is billed, but neither
+                      # thought text nor the signatures a later turn replays
+                      # come back. Sent whenever thinking is configured.
                       json.field "includeThoughts", true
                     end
                   end

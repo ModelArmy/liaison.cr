@@ -1,9 +1,8 @@
 require "./block"
 
 module Liaison::MPSH
-  # The five outcomes, ordered by fidelity. The ordering is load-bearing:
-  # a degradation policy is expressed as "nothing worse than X", which is a
-  # comparison, not a table.
+  # The five outcomes, ordered by fidelity. A policy reads "nothing worse than
+  # X", so the order is compared rather than looked up.
   enum Outcome
     Exact        # native support, direct translation
     Restructured # same information, different shape
@@ -20,11 +19,9 @@ module Liaison::MPSH
     end
   end
 
-  # Off-path metadata. Annotations are *not* conversation content: they never
-  # enter the linearization path and are never sent to a provider. They exist so
-  # a session's fidelity history is auditable after the fact — the answer to a
-  # mature client that stores tool-result images faithfully and then silently
-  # drops them on the wire.
+  # A recorded fidelity outcome, kept off the conversation: never linearized
+  # and never sent to a provider. Lets a caller audit afterwards what a
+  # provider was not sent.
   struct Annotation
     getter outcome : Outcome
     getter provider : String
