@@ -31,6 +31,19 @@ private def gemini_reply(body : String)
   Liaison::Protocol::Gemini::Exporter.new(mapper.calls).export_reply(body)
 end
 
+# A recorded body with one value replaced. Raises if the value is not there, so
+# an edited fixture cannot quietly turn an example into a test of the original.
+private def altered(body : String, from : String, to : String) : String
+  raise "fixture no longer contains #{from}" unless body.includes?(from)
+  body.sub(from, to)
+end
+
+# The first call's arguments in the two OpenAI fixtures, as the JSON string the
+# wire carries.
+private def paris_arguments : String
+  %("{\\"location\\":\\"Paris, France\\"}")
+end
+
 describe "response export" do
   describe "Chat Completions" do
     it "reads a plain text reply" do
@@ -234,6 +247,70 @@ describe "response export" do
       key = Liaison::Protocol::Gemini::METADATA_KEY
 
       reply.content[0].as(M::ReasoningBlock).meta?(key, "thought_signature").should_not be_nil
+    end
+  end
+
+  # A tool call whose arguments cannot be read raises, rather than becoming a
+  # call with no arguments that a tool would then run on. Each protocol reads
+  # through `Protocol::Arguments`; these prove that it does, and that each
+  # reader hands export the value it found rather than a default.
+  describe "unreadable tool-call arguments" do
+    it "raises on Chat Completions arguments that do not parse" do
+      expect_raises(P::MalformedResponseError, /get_weather/) do
+        chat_reply(altered(RF::CHAT_TOOL_CALL, paris_arguments, %("{\\"location\\":\\"Par")))
+      end
+    end
+
+    it "raises on Chat Completions arguments that are not an object" do
+      expect_raises(P::MalformedResponseError, /not a JSON object/) do
+        chat_reply(altered(RF::CHAT_TOOL_CALL, paris_arguments, %("[\\"Paris\\"]")))
+      end
+
+      expect_raises(P::MalformedResponseError, /not a JSON object/) do
+        chat_reply(altered(RF::CHAT_TOOL_CALL, paris_arguments, "null"))
+      end
+    end
+
+    it "reads blank Chat Completions arguments as no arguments" do
+      reply = chat_reply(altered(RF::CHAT_TOOL_CALL, paris_arguments, %("")))
+
+      reply.content.select(M::ToolCallBlock)[0].arguments.should be_empty
+    end
+
+    # The specification says a string. An object is what the string would
+    # have held, so it is read rather than discarded.
+    it "reads Chat Completions arguments sent as an object instead of a string" do
+      reply = chat_reply(altered(RF::CHAT_TOOL_CALL, paris_arguments, %({"location":"Paris, France"})))
+
+      reply.content.select(M::ToolCallBlock)[0].arguments["location"].should eq "Paris, France"
+    end
+
+    it "raises on Responses arguments that do not parse" do
+      expect_raises(P::MalformedResponseError, /get_weather/) do
+        responses_reply(altered(RF::RESPONSES_REASONING_AND_CALL, paris_arguments,
+          %("{\\"location\\":\\"Par")))
+      end
+    end
+
+    it "raises on an Anthropic input that is not an object" do
+      expect_raises(P::MalformedResponseError, /not a JSON object/) do
+        anthropic_reply(altered(RF::ANTHROPIC_TOOL_USE,
+          %({"location": "San Francisco, CA", "unit": "celsius"}), %("San Francisco, CA")))
+      end
+    end
+
+    it "raises on Gemini args that are not an object" do
+      expect_raises(P::MalformedResponseError, /not a JSON object/) do
+        gemini_reply(altered(RF::GEMINI_FUNCTION_CALL, %({"location": "Paris"}), %("Paris")))
+      end
+    end
+
+    # Gemini omits empty fields, so a call to a function with no parameters
+    # arrives with no `args` at all.
+    it "reads absent Gemini args as no arguments" do
+      reply = gemini_reply(altered(RF::GEMINI_FUNCTION_CALL, %(, "args": {"location": "Paris"}), ""))
+
+      reply.content.select(M::ToolCallBlock)[0].arguments.should be_empty
     end
   end
 
