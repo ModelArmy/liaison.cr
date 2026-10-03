@@ -53,9 +53,10 @@ Request options are complete: tool declarations, output caps and reasoning
 controls, the last of which introduced `Capability::Catalog` — the fourth
 identity. It now carries **two axes**: the reasoning unit two protocols spell
 differently and reject being handed both, and whether a model authenticates
-its own tool calls. Both narrow the same `Profile` per call. Read *A model
-catalog* in `SCOPE.md` before adding a third — the two reach the same
-optimistic default by *opposite* arguments, and neither generalises.
+its own tool calls. Both narrow the same `Profile` per call. Read *Three
+identities, kept apart* in `DEVELOPMENT.md` before adding a third — the two
+reach the same optimistic default by *different* arguments, and neither
+generalises.
 
 **Gemini is now executed, the last of the four.** Ollama never served it, so
 unlike Anthropic this had no compatibility port to have already exercised the
@@ -158,6 +159,31 @@ honours *less* than its protocol allows, never more.
 
 ## Next
 
+**The comments and docs now describe the code as it is.** Every comment in
+`src/` was checked against the source, and against Crystal's stdlib and
+Wiretap's where a comment leaned on them, then rewritten as API docs, with
+change history moved out and rationale moved to `DEVELOPMENT.md` where it was
+not already there. The documents were then brought into line, including new
+resolution diagrams in `DEVELOPMENT.md` traced from `resolver.cr`.
+
+The pass changed no code, and logged eleven defects it found in `SCOPE.md`
+instead. Worth taking first, in this order:
+
+1. **A raise mid-stream leaves the shared connection mid-body.** It surfaces
+   as a garbled reply on a later, unrelated call, so it is the one most likely
+   to cost someone a day.
+2. **Unreadable tool-call arguments become an empty object**, in all four
+   protocols, so a tool runs with arguments the model never sent.
+3. **`error_detail` raises on a JSON error body that is not an object**,
+   replacing the real failure with an unrelated exception.
+
+**Nothing records a session's annotations** is the other one to read early,
+and it is a design decision rather than a bug: either `Client` annotates the
+session it is handed, or the documents say the audit trail is the caller's.
+`docs/MPSH_SPECIFICATION.md` (line 416) promises that a session's fidelity
+history is auditable, and today it is only if the caller makes it so; the
+specification is normative, so it was flagged rather than edited.
+
 **Tool execution's library half is built, and the library half is all this
 shard owes.** What an application declares and what it runs is its question, not
 this one's — `docs/TOOL_EXECUTION.md`'s *What this does not answer* says so, and
@@ -182,8 +208,8 @@ nowhere else. So a tool that *reports* failure sets only `is_error`, and a tool
 that raises unexpectedly must set both — otherwise it crashes and the model is
 never told.
 
-`SCOPE.md`'s remaining entries all predate the streaming work, apart from the
-two `tool_choice` left behind.
+`SCOPE.md`'s other entries predate the streaming work, apart from the
+`tool_choice` items and the findings above.
 
 **`Options#tool_choice` ends a tool loop**, which was the one thing a caller
 running one could not ask for. `Auto` and `None`, no more. Every protocol
@@ -330,8 +356,8 @@ exists now:
   body, and `alt=sse` is required or the endpoint streams a chunked JSON array
   instead of server-sent events.
 
-**The rule every remaining assembler follows: never stitch anything whose
-partial form is invalid.** Text concatenates — a prefix is a legitimate short
+**The rule every assembler follows: never stitch anything whose partial form
+is invalid.** Text concatenates — a prefix is a legitimate short
 answer. A tool call does not: half an arguments blob cannot be dispatched, so a
 call still arriving when the stream ended must not appear in the reply.
 
@@ -339,9 +365,8 @@ Both halves of that were learned rather than designed. Responses first called
 for keeping only the terminal frame, which is trivial and wrong — the whole
 reply lives in that frame, so `Turn#stop` would return nothing. Gemini then
 broke the replacement wording (*assemble from complete units*) by emitting no
-finished units at all. `docs/STREAMING_DESIGN.md` records both corrections;
-expect Anthropic and Chat Completions to test the rule again rather than to
-fit it quietly.
+finished units at all. `docs/STREAMING_DESIGN.md` records both corrections.
+Anthropic and Chat Completions, built after, fitted the current wording.
 
 **Streaming is proved against vendors, not only against Ollama.** That turned
 out to matter: recording against Azure and Anthropic found a bug Ollama had
@@ -442,6 +467,11 @@ than a green run here to settle it. See `docs/protocols/ANTHROPIC.md`.
   wire.** One recording found a bug that hundreds of green offline examples
   could not. See *Live specs* in `DEVELOPMENT.md` for the rules that follow
   from it.
+- **A comment is a claim, and so is a document.** Checking every one against
+  the code found claims that had been true once, claims copied from another
+  protocol, and one rule (`must define tools`) stated as fact in several places
+  that a single recording then falsified. Check a claim against the source,
+  or a recording, before relying on it or repeating it.
 - **A settled "won't do" is a decision**, not an oversight to helpfully
   correct. `DEVELOPMENT.md`'s "No `UNSUPPORTED.md`" and this file's *Deferred,
   and staying deferred*, below, are both this.
