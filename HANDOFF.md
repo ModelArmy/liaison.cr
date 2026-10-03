@@ -167,20 +167,21 @@ not already there. The documents were then brought into line, including new
 resolution diagrams in `DEVELOPMENT.md` traced from `resolver.cr`.
 
 The pass changed no code, and logged eleven findings in `SCOPE.md` instead.
-The first `MUST FIX` is now fixed: `Server#stream` closes the shared
+Two `MUST FIX` items are now fixed. `Server#stream` closes the shared
 connection on any exit that leaves the body unread, a raise included, and
 `spec/streaming/connection_spec.cr` proves it against a loopback server — the
-one spec on a real socket, since Wiretap never opens one. Two remain, in this
-order:
+one spec on a real socket, since Wiretap never opens one. And tool-call
+arguments are read through one rule, `Protocol::Arguments`: blank is no
+arguments, anything else that is not a JSON object raises
+`MalformedResponseError`, so a tool never runs on arguments the model did not
+send. One remains:
 
-1. **Unreadable tool-call arguments become an empty object**, in all four
-   protocols, so a tool runs with arguments the model never sent.
-2. **Nothing records a session's annotations**, a design decision rather than
-   a bug: either `Client` annotates the session it is handed, or the documents
-   say the audit trail is the caller's. `docs/MPSH_SPECIFICATION.md` (line 416)
-   promises that a session's fidelity history is auditable, and today it is
-   only if the caller makes it so; the specification is normative, so it was
-   flagged rather than edited.
+- **Nothing records a session's annotations**, a design decision rather than
+  a bug: either `Client` annotates the session it is handed, or the documents
+  say the audit trail is the caller's. `docs/MPSH_SPECIFICATION.md` (line 416)
+  promises that a session's fidelity history is auditable, and today it is
+  only if the caller makes it so; the specification is normative, so it was
+  flagged rather than edited.
 
 First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
 object**, replacing the real failure with an unrelated exception. Loud, and no

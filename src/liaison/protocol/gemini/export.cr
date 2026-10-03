@@ -1,6 +1,7 @@
 require "./wire/request"
 require "./wire/response"
 require "./mapper"
+require "../arguments"
 require "../../capability/carrier"
 require "../../mpsh/session"
 require "../../mpsh/translation"
@@ -130,7 +131,8 @@ module Liaison::Protocol::Gemini
     # thought's is kept. A call from another protocol has nothing there, and
     # `Resolver` treats both alike.
     private def tool_call(mpsh_id : String, part : Wire::FunctionCallPart) : MPSH::ToolCallBlock
-      block = MPSH::ToolCallBlock.new(mpsh_id, part.name, parse_object(part.args))
+      arguments = Arguments.read(part.args, NAME, part.name)
+      block = MPSH::ToolCallBlock.new(mpsh_id, part.name, arguments)
       if value = part.thought_signature
         block.put_meta(METADATA_KEY, "thought_signature", value)
       end
@@ -184,25 +186,6 @@ module Liaison::Protocol::Gemini
 
     private def split_placeholders(body : String) : Array(MPSH::Block)
       Capability::Carrier.split(body)
-    end
-
-    private def parse_object(json : String) : MPSH::Object
-      raw = JSON.parse(json).as_h?
-      return MPSH::Object.new unless raw
-      raw.each_with_object(MPSH::Object.new) { |(key, value), acc| acc[key] = to_value(value) }
-    rescue JSON::ParseException
-      MPSH::Object.new
-    end
-
-    private def to_value(any : JSON::Any) : MPSH::Value
-      case raw = any.raw
-      when Nil, Bool, Int64, Float64, String
-        raw
-      when Array
-        raw.map { |item| to_value(item).as(MPSH::Value) }
-      when Hash
-        raw.each_with_object(MPSH::Object.new) { |(key, item), acc| acc[key] = to_value(item) }
-      end
     end
 
     private def byte_size(base64 : String) : Int64

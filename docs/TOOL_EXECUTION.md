@@ -104,8 +104,9 @@ out is not*.
 `call` takes an `MPSH::Object`, not a JSON string. By the time a reply exists
 the exporter has already parsed the arguments; handing over a string would mean
 serializing something parsed so that it could be parsed again, and `block.cr`
-says which direction fails. (Arguments that do not parse currently arrive as an
-empty object rather than failing the reply; `SCOPE.md` logs this as a defect.)
+says which direction fails. Arguments that are not a JSON object fail the
+reply with `Protocol::MalformedResponseError`, so a tool never runs on
+arguments the model did not send; blank arguments are a call with none.
 
 `MPSH::Value` is a real union rather than a `JSON::Any`, deliberately, so a
 function reaches into arguments with `as?(String)` and there is no wire identity

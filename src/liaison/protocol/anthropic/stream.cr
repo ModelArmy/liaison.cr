@@ -3,6 +3,7 @@ require "./export"
 require "./wire/response"
 require "../../streaming/assembler"
 require "../errors"
+require "../arguments"
 
 module Liaison::Protocol::Anthropic
   # Frames from Anthropic's message stream, assembled into a
@@ -181,21 +182,11 @@ module Liaison::Protocol::Anthropic
         fields["thinking"] = JSON::Any.new(pending.text)
         pending.signature.try { |value| fields["signature"] = JSON::Any.new(value) }
       when "tool_use", "server_tool_use"
-        fields["input"] = arguments(pending.json)
+        name = pending.skeleton["name"]?.try(&.as_s?) || ""
+        fields["input"] = JSON::Any.new(Arguments.object(pending.json, NAME, name))
       end
 
       JSON::Any.new(fields)
-    end
-
-    # A closed tool block whose arguments are empty or unparseable reads as a
-    # call with no arguments, rather than raising and losing the whole
-    # reply.
-    private def arguments(json : String) : JSON::Any
-      return JSON::Any.new({} of String => JSON::Any) if json.blank?
-
-      JSON.parse(json)
-    rescue JSON::ParseException
-      JSON::Any.new({} of String => JSON::Any)
     end
 
     # Merges `message_delta`'s output count into `message_start`'s input

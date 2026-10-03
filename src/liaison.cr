@@ -35,6 +35,7 @@ require "./liaison/streaming/assembler"
 # (request out, response in), mapper and exporter.
 require "./liaison/options"
 require "./liaison/protocol/errors"
+require "./liaison/protocol/arguments"
 # - Chat completions
 require "./liaison/protocol/chat_completions/capabilities"
 require "./liaison/protocol/chat_completions/wire/request"

@@ -123,7 +123,10 @@ module Liaison::Protocol::Responses
         FunctionCallItem.new(
           any["call_id"]?.try(&.as_s?) || any["id"]?.try(&.as_s?) || "",
           name,
-          any["arguments"]?.try(&.as_s?) || "{}")
+          # As on Chat Completions: a JSON string, or any other value as its
+          # JSON text, so export judges it rather than this reading it as
+          # empty.
+          any["arguments"]?.try { |value| value.as_s? || value.to_json } || "{}")
       end
 
       # Keeps `encrypted_content` byte-identical, so the trace replays over

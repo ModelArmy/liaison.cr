@@ -134,7 +134,7 @@ flowchart TB
 src/liaison/
   mpsh/         canonical types — knows nothing of HTTP or any provider
   capability/   outcomes, profiles, policy — depends on mpsh, never the reverse
-  protocol/     errors.cr, then one directory per protocol:
+  protocol/     errors.cr, arguments.cr, then one directory per protocol:
                   capabilities.cr   declared Profile
                   wire/request.cr   serialize-only — what we build
                   wire/response.cr  parse-only — what we read
@@ -697,6 +697,12 @@ abstraction is the first protocol from a different family.
    arrays are *alternatives* (`choices`, `candidates` — take index 0, we never
    ask for more than one) and which are the reply's own parts (`output`,
    Anthropic's `content` — walk them entire).
+
+   Tool-call arguments are the exception to tolerance. Hand export the value
+   the wire carried as JSON text, whatever its type, and never substitute
+   `{}` for one that is present: a default here becomes a tool run on
+   arguments the model never sent. Only what an *absent* field means is the
+   reader's call (Gemini omits empty fields, so absent `args` is none).
 4. **Write the export direction.** Response in, MPSH out. This direction carries
    obligations the other does not: normalize roles, mint MPSH IDs and record the
    translation, split fused representations, un-hoist fields into blocks,
@@ -706,6 +712,11 @@ abstraction is the first protocol from a different family.
    re-imported as though it were real. That last part is
    `Capability::Carrier`'s `carrier?`, `absorb` and `split`; a protocol adds
    only its own precondition, via `eligible`.
+
+   Arguments are read with `Protocol::Arguments.read`, as are an assembler's
+   with `Protocol::Arguments.object`: blank is no arguments, anything else that
+   is not a JSON object raises `MalformedResponseError`. Four exporters once
+   held their own copies, and all four read garbage as `{}`.
 5. **Write the request options.** Tool declarations and the output cap, in this
    protocol's spelling. All four differ; see `options.cr` and
    `spec/conformance/options_spec.cr`.

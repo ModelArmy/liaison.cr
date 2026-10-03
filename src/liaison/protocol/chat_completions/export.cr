@@ -1,6 +1,7 @@
 require "./wire/request"
 require "./wire/response"
 require "./mapper"
+require "../arguments"
 require "../../capability/carrier"
 require "../../mpsh/session"
 require "../../mpsh/translation"
@@ -143,7 +144,7 @@ module Liaison::Protocol::ChatCompletions
       # Unhoisting: the message-level field becomes blocks.
       message.tool_calls.try &.each do |call|
         blocks << MPSH::ToolCallBlock.new(
-          calls.mpsh_id(call.id), call.name, parse_arguments(call.arguments))
+          calls.mpsh_id(call.id), call.name, Arguments.read(call.arguments, NAME, call.name))
       end
 
       blocks
@@ -187,29 +188,6 @@ module Liaison::Protocol::ChatCompletions
 
       head, _, body = url[5..].partition(";base64,")
       {head, body}
-    end
-
-    private def parse_arguments(json : String) : MPSH::Object
-      parsed = JSON.parse(json)
-      raw = parsed.as_h?
-      return MPSH::Object.new unless raw
-
-      raw.each_with_object(MPSH::Object.new) do |(key, value), acc|
-        acc[key] = to_value(value)
-      end
-    rescue JSON::ParseException
-      MPSH::Object.new
-    end
-
-    private def to_value(any : JSON::Any) : MPSH::Value
-      case raw = any.raw
-      when Nil, Bool, Int64, Float64, String
-        raw
-      when Array
-        raw.map { |item| to_value(item).as(MPSH::Value) }
-      when Hash
-        raw.each_with_object(MPSH::Object.new) { |(key, item), acc| acc[key] = to_value(item) }
-      end
     end
 
     private def merge_system(existing : String?, addition : String) : String

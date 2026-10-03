@@ -131,8 +131,9 @@ module Liaison::Protocol::ChatCompletions
             entry["id"]?.try(&.as_s?) || "",
             name,
             # A JSON string on this protocol; kept as text and parsed at
-            # export.
-            function["arguments"]?.try(&.as_s?) || "{}")
+            # export. Any other value is kept as its JSON text, so export
+            # judges it rather than this reading it as empty.
+            function["arguments"]?.try { |value| value.as_s? || value.to_json } || "{}")
         end
       end
     end

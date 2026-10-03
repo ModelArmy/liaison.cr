@@ -1,6 +1,7 @@
 require "./wire/request"
 require "./wire/response"
 require "./mapper"
+require "../arguments"
 require "../../capability/carrier"
 require "../../mpsh/session"
 require "../../mpsh/translation"
@@ -30,7 +31,7 @@ module Liaison::Protocol::Responses
         when Wire::FunctionCallItem
           flush_run(session, run)
           assistant << MPSH::ToolCallBlock.new(
-            calls.mpsh_id(item.call_id), item.name, parse_arguments(item.arguments))
+            calls.mpsh_id(item.call_id), item.name, Arguments.read(item.arguments, NAME, item.name))
         when Wire::FunctionCallOutputItem
           flush_assistant(session, assistant)
           run << MPSH::ToolResultBlock.new(
@@ -63,7 +64,7 @@ module Liaison::Protocol::Responses
           blocks << reasoning(item)
         when Wire::FunctionCallItem
           blocks << MPSH::ToolCallBlock.new(
-            calls.mpsh_id(item.call_id), item.name, parse_arguments(item.arguments))
+            calls.mpsh_id(item.call_id), item.name, Arguments.read(item.arguments, NAME, item.name))
         when Wire::RefusalItem
           blocks << MPSH::RefusalBlock.new(item.reason)
         when Wire::MessageItem
@@ -188,25 +189,6 @@ module Liaison::Protocol::Responses
 
       head, _, body = url[5..].partition(";base64,")
       {head, body}
-    end
-
-    private def parse_arguments(json : String) : MPSH::Object
-      raw = JSON.parse(json).as_h?
-      return MPSH::Object.new unless raw
-      raw.each_with_object(MPSH::Object.new) { |(key, value), acc| acc[key] = to_value(value) }
-    rescue JSON::ParseException
-      MPSH::Object.new
-    end
-
-    private def to_value(any : JSON::Any) : MPSH::Value
-      case raw = any.raw
-      when Nil, Bool, Int64, Float64, String
-        raw
-      when Array
-        raw.map { |item| to_value(item).as(MPSH::Value) }
-      when Hash
-        raw.each_with_object(MPSH::Object.new) { |(key, item), acc| acc[key] = to_value(item) }
-      end
     end
 
     private def byte_size(base64 : String) : Int64

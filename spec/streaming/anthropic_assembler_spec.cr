@@ -144,6 +144,27 @@ describe Liaison::Protocol::Anthropic::Assembler do
       JSON.parse(call.input)["city"].as_s.should eq "Paris"
     end
 
+    it "reads a closed call with no fragments as having no arguments" do
+      subject, _ = run([
+        start(0, %({"type":"tool_use","id":"tu_1","name":"get_time","input":{}})),
+        stop(0),
+      ])
+
+      subject.finish.content.select(M::ToolCallBlock)[0].arguments.should be_empty
+    end
+
+    # Closed means the server vouched for the arguments. If they still do not
+    # parse, the reply is malformed, as a buffered one would be.
+    it "raises when a closed call's arguments do not parse" do
+      subject, _ = run([
+        start(0, %({"type":"tool_use","id":"tu_1","name":"get_weather","input":{}})),
+        delta(0, %({"type":"input_json_delta","partial_json":"{\\"city\\":"})),
+        stop(0),
+      ])
+
+      expect_raises(P::MalformedResponseError, /get_weather/) { subject.finish }
+    end
+
     it "reports no events for argument fragments" do
       # Fragments of an arguments object are not watchable and an event
       # carrying them would invite the accumulation this design refuses.
