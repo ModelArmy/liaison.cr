@@ -14,29 +14,6 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 
 ## MUST FIX
 
-### A raise mid-stream leaves the shared connection mid-body
-
-`Server#stream` closes the connection when its block returns `false`, because
-the keep-alive socket is left part-way through a response body. When the block
-*raises* instead, `close if stopped` is never reached. The stdlib does not cover
-it: `HTTP::Client#handle_response` closes the body IO in an `ensure`, but
-closing an `HTTP::ChunkedContent` or `FixedLengthContent` does not skip to its
-end, and the socket is closed only when the response is not keep-alive. The
-next request on that `Server` reads the remainder of the old body as its
-response. Where: `src/liaison/server.cr`, `stream`.
-
-The block raises whenever the caller's event handler does, or an assembler
-rejects a frame (`Protocol::MalformedResponseError`, an in-band
-`Protocol::StreamError`). Every `Provider` on the server shares the socket, so
-the failure surfaces on an unrelated later call. Likely fix: close on any
-non-normal exit (`rescue` then re-raise, or `ensure` with a completion flag).
-Predicted by reading the stdlib (`src/http/client.cr`, `src/http/content.cr`);
-no spec covers it.
-
-Why MUST FIX: the fix is a few lines, and the cost of leaving it grows, since
-the failure surfaces on a later, unrelated call (possibly through another
-`Provider` on the same server) and is debugged on the wrong request first.
-
 ### Unreadable tool-call arguments become an empty object
 
 A tool call whose arguments do not parse, or parse to something other than a

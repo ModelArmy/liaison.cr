@@ -62,9 +62,13 @@ module Liaison
     end
 
     # Posts a request and yields each server-sent event frame as it arrives.
-    # The block returns `true` to continue and `false` to stop. A stop closes
-    # the connection, since the shared socket is left mid-body. Status errors
+    # The block returns `true` to continue and `false` to stop. Status errors
     # raise as in `post`, before any frame.
+    #
+    # The shared connection is closed whenever the body is not read to its
+    # end: a stop, or a raise from the block or the frame reader. Left open,
+    # the next request on this server would read the rest of the body as its
+    # own response.
     #
     # Built with `exec` rather than `post` with a block: Wiretap redefines
     # `exec(request, &block)` with a captured block, and the stdlib `post`
@@ -73,24 +77,29 @@ module Liaison
     def stream(path : String, headers : HTTP::Headers, body : String,
                detail : Proc(String, String?)? = nil,
                &block : Streaming::Sse::Frame -> Bool) : Nil
-      stopped = false
+      drained = false
       request = HTTP::Request.new("POST", path, headers, body)
 
-      client.exec(request) do |response|
-        unless response.success?
-          explanation = detail.try(&.call(response.body_io.gets_to_end))
-          raise error_for(response.status_code, explanation)
-        end
-
-        Streaming::Sse.each_frame(response.body_io) do |frame|
-          unless block.call(frame)
-            stopped = true
-            break
+      begin
+        client.exec(request) do |response|
+          unless response.success?
+            error_body = response.body_io.gets_to_end
+            drained = true
+            raise error_for(response.status_code, detail.try(&.call(error_body)))
           end
-        end
-      end
 
-      close if stopped
+          stopped = false
+          Streaming::Sse.each_frame(response.body_io) do |frame|
+            unless block.call(frame)
+              stopped = true
+              break
+            end
+          end
+          drained = !stopped
+        end
+      ensure
+        close unless drained
+      end
     end
 
     # The `TransportError` subclass for an HTTP status.

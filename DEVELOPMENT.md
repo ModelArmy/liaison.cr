@@ -184,6 +184,43 @@ so `response.cr` is parse-only. One direction per file, because the two fail in
 different ways and mixing them invites a request type to grow a reader nobody
 needs.
 
+### One connection per server, read to its end
+
+A `Server` holds one keep-alive connection, shared by every `Provider` on it.
+So a response body left part-read is not that call's problem: the next request
+on the connection, possibly through another `Provider`, reads the remainder as
+its own response and fails there, on the wrong call. The stdlib does not
+prevent this. Closing a body IO does not skip to its end, and the socket closes
+only when the response is not keep-alive.
+
+The rule for anything on `Server` that reads a body: **read it to its end, or
+close the connection.** `post` reads every body whole. `stream` is the method
+that can stop early, and closes in an `ensure` unless the body was drained:
+
+```mermaid
+flowchart TD
+    start([Server#stream]) --> status{{2xx?}}
+    status -- no --> errbody[Read error body to end] --> raiseT[Raise TransportError]
+    status -- yes --> frame[Read next frame]
+    frame --> eof{{Body ended?}}
+    eof -- yes --> keep([Keep connection])
+    eof -- no --> callblk[Call block]
+    callblk --> outcome{{Block returned?}}
+    outcome -- true --> frame
+    outcome -- false --> close([Close connection])
+    outcome -- raised --> close
+    frame -. reader raised .-> close
+    raiseT --> keep
+
+    classDef open stroke:#2e7d32,stroke-width:3px
+    classDef shut stroke:#c62828,stroke-width:3px
+    class keep open
+    class close shut
+```
+
+A raise is the exit worth remembering. The caller's event handler raises, and
+so does an assembler rejecting a frame. Both arrive inside `stream`'s block.
+
 ## Three identities, kept apart
 
 The distinction that the live layer exists to preserve, and the one most likely
@@ -780,7 +817,7 @@ crystal spec                                     # proves it replays
 The second command is the one that matters. It is the first time the new
 transcript is exercised as a recording rather than produced as one.
 
-Six things learned the hard way:
+Seven things learned the hard way:
 
 - **Record, never hand-write.** Both times a transcript was guessed at rather
   than captured, the guess was wrong and cost a debugging round.
@@ -810,6 +847,12 @@ Six things learned the hard way:
   for matching only; the transcript still stores what went over the wire. Anything else non-deterministic in a request body needs the
   same treatment, and the symptom is a miss reported as *matched method and URL,
   body differed*.
+- **Wiretap never opens a socket**, on record or replay, so no transcript can
+  show what a call leaves on the connection. `spec/streaming/connection_spec.cr`
+  serves a loopback `HTTP::Server` outside `Wiretap.intercept` instead. It
+  needs no transcript and no network, so it runs anywhere. Reach for the same
+  arrangement when the behaviour under test is the connection's, not the
+  wire's.
 
 Always cap output on a live request: an uncapped local model can stall a run
 for minutes, reasoning without reaching an answer.
