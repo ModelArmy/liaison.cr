@@ -166,23 +166,24 @@ change history moved out and rationale moved to `DEVELOPMENT.md` where it was
 not already there. The documents were then brought into line, including new
 resolution diagrams in `DEVELOPMENT.md` traced from `resolver.cr`.
 
-The pass changed no code, and logged eleven defects it found in `SCOPE.md`
-instead. Worth taking first, in this order:
+The pass changed no code, and logged eleven findings in `SCOPE.md` instead.
+Three are `MUST FIX`, in this order:
 
 1. **A raise mid-stream leaves the shared connection mid-body.** It surfaces
    as a garbled reply on a later, unrelated call, so it is the one most likely
    to cost someone a day.
 2. **Unreadable tool-call arguments become an empty object**, in all four
    protocols, so a tool runs with arguments the model never sent.
-3. **`error_detail` raises on a JSON error body that is not an object**,
-   replacing the real failure with an unrelated exception.
+3. **Nothing records a session's annotations**, a design decision rather than
+   a bug: either `Client` annotates the session it is handed, or the documents
+   say the audit trail is the caller's. `docs/MPSH_SPECIFICATION.md` (line 416)
+   promises that a session's fidelity history is auditable, and today it is
+   only if the caller makes it so; the specification is normative, so it was
+   flagged rather than edited.
 
-**Nothing records a session's annotations** is the other one to read early,
-and it is a design decision rather than a bug: either `Client` annotates the
-session it is handed, or the documents say the audit trail is the caller's.
-`docs/MPSH_SPECIFICATION.md` (line 416) promises that a session's fidelity
-history is auditable, and today it is only if the caller makes it so; the
-specification is normative, so it was flagged rather than edited.
+First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
+object**, replacing the real failure with an unrelated exception. Loud, and no
+dearer to fix later.
 
 **Tool execution's library half is built, and the library half is all this
 shard owes.** What an application declares and what it runs is its question, not
@@ -286,7 +287,7 @@ both policies.
 Interrupted-turn repair was `SCOPE.md`'s last `MUST FIX` and is built; the
 argument that used to live there now lives in `docs/MPSH_SPECIFICATION.md` §3a
 — where it belongs, being a statement about the format rather than an open
-question. `MUST FIX` is now empty.
+question. That emptied `MUST FIX` until the comments pass refilled it.
 
 `MPSH::Ending` is a settable field on `MPSH::Message`: `Complete`, `Truncated`,
 `Stopped`, `Interrupted`. The four exporters normalise their own stop reason

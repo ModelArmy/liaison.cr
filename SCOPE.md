@@ -14,7 +14,73 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 
 ## MUST FIX
 
-Nothing open.
+### A raise mid-stream leaves the shared connection mid-body
+
+`Server#stream` closes the connection when its block returns `false`, because
+the keep-alive socket is left part-way through a response body. When the block
+*raises* instead, `close if stopped` is never reached. The stdlib does not cover
+it: `HTTP::Client#handle_response` closes the body IO in an `ensure`, but
+closing an `HTTP::ChunkedContent` or `FixedLengthContent` does not skip to its
+end, and the socket is closed only when the response is not keep-alive. The
+next request on that `Server` reads the remainder of the old body as its
+response. Where: `src/liaison/server.cr`, `stream`.
+
+The block raises whenever the caller's event handler does, or an assembler
+rejects a frame (`Protocol::MalformedResponseError`, an in-band
+`Protocol::StreamError`). Every `Provider` on the server shares the socket, so
+the failure surfaces on an unrelated later call. Likely fix: close on any
+non-normal exit (`rescue` then re-raise, or `ensure` with a completion flag).
+Predicted by reading the stdlib (`src/http/client.cr`, `src/http/content.cr`);
+no spec covers it.
+
+Why MUST FIX: the fix is a few lines, and the cost of leaving it grows, since
+the failure surfaces on a later, unrelated call (possibly through another
+`Provider` on the same server) and is debugged on the wrong request first.
+
+### Unreadable tool-call arguments become an empty object
+
+A tool call whose arguments do not parse, or parse to something other than a
+JSON object, is read as a call with no arguments (`{}`) instead of failing. The
+call then reaches `Toolbox#dispatch`, which runs the tool with arguments the
+model never sent. Where, one per protocol:
+
+- `src/liaison/protocol/anthropic/stream.cr`, `Assembler#arguments`: a closed
+  `tool_use` block's accumulated `partial_json`
+- `src/liaison/protocol/anthropic/export.cr`, `parse_input`
+- `src/liaison/protocol/chat_completions/export.cr`, `parse_arguments`
+- `src/liaison/protocol/responses/export.cr`, `parse_arguments`
+- `src/liaison/protocol/gemini/export.cr`, `parse_object`
+
+The four exporters run on both buffered and streamed replies. A blank string is
+a legitimate empty argument list and should stay `{}`; anything else that does
+not parse to an object is a malformed response. Likely fix: raise
+`Protocol::MalformedResponseError` there, as the readers do for a body missing
+its required shape. Predicted by reading; no spec covers it.
+
+Why MUST FIX: it does not lose information quietly, it invents some. A tool with
+side effects runs on arguments the model never sent, and nothing records it.
+
+### Nothing records a session's annotations
+
+`docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a
+session's fidelity history is auditable after the fact, and `Session` holds an
+`annotations` list for it. Nothing in `src/` writes to it: `Report` collects
+annotations per call, `Client#send` returns the report, and no code calls
+`Session#annotate`. A caller who appends the reply and drops the report keeps a
+session whose history says nothing was ever lost. Where: `src/liaison/client.cr`
+(`send`), `src/liaison/capability/policy.cr` (`Report`).
+
+It matters because a silent record of loss is the failure the capability model
+exists to prevent, and an archive written from such a session carries the
+silence to disk. Two candidate fixes, and the choice is a design question:
+`Client` annotates the session it was handed, which makes `send` mutate its
+argument; or the documentation says the audit trail is the caller's to keep,
+with the one line that keeps it. Predicted by reading; no spec covers it.
+
+Why MUST FIX: deciding is cheap now and expensive later. Every archive written
+before this is settled has lost its fidelity history permanently, and no later
+fix can recover annotations that were never stored. Decide, then either
+implement the chosen fix or document the caller's line.
 
 ---
 
@@ -114,45 +180,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### Unreadable tool-call arguments become an empty object
-
-A tool call whose arguments do not parse, or parse to something other than a
-JSON object, is read as a call with no arguments (`{}`) instead of failing. The
-call then reaches `Toolbox#dispatch`, which runs the tool with arguments the
-model never sent. Where, one per protocol:
-
-- `src/liaison/protocol/anthropic/stream.cr`, `Assembler#arguments`: a closed
-  `tool_use` block's accumulated `partial_json`
-- `src/liaison/protocol/anthropic/export.cr`, `parse_input`
-- `src/liaison/protocol/chat_completions/export.cr`, `parse_arguments`
-- `src/liaison/protocol/responses/export.cr`, `parse_arguments`
-- `src/liaison/protocol/gemini/export.cr`, `parse_object`
-
-The four exporters run on both buffered and streamed replies. A blank string is
-a legitimate empty argument list and should stay `{}`; anything else that does
-not parse to an object is a malformed response. Likely fix: raise
-`Protocol::MalformedResponseError` there, as the readers do for a body missing
-its required shape. Predicted by reading; no spec covers it.
-
-### A raise mid-stream leaves the shared connection mid-body
-
-`Server#stream` closes the connection when its block returns `false`, because
-the keep-alive socket is left part-way through a response body. When the block
-*raises* instead, `close if stopped` is never reached. The stdlib does not cover
-it: `HTTP::Client#handle_response` closes the body IO in an `ensure`, but
-closing an `HTTP::ChunkedContent` or `FixedLengthContent` does not skip to its
-end, and the socket is closed only when the response is not keep-alive. The
-next request on that `Server` reads the remainder of the old body as its
-response. Where: `src/liaison/server.cr`, `stream`.
-
-The block raises whenever the caller's event handler does, or an assembler
-rejects a frame (`Protocol::MalformedResponseError`, an in-band
-`Protocol::StreamError`). Every `Provider` on the server shares the socket, so
-the failure surfaces on an unrelated later call. Likely fix: close on any
-non-normal exit (`rescue` then re-raise, or `ensure` with a completion flag).
-Predicted by reading the stdlib (`src/http/client.cr`, `src/http/content.cr`);
-no spec covers it.
-
 ### `error_detail` raises on a JSON error body that is not an object
 
 `Adapter#nested_error` reads `JSON.parse(body)["error"]?.try(&.["message"]?)`
@@ -210,23 +237,6 @@ and is not listed, so a foreign tool call sent to it maps `Exact` and draws the
 400. Its replays pass only because every call they send was minted by the model
 itself. Where: `src/liaison/capability/catalog.cr`. Fix: add the spelling, once
 a recording shows the 400 on that model.
-
-### Nothing records a session's annotations
-
-`docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a
-session's fidelity history is auditable after the fact, and `Session` holds an
-`annotations` list for it. Nothing in `src/` writes to it: `Report` collects
-annotations per call, `Client#send` returns the report, and no code calls
-`Session#annotate`. A caller who appends the reply and drops the report keeps a
-session whose history says nothing was ever lost. Where: `src/liaison/client.cr`
-(`send`), `src/liaison/capability/policy.cr` (`Report`).
-
-It matters because a silent record of loss is the failure the capability model
-exists to prevent, and an archive written from such a session carries the
-silence to disk. Two candidate fixes, and the choice is a design question:
-`Client` annotates the session it was handed, which makes `send` mutate its
-argument; or the documentation says the audit trail is the caller's to keep,
-with the one line that keeps it. Predicted by reading; no spec covers it.
 
 ### `MalformedResponseError` is defined twice
 
