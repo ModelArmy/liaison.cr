@@ -26,10 +26,14 @@ module Liaison
                    @retention : Capability::ReasoningRetention = Capability::ReasoningRetention::All)
     end
 
-    # Sends the session and returns the reply with its `Report`; a caller that
-    # ignores the report will not notice a degradation. `policy` and
+    # Sends the session and returns the reply with its `Report`. `policy` and
     # `retention` override the client's for this call. `max_tokens` defaults
     # per provider; only the Anthropic protocol requires it.
+    #
+    # The session gains the exchange's content losses as annotations, each
+    # once (`Report#annotate`); that is the only change `send` makes to it.
+    # The reply is not appended. Everything else the report holds is about
+    # this request alone, and a caller that ignores it will not hear of it.
     #
     # Raises `Capability::RefusedError` before sending, a `TransportError` for
     # a failed request, and `Protocol::MalformedResponseError` for an
@@ -101,6 +105,7 @@ module Liaison
         reply.ending = turn.stopped? ? MPSH::Ending::Stopped : MPSH::Ending::Interrupted
       end
 
+      report.annotate(session)
       {reply, report}
     end
 
@@ -116,6 +121,7 @@ module Liaison
         options)
 
       reply = exchange.read(transmit(model, exchange.body))
+      exchange.report.annotate(session)
       {reply, exchange.report}
     end
 

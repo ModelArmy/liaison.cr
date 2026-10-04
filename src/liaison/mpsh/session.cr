@@ -14,7 +14,8 @@ module Liaison::MPSH
   end
 
   # The canonical session: a system prompt, a flat list of messages, and
-  # annotations.
+  # annotations: each block a provider was sent in degraded form, once per
+  # provider, by message index.
   #
   # It has no serialization of its own. `Archive` stores it and the mappers
   # render it, both from outside, so storage form never becomes wire form.

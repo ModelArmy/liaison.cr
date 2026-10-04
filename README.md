@@ -79,9 +79,10 @@ reply, report = Liaison::Client.new(provider).send(session, "claude-haiku-4-5")
 report.annotations.each { |note| puts note }   # what the handoff cost, if anything
 ```
 
-The report is per call. To keep a record of what a session has lost across
-handoffs, add the annotations to it yourself with `session.annotate(note)`:
-`Client` does not, and an archive holds only what the session does.
+The report is per call. What the session keeps is the lasting part:
+`send` adds each block a provider received in degraded form to
+`session.annotations`, once per provider however many turns re-send it, and the
+archive carries that record with the session.
 
 Nothing in `vienna.json` names a vendor as its owner. That is the whole idea.
 

@@ -167,21 +167,22 @@ not already there. The documents were then brought into line, including new
 resolution diagrams in `DEVELOPMENT.md` traced from `resolver.cr`.
 
 The pass changed no code, and logged eleven findings in `SCOPE.md` instead.
-Two `MUST FIX` items are now fixed. `Server#stream` closes the shared
-connection on any exit that leaves the body unread, a raise included, and
-`spec/streaming/connection_spec.cr` proves it against a loopback server — the
-one spec on a real socket, since Wiretap never opens one. And tool-call
-arguments are read through one rule, `Protocol::Arguments`: blank is no
-arguments, anything else that is not a JSON object raises
-`MalformedResponseError`, so a tool never runs on arguments the model did not
-send. One remains:
+All three `MUST FIX` items among them are now done:
 
-- **Nothing records a session's annotations**, a design decision rather than
-  a bug: either `Client` annotates the session it is handed, or the documents
-  say the audit trail is the caller's. `docs/MPSH_SPECIFICATION.md` (line 416)
-  promises that a session's fidelity history is auditable, and today it is
-  only if the caller makes it so; the specification is normative, so it was
-  flagged rather than edited.
+1. **`Server#stream` closes the shared connection** on any exit that leaves
+   the body unread, a raise included. `spec/support/loopback.cr` serves a real
+   socket for specs like this one, since Wiretap never opens one.
+2. **Tool-call arguments are read through one rule**, `Protocol::Arguments`:
+   blank is no arguments, anything else that is not a JSON object raises
+   `MalformedResponseError`, so a tool never runs on arguments the model did
+   not send.
+3. **`Client#send` keeps the session's register of content losses**, through
+   `Report#annotate`. A register, not a log: each block a provider received in
+   degraded form is recorded once per provider, however many turns re-send it.
+   Compensations, sequence adaptations and request options stay in the
+   per-call `Report`. `docs/MPSH_SPECIFICATION.md` §7 was amended to say so,
+   and `DEVELOPMENT.md` has the reasoning, including why repeats are counted
+   rather than tested for.
 
 First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
 object**, replacing the real failure with an unrelated exception. Loud, and no

@@ -14,27 +14,7 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 
 ## MUST FIX
 
-### Nothing records a session's annotations
-
-`docs/MPSH_SPECIFICATION.md` says degradation annotations exist so that a
-session's fidelity history is auditable after the fact, and `Session` holds an
-`annotations` list for it. Nothing in `src/` writes to it: `Report` collects
-annotations per call, `Client#send` returns the report, and no code calls
-`Session#annotate`. A caller who appends the reply and drops the report keeps a
-session whose history says nothing was ever lost. Where: `src/liaison/client.cr`
-(`send`), `src/liaison/capability/policy.cr` (`Report`).
-
-It matters because a silent record of loss is the failure the capability model
-exists to prevent, and an archive written from such a session carries the
-silence to disk. Two candidate fixes, and the choice is a design question:
-`Client` annotates the session it was handed, which makes `send` mutate its
-argument; or the documentation says the audit trail is the caller's to keep,
-with the one line that keeps it. Predicted by reading; no spec covers it.
-
-Why MUST FIX: deciding is cheap now and expensive later. Every archive written
-before this is settled has lost its fidelity history permanently, and no later
-fix can recover annotations that were never stored. Decide, then either
-implement the chosen fix or document the caller's line.
+Nothing outstanding.
 
 ---
 

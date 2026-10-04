@@ -1,4 +1,5 @@
 require "../mpsh/annotation"
+require "../mpsh/session"
 
 module Liaison::Capability
   # Which outcomes a caller accepts, set per `Client` and overridable per
@@ -6,7 +7,7 @@ module Liaison::Capability
   enum Policy
     Strict       # nothing worse than Restructured
     Compensating # Compensated allowed; Degraded is not
-    Lenient      # Degraded allowed, each occurrence recorded
+    Lenient      # Degraded allowed, each degraded block recorded
 
     def worst_allowed : MPSH::Outcome
       case self
@@ -39,8 +40,8 @@ module Liaison::Capability
   # annotation, and the worst outcome seen. Synthesized content itself exists
   # only in the outgoing request.
   #
-  # `Client` does not copy annotations onto the session; a caller keeping an
-  # audit trail calls `Session#annotate`.
+  # Only content losses outlive the call, through `annotate`. Compensations,
+  # sequence adaptations and request options describe this request alone.
   class Report
     getter provider : String
     getter policy : Policy
@@ -64,6 +65,24 @@ module Liaison::Capability
     # `Degraded` fallback under the default policy.
     property? streamed : Bool = false
 
+    # Adds this call's content losses to `session`'s annotations, each once.
+    #
+    # A content loss is a `Degraded` outcome on a block of the history, so it
+    # carries a `message_index`. One is identified by outcome, provider,
+    # message index and block kind; `session` keeps as many of each as the
+    # largest single report has held, which counts two degraded blocks of one
+    # message as two. Re-sending the same history adds nothing; another
+    # provider losing the same block adds its own. `Client#send` calls this
+    # after each exchange that returns.
+    def annotate(session : MPSH::Session) : Nil
+      losses = @annotations.select { |note| note.outcome.degraded? && note.message_index }
+
+      losses.group_by { |note| identity(note) }.each do |key, notes|
+        held = session.annotations.count { |note| identity(note) == key }
+        notes.skip(held).each { |note| session.annotate(note) }
+      end
+    end
+
     # Records an outcome: raises `RefusedError` if the policy does not permit
     # it, and annotates it if lossy or synthesized. Every mapper reports every
     # outcome here.
@@ -79,6 +98,10 @@ module Liaison::Capability
         @annotations << MPSH::Annotation.new(outcome, provider, detail, message_index, block_kind)
       end
       outcome
+    end
+
+    private def identity(note : MPSH::Annotation)
+      {note.outcome, note.provider, note.message_index, note.block_kind}
     end
   end
 end

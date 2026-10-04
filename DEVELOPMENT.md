@@ -543,8 +543,21 @@ converts, which is how the two quietly disagreed for three implementations.
 Annotations are a category borrowed from `docs/PSR_BRANCHING_AND_SCATTER_GATHER.md`,
 which is otherwise deferred: never on the linearization path, never sent to a
 provider, and archived with a session that holds them. Each call's annotations
-arrive in its `Report`; `Client` does not copy them onto the session, so a
-caller keeping an audit trail calls `Session#annotate` (see `SCOPE.md`).
+arrive in its `Report`, and `Client#send` copies the content losses among them
+onto the session it was handed, through `Report#annotate`.
+
+**The session holds a register, not a log.** `Client` re-maps the whole history
+on every send, so a block degraded once is degraded again on every later turn to
+the same provider; copying every report would fill the session with the same
+loss once per turn. So only `Degraded` outcomes carrying a `message_index` are
+copied, each identified by outcome, provider, message index and block kind, and
+the session keeps as many of each as the largest single report held. Counting
+rather than testing presence matters: blocks nested in a tool result share their
+message's index, and two degraded images there must stay two. Compensations,
+sequence adaptations and request options stay in the `Report`, since they
+describe one request rather than the history. `message_index` is a sound key
+because nothing in this shard edits a session's history, only appends to it; a
+caller who rewrites history takes on renumbering the annotations with it.
 
 **Annotations record loss the caller did not ask for.** Requested trimming — for
 instance `ReasoningRetention` — is counted, not annotated. Mixing the two makes
@@ -859,11 +872,12 @@ Seven things learned the hard way:
   same treatment, and the symptom is a miss reported as *matched method and URL,
   body differed*.
 - **Wiretap never opens a socket**, on record or replay, so no transcript can
-  show what a call leaves on the connection. `spec/streaming/connection_spec.cr`
-  serves a loopback `HTTP::Server` outside `Wiretap.intercept` instead. It
-  needs no transcript and no network, so it runs anywhere. Reach for the same
-  arrangement when the behaviour under test is the connection's, not the
-  wire's.
+  show what a call leaves on the connection. `spec/support/loopback.cr` serves
+  a local `HTTP::Server` outside `Wiretap.intercept` instead. It needs no
+  transcript and no network, so it runs anywhere. Reach for it when the
+  behaviour under test is the connection's, or `Client`'s around a reply,
+  rather than the wire's; serve a body from a committed transcript
+  (`Loopback.recorded_body`) so the reply is still recorded, not written.
 
 Always cap output on a live request: an uncapped local model can stall a run
 for minutes, reasoning without reaching an answer.

@@ -411,9 +411,11 @@ Policy          |Behavior
 ----------------|------------------------------------------------------------------------------------------
 **Strict**      |Refuse on anything below Restructured. Suited to agents where silent loss corrupts results
 **Compensating**|Allow Compensated; refuse Degraded                                                        
-**Lenient**     |Allow Degraded, recording each occurrence                                                 
+**Lenient**     |Allow Degraded, recording each degraded block                                             
 
 Degradation events are recorded as **annotations** — the same off-path metadata category defined for rankings in the branching document. They are not conversation content, must never enter the linearization path, and exist so that a session's fidelity history is auditable after the fact.
+
+A session's annotations are a **register of content losses**, not a log of sends. An entry records that a block of the history reached a provider in degraded form, identified by `(outcome, provider, message_index, block_kind)`, and is recorded once however often that history is sent there again. Another provider losing the same block is a second entry. Outcomes that describe one request rather than the history — compensations, adaptations of the message sequence, and request options such as reasoning controls — are reported per call and not stored with the session.
 
 ---
 
