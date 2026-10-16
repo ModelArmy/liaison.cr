@@ -128,6 +128,15 @@ suggested a minimum spend is enforced, only a minimum offer. See
 `effort` is deliberately not inside `thinking`: it shapes the whole response,
 tool calls included, and works whether or not thinking is enabled.
 
+**Turning thinking off is model-dependent too.** `Reasoning::Off` is spelled
+`thinking: {type: disabled}`, and models whose thinking is always on reject it:
+`claude-opus-5-5`, `claude-fable-5` and `claude-fable-5-1` each answered with a
+400 (`spec/live/anthropic_spec.cr`, catalog probes); Opus named adaptive
+thinking and `effort` as the alternative.
+`CANNOT_DISABLE_THINKING` lists such models, and the mapper sends the lowest
+rung in place of `disabled`, recorded as `Degraded`, as Gemini's list of the
+same name does for `gemini-3.1-pro-preview`.
+
 One consequence worth knowing before prompt caching arrives: **changing either
 control between turns invalidates cached prefixes**, because the value is
 rendered into the prompt.

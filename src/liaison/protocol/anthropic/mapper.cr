@@ -50,7 +50,7 @@ module Liaison::Protocol::Anthropic
       # `options.max_output_tokens` wins; the positional `max_tokens` is the
       # fallback this protocol requires.
       cap = options.max_output_tokens || max_tokens
-      budget, effort, disabled = reasoning(options, cap, report)
+      budget, effort, disabled = reasoning(options, model, cap, report)
 
       {Wire::Request.new(model, messages, cap,
         session.system_prompt, declarations(options),
@@ -60,13 +60,25 @@ module Liaison::Protocol::Anthropic
 
     # The thinking budget, the effort rung, and whether thinking is off. At
     # most one is set, since the unit was resolved before mapping.
-    private def reasoning(options : Options, cap : Int32,
+    private def reasoning(options : Options, model : String, cap : Int32,
                           report : Capability::Report) : {Int32?, String?, Bool}
       request = options.reasoning
       return {nil, nil, false} unless request
 
       unit = profile.reasoning_unit
       rendering, outcome = Capability::ReasoningControl.resolve(request, unit)
+
+      # These models reject `thinking: disabled`, so the lowest rung is sent
+      # instead and recorded as `Degraded`: the caller asked for no thinking
+      # and gets some.
+      if rendering.disable? && CANNOT_DISABLE_THINKING.includes?(model.downcase)
+        report.record(MPSH::Outcome::Degraded,
+          "reasoning control: reasoning off not supported on #{model}, sent as the lowest rung instead")
+        lowest = Reasoning::Effort::Low
+        return {clamped_budget(lowest, cap, report), nil, false} if unit.budget?
+        return {nil, lowest.wire_name, false}
+      end
+
       report.record(outcome, Capability::ReasoningControl.detail(request, rendering, unit))
 
       case rendering

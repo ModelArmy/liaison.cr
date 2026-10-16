@@ -19,9 +19,41 @@ require "../spec_helper"
 # out to need a different model.
 private MODEL = "claude-haiku-4-5"
 
-# The one model whose documentation lists thinking as always on, appearing
-# only in the catalog probe below.
-private MODEL_OPUS = "claude-opus-5-5"
+# Models whose documentation lists thinking as always on, appearing only in
+# the catalog probes below.
+private MODEL_OPUS    = "claude-opus-5-5"
+private MODEL_FABLE   = "claude-fable-5"
+private MODEL_FABLE_1 = "claude-fable-5-1"
+
+# What `Client` sends a model the catalog does not list, addressed to `model`.
+#
+# Mapped under a model name no list holds, then readdressed, so the entry a
+# probe argues for, once added, leaves its transcript matching: mapping under
+# the real name would send the substitute the entry exists to make.
+private def unlisted_body(session : M::Session, model : String, options : Liaison::Options) : String
+  adapter = Liaison::AnthropicAdapter.new
+  request, _ = P::Anthropic::Mapper.new(adapter.narrowed("unlisted"))
+    .map(session, "unlisted", max_tokens: 256, options: options)
+  body = request.to_json
+  raise "model field not found" unless body.includes?(%("model":"unlisted"))
+  body.sub(%("model":"unlisted"), %("model":"#{model}"))
+end
+
+# Sends `Reasoning::Off` to `model` as an unlisted model would, expecting a
+# rejection, and returns it.
+private def thinking_off_rejected(model : String) : Liaison::TransportError
+  session = M::Session.new("Answer in one short sentence.")
+  session << M::Message.user("What is 12 times 14?")
+  body = unlisted_body(session, model,
+    Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new))
+  JSON.parse(body)["thinking"]["type"].should eq "disabled"
+
+  adapter = Liaison::AnthropicAdapter.new
+  expect_raises(Liaison::TransportError) do
+    anthropic.post(adapter.path(model), adapter.headers(anthropic.credential), body,
+      ->adapter.error_detail(String))
+  end
+end
 
 private def anthropic : Liaison::Server
   Liaison::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
@@ -122,31 +154,29 @@ describe "Anthropic" do
     end
   end
 
-  # Catalog probe: whether Opus 5.5 needs a "cannot disable thinking" entry,
-  # as `gemini-3.1-pro-preview` did on Gemini. Anthropic lists its thinking as
-  # adaptive and always on, so `Reasoning::Off`, sent as `thinking: disabled`,
-  # is predicted to be a 400. Asserted as predicted; a recording that
-  # disagrees goes red, and is the answer either way.
-  #
-  # Mapped as `Client` maps it today, then posted directly, so the rejection
-  # is recorded rather than raised from inside `send`.
-  describe "catalog probe" do
+  # Catalog probes: whether a model needs a `CANNOT_DISABLE_THINKING` entry.
+  # Each sends `Reasoning::Off`, spelled `thinking: disabled`, as an unlisted
+  # model gets it. All three rejected it and are on the list.
+  describe "catalog probes" do
     it "claude-opus-5-5 rejects thinking disabled" do
       Wiretap.intercept("anthropic_catalog_reasoning_off_opus55") do
-        session = M::Session.new("Answer in one short sentence.")
-        session << M::Message.user("What is 12 times 14?")
+        error = thinking_off_rejected(MODEL_OPUS)
+        error.status.should eq 400
+        error.message.to_s.should match /thinking/i
+      end
+    end
 
-        adapter = Liaison::AnthropicAdapter.new
-        request, _ = P::Anthropic::Mapper.new(adapter.narrowed(MODEL_OPUS))
-          .map(session, MODEL_OPUS, max_tokens: 256,
-            options: Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new))
-        body = request.to_json
-        JSON.parse(body)["thinking"]["type"].should eq "disabled"
+    it "claude-fable-5 rejects thinking disabled" do
+      Wiretap.intercept("anthropic_catalog_reasoning_off_fable5") do
+        error = thinking_off_rejected(MODEL_FABLE)
+        error.status.should eq 400
+        error.message.to_s.should match /thinking/i
+      end
+    end
 
-        error = expect_raises(Liaison::TransportError) do
-          anthropic.post(adapter.path(MODEL_OPUS), adapter.headers(anthropic.credential), body,
-            ->adapter.error_detail(String))
-        end
+    it "claude-fable-5-1 rejects thinking disabled" do
+      Wiretap.intercept("anthropic_catalog_reasoning_off_fable51") do
+        error = thinking_off_rejected(MODEL_FABLE_1)
         error.status.should eq 400
         error.message.to_s.should match /thinking/i
       end

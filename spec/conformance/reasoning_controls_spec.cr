@@ -285,6 +285,46 @@ describe "reasoning controls" do
     end
   end
 
+  # Models whose thinking is always on reject a request to turn it off, so each
+  # protocol's `CANNOT_DISABLE_THINKING` sends the lowest rung instead. The
+  # caller asked for none and gets some, which is a loss, so the default policy
+  # refuses it.
+  describe "off, on a model that cannot turn thinking off" do
+    off = Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new)
+
+    it "sends the lowest rung on Anthropic, recorded as Degraded" do
+      %w(claude-opus-5-5 claude-fable-5 claude-fable-5-1).each do |model|
+        request = body(Liaison::ProtocolKind::Anthropic, off, model)
+        request["thinking"]?.should be_nil
+        request["output_config"]["effort"].as_s.should eq "low"
+
+        control_loss(exchange(Liaison::ProtocolKind::Anthropic, off, model))
+          .should eq M::Outcome::Degraded
+      end
+    end
+
+    it "sends the lowest rung on Gemini, recorded as Degraded" do
+      request = body(Liaison::ProtocolKind::Gemini, off, "gemini-3.1-pro-preview")
+      config = request["generationConfig"]["thinkingConfig"]
+      config["thinkingBudget"]?.should be_nil
+      config["thinkingLevel"].as_s.should eq "LOW"
+
+      control_loss(exchange(Liaison::ProtocolKind::Gemini, off, "gemini-3.1-pro-preview"))
+        .should eq M::Outcome::Degraded
+    end
+
+    it "is refused under the default policy" do
+      expect_raises(C::RefusedError) do
+        exchange(Liaison::ProtocolKind::Anthropic, off, "claude-opus-5-5", C::Policy::Compensating)
+      end
+    end
+
+    it "leaves other models of the same generation disabling it" do
+      body(Liaison::ProtocolKind::Anthropic, off, "claude-haiku-5-5")["thinking"]["type"].as_s
+        .should eq "disabled"
+    end
+  end
+
   # The catalog resolves `Either`, and may only ever resolve it — an entry
   # cannot add a capability or overturn a refusal, which is the test any model
   # catalog has to pass to belong here.

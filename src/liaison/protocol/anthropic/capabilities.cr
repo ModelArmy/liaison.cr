@@ -16,6 +16,17 @@ module Liaison::Protocol::Anthropic
   # The API rejects a smaller budget outright.
   MIN_THINKING_BUDGET = 1024
 
+  # Models that reject `thinking: {type: "disabled"}` (`"thinking.type.disabled"
+  # is not supported for this model`, recorded in `spec/live/anthropic_spec.cr`),
+  # their thinking being always on. `Reasoning::Off` becomes the lowest rung,
+  # recorded as `Degraded`. Exact names, added only on a live rejection, as
+  # Gemini's list of the same name.
+  CANNOT_DISABLE_THINKING = Set{
+    "claude-opus-5-5",
+    "claude-fable-5",
+    "claude-fable-5-1",
+  }
+
   # A named rung rendered as a token budget, for deployments that take only a
   # budget. `Restructured` rather than `Degraded`: Anthropic presents these
   # rungs itself, and the figures follow its budget guidance (start near the

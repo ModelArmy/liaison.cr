@@ -163,14 +163,19 @@ Gemini rejects the orphan or the model is merely confused is unrecorded.
 Likely fix: degrade the result with its call, rendering both as text, as a
 server-executed call is elsewhere. Predicted by reading; no spec covers it.
 
-### `SIGNED_TOOL_CALLS` lags its own criterion
+### Fable's reasoning is model-bound, and replays as if it were not
 
-The set admits Gemini 3 spellings this repository has used or seen named by the
-API. `gemini-3.8-flash` is used in `spec/live/gemini_spec.cr` (`MODEL_CURRENT`)
-and is not listed, so a foreign tool call sent to it maps `Exact` and draws the
-400. Its replays pass only because every call they send was minted by the model
-itself. Where: `src/liaison/capability/catalog.cr`. Fix: add the spelling, once
-a recording shows the 400 on that model.
+Anthropic documents that thinking blocks from `claude-fable-5` and
+`claude-mythos-5` are tied to the model that produced them, and that other
+Claude models silently ignore them. `Resolver#own?` keys on the vendor
+(`metadata_key` is `anthropic` for every Claude model), so a Fable session
+continued on Opus or Haiku maps that reasoning `Exact`, and the model drops it
+unannounced: the silent loss the capability model exists to report. Read from
+documentation, not yet recorded. Where: `Resolver#own?` and
+`Capability::Catalog`. Fix: decide whether the producing model belongs in the
+reasoning block's provenance, which is a question about MPSH, not only this
+protocol; then a probe, though "silently ignored" may show only as a reply
+that does not use the earlier reasoning.
 
 ### `MalformedResponseError` is defined twice
 
@@ -286,6 +291,14 @@ default. Still open, and the reason this stays in WILL FIX:
   model-gated in practice.
 - Per-model *rung* support, if a rejection ever demands it. A second axis on
   the same entry, not a second mechanism.
+- **"Cannot turn thinking off" is a model fact held in two protocol lists.**
+  `CANNOT_DISABLE_THINKING` exists on Gemini (`gemini-3.1-pro-preview`) and on
+  Anthropic (`claude-opus-5-5`), each with its mapper substituting the lowest
+  rung. The fact belongs to the model; only the substitute's spelling belongs
+  to the protocol. The move is a `Catalog` axis narrowing a `Profile` field,
+  with `ReasoningControl.resolve` turning `Off` into the lowest rung for every
+  protocol. Kept as two lists until a third model or protocol needs one, since
+  the move touches working Gemini code for one shared line of logic.
 
 ### A localizable content synthesizer
 

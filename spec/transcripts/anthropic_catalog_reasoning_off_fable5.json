@@ -1,0 +1,46 @@
+{
+  "name": "anthropic_catalog_reasoning_off_fable5",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Content-Length": "202",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-fable-5\",\"max_tokens\":256,\"system\":\"Answer in one short sentence.\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"What is 12 times 14?\"}]}],\"thinking\":{\"type\":\"disabled\"}}",
+        "body_digest": "67d555b9c1addf100bc8c74eccc8177cf19e5eb1d63e4782eee2f257fbfba45c"
+      },
+      "response": {
+        "status": 400,
+        "headers": {
+          "Date": "Fri, 16 Oct 2026 03:37:19 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "x-should-retry": "false",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "request-id": "req_011Cg5Db3DQgsdpCDwaQ8RaU",
+          "traceresponse": "00-5957b0851b5454d3502f4c9275925e43-e1191780f3e5f170-01",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "vary": "Accept-Encoding",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "Server": "cloudflare",
+          "cf-cache-status": "DYNAMIC",
+          "X-Robots-Tag": "none",
+          "CF-RAY": "a4b40636ae27c03e-YUL"
+        },
+        "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"\\\"thinking.type.disabled\\\" is not supported for this model. Use \\\"thinking.type.adaptive\\\" and \\\"output_config.effort\\\" to control thinking behavior.\"},\"request_id\":\"req_011Cg5Db3DQgsdpCDwaQ8RaU\"}"
+      },
+      "recorded_at": "2026-10-16T03:37:19Z"
+    }
+  ]
+}
