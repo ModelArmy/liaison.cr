@@ -19,6 +19,10 @@ require "../spec_helper"
 # out to need a different model.
 private MODEL = "claude-haiku-4-5"
 
+# The one model whose documentation lists thinking as always on, appearing
+# only in the catalog probe below.
+private MODEL_OPUS = "claude-opus-5-5"
+
 private def anthropic : Liaison::Server
   Liaison::Server.new("anthropic", "https://api.anthropic.com", ENV["ANTHROPIC_API_KEY"]?)
 end
@@ -114,6 +118,37 @@ describe "Anthropic" do
             ->adapter.error_detail(String))
         end
         error.status.should eq 400
+      end
+    end
+  end
+
+  # Catalog probe: whether Opus 5.5 needs a "cannot disable thinking" entry,
+  # as `gemini-3.1-pro-preview` did on Gemini. Anthropic lists its thinking as
+  # adaptive and always on, so `Reasoning::Off`, sent as `thinking: disabled`,
+  # is predicted to be a 400. Asserted as predicted; a recording that
+  # disagrees goes red, and is the answer either way.
+  #
+  # Mapped as `Client` maps it today, then posted directly, so the rejection
+  # is recorded rather than raised from inside `send`.
+  describe "catalog probe" do
+    it "claude-opus-5-5 rejects thinking disabled" do
+      Wiretap.intercept("anthropic_catalog_reasoning_off_opus55") do
+        session = M::Session.new("Answer in one short sentence.")
+        session << M::Message.user("What is 12 times 14?")
+
+        adapter = Liaison::AnthropicAdapter.new
+        request, _ = P::Anthropic::Mapper.new(adapter.narrowed(MODEL_OPUS))
+          .map(session, MODEL_OPUS, max_tokens: 256,
+            options: Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new))
+        body = request.to_json
+        JSON.parse(body)["thinking"]["type"].should eq "disabled"
+
+        error = expect_raises(Liaison::TransportError) do
+          anthropic.post(adapter.path(MODEL_OPUS), adapter.headers(anthropic.credential), body,
+            ->adapter.error_detail(String))
+        end
+        error.status.should eq 400
+        error.message.to_s.should match /thinking/i
       end
     end
   end
