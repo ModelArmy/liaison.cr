@@ -157,6 +157,15 @@ describe "Gemini round trip" do
       unsigned.tool_call_signature_required?.should be_false
     end
 
+    # The two the catalog probes in `spec/live/gemini_spec.cr` found rejecting
+    # an unsigned call.
+    it "requires a signature on Gemini 3.8 Flash and Gemini 4 Argon" do
+      %w(gemini-3.8-flash gemini-4-argon).each do |model|
+        Liaison::Capability::Catalog.narrow(Liaison::Protocol::Gemini::PROFILE, model)
+          .tool_call_signature_required?.should be_true
+      end
+    end
+
     it "degrades a tool call carrying no signature of this vendor's" do
       session = Liaison::Fixtures.tool_call_text_result
       mapper = Liaison::Protocol::Gemini::Mapper.new(signed)

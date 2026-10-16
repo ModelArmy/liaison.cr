@@ -69,6 +69,12 @@ an active 400: `Budget 0 is invalid. This model only works in thinking mode.`
 Not a silent no-op either way — the first run of the Pro test found this the
 hard way.
 
+`gemini-4-argon` sides with Flash, against its own documentation. Google says
+thinking cannot be turned off on it and that any `thinkingBudget` is a 400;
+recorded, a budget of 0 was accepted and no thinking reported. It is
+therefore not on the list below. If Google starts enforcing what it
+documents, the recorded probe is what goes red on re-recording.
+
 `Capabilities::CANNOT_DISABLE_THINKING` is a closed, explicit list of models
 confirmed to reject a zero budget outright, checked before a request is built
 rather than after it fails. A model on the list gets its `Off` request
@@ -185,6 +191,12 @@ strictly on replay: omitting it is a 400
 confirmed against a real endpoint (`spec/live/gemini_spec.cr`), not merely
 documented. Optional on the 2.5 series, which is why the model chosen for a
 tool-call test matters here in a way it doesn't on the other three protocols.
+
+The check covers only the *current turn*, which begins at the latest user
+message carrying text. An unsigned call followed by its result and a fresh
+question is outside it and accepted; the same call with nothing after its
+result is the 400. A probe for a new model has to end at the result, or it
+proves nothing (`spec/live/gemini_spec.cr`, catalog probes).
 
 Captured and replayed the same way a `ThoughtPart`'s signature is —
 `provider_metadata`, same key — so `export.cr` and `mapper.cr` round-trip it

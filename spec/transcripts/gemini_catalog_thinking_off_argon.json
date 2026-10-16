@@ -1,0 +1,40 @@
+{
+  "name": "gemini_catalog_thinking_off_argon",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-4-argon:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Content-Length": "249",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in one short sentence.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is 12 times 14?\"}]}],\"generationConfig\":{\"maxOutputTokens\":256,\"thinkingConfig\":{\"thinkingBudget\":0,\"includeThoughts\":true}}}",
+        "body_digest": "c266def418fd5999fc879c9bf7f60c016eb51e27876de25d670a7ac68bc37ac0"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Fri, 16 Oct 2026 03:09:06 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=3896",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"12 times 14 is 168.\",\n            \"thoughtSignature\": \"ElkKVwFpFH0TPQ3sQj/a/wL+E3/NJcMDFJU3jXl1CZD32z00vgrhO8cYKlzsjzHxQOD0MK7vrtmGDE22Nfn1j3Hw7vWaK6WaL6ulcX+VTX0Lj9B6VK/fkVmfRg==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 52,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 68,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 52\n      }\n    ],\n    \"candidatesTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 16\n      }\n    ]\n  },\n  \"modelVersion\": \"gemini-4-argon\",\n  \"responseId\": \"TpXRasDvH6aajMcPr7qWiAM\"\n}\n"
+      },
+      "recorded_at": "2026-10-16T03:09:06Z"
+    }
+  ]
+}

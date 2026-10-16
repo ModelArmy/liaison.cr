@@ -61,6 +61,10 @@ module Liaison::Capability
       # retired 2.5 models.
       "gemini-3.5-flash-lite",
       "gemini-3.6-flash",
+      # Confirmed by live 400s in this repository: an unsigned call in the
+      # current turn, the one place Google enforces the signature.
+      "gemini-3.8-flash",
+      "gemini-4-argon",
     }
 
     # The unit this model needs, or `nil` where the catalog has no opinion,

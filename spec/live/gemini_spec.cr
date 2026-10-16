@@ -39,6 +39,9 @@ private MODEL_PRO = "gemini-3.1-pro-preview"
 # and this ID is the one thing here taken from documentation rather than from
 # a response this key actually received.
 private MODEL_CURRENT = "gemini-3.8-flash"
+# The first Gemini 4 model, appearing only in the catalog probes below. Taken
+# from documentation as well; confirm it the same way.
+private MODEL_ARGON = "gemini-4-argon"
 
 private def gemini : Liaison::Server
   Liaison::Server.new("gemini", "https://generativelanguage.googleapis.com", ENV["GEMINI_API_KEY"]?)
@@ -55,6 +58,60 @@ end
 
 private def armed : Liaison::Options
   Liaison::Options.new(tools: [weather_tool], max_output_tokens: 512)
+end
+
+# What `Client` sends a model the catalog does not list.
+#
+# Every model starts here until a recorded rejection earns it an entry, and
+# the probes below record that rejection. Mapped under the protocol's own
+# profile with a model name no list holds, then posted directly, so the entry a
+# probe argues for, once added, leaves its transcript matching. A Gemini body
+# carries no model name; the model goes only in the path.
+private def unlisted_body(session : M::Session, options : Liaison::Options) : String
+  profile = P::Gemini::PROFILE.with_reasoning_unit(C::ReasoningUnit::Effort)
+  request, _ = P::Gemini::Mapper.new(profile).map(session, "unlisted", options: options)
+  request.to_json
+end
+
+# A Paris weather call made on Anthropic and its result, ending there: a tool
+# call no Gemini model signed, inside the current turn.
+#
+# Google validates signatures only in the current turn, which begins at the
+# latest user message carrying text. A follow-up question after the result
+# would start a new turn and put the call out of reach of the check: a session
+# ending that way was accepted unsigned by both models probed below.
+private def foreign_call_turn : M::Session
+  session = tool_question
+  call = M::ToolCallBlock.new("call_ext_1", "get_weather",
+    M::Object{"city" => "Paris".as(M::Value)})
+  call.put_meta("anthropic", "id", "toolu_01ABCDEF")
+  session << M::Message.new(M::Role::Assistant, [call.as(M::Block)])
+  session << M::Message.new(M::Role::User, [
+    M::ToolResultBlock.new("call_ext_1",
+      [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block),
+  ])
+  session
+end
+
+# Whether the body's one `functionCall` part went out without a signature,
+# checked before sending: a signed call would be a valid, billed request
+# proving nothing.
+private def unsigned_call?(body : String) : Bool
+  parts = JSON.parse(body)["contents"].as_a.flat_map(&.["parts"].as_a)
+  calls = parts.select(&.["functionCall"]?)
+  calls.size == 1 && calls.first["thoughtSignature"]?.nil?
+end
+
+# Posts `body` to `model` and returns the response body.
+private def posted(model : String, body : String) : String
+  adapter = Liaison::GeminiAdapter.new
+  gemini.post(adapter.path(model), adapter.headers(gemini.credential), body,
+    ->adapter.error_detail(String))
+end
+
+# Posts `body` to `model`, expecting a rejection, and returns it.
+private def rejected(model : String, body : String) : Liaison::TransportError
+  expect_raises(Liaison::TransportError) { posted(model, body) }
 end
 
 private def tool_question : M::Session
@@ -213,6 +270,53 @@ describe "Gemini" do
         # And the request was still accepted, which is the whole point: the
         # 400 this replaces was not recoverable, a degradation is.
         reply.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+  end
+
+  # Catalog probes: whether each newer model needs an entry. Each sends the
+  # request an unlisted model gets, so its transcript still matches once the
+  # entry exists. Both models rejected the unsigned call, and are now in
+  # `Catalog::SIGNED_TOOL_CALLS`.
+  describe "catalog probes" do
+    it "gemini-3.8-flash rejects an unsigned tool call in the current turn" do
+      Wiretap.intercept("gemini_catalog_current_turn_call_38") do
+        body = unlisted_body(foreign_call_turn, armed)
+        unsigned_call?(body).should be_true
+
+        error = rejected(MODEL_CURRENT, body)
+        error.status.should eq 400
+        error.message.to_s.should match /thought_signature/
+      end
+    end
+
+    it "gemini-4-argon rejects an unsigned tool call in the current turn" do
+      Wiretap.intercept("gemini_catalog_current_turn_call_argon") do
+        body = unlisted_body(foreign_call_turn, armed)
+        unsigned_call?(body).should be_true
+
+        error = rejected(MODEL_ARGON, body)
+        error.status.should eq 400
+        error.message.to_s.should match /thought_signature/
+      end
+    end
+
+    # Google documents that thinking cannot be turned off on this model and
+    # that any `thinkingBudget` is a 400. Recorded otherwise: the budget was
+    # accepted and no thinking reported, so `Reasoning::Off` is honoured and
+    # Argon needs no `CANNOT_DISABLE_THINKING` entry. Asserted as observed; a
+    # re-recording after Google enforces its documentation goes red.
+    it "gemini-4-argon turns thinking off with a budget of zero" do
+      Wiretap.intercept("gemini_catalog_thinking_off_argon") do
+        session = M::Session.new("Answer in one short sentence.")
+        session << M::Message.user("What is 12 times 14?")
+        body = unlisted_body(session,
+          Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new, max_output_tokens: 256))
+        JSON.parse(body)["generationConfig"]["thinkingConfig"]["thinkingBudget"].should eq 0
+
+        # Absent and zero are the same here: Gemini omits zero-valued fields.
+        usage = JSON.parse(posted(MODEL_ARGON, body))["usageMetadata"]
+        (usage["thoughtsTokenCount"]?.try(&.as_i64?) || 0_i64).should eq 0_i64
       end
     end
   end
