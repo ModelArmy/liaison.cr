@@ -96,6 +96,24 @@ against — same shape as `reasoning_unit`'s existing override, and the same
 justification. Detail in `docs/servers/AZURE.md` and
 `docs/protocols/CHAT_COMPLETIONS.md`'s own *Live finding* sections.
 
+**The October 2026 models are catalogued, each entry earned by a recording.**
+Haiku and Sonnet 5.5 need nothing: their defaults are right. Opus 5.5, Fable 5
+and Fable 5.1 reject `thinking: disabled`, so Anthropic gained a
+`CANNOT_DISABLE_THINKING` list like Gemini's, and `Reasoning::Off` sends the
+lowest rung there, recorded as `Degraded`. Gemini 3.8 Flash and Gemini 4 Argon
+reject an unsigned tool call and joined `Catalog::SIGNED_TOOL_CALLS`. Argon
+honours `thinkingBudget: 0`, against Google's documentation, so it is on no
+list. Two lessons from the probes, both written up where they apply:
+
+- **Probe what an unlisted model gets.** Each probe maps under a model name no
+  list holds and posts directly, readdressing the body where the model name is
+  in it. Mapped under the real name, the entry the probe argues for would
+  change the request and break its own replay.
+- **Gemini checks signatures only in the current turn**, which starts at the
+  latest user message with text. The first probes put a follow-up question
+  after the tool result, and both models accepted the unsigned call;
+  `docs/protocols/GEMINI.md` has the rule.
+
 **Carrier deferral is now extracted**, ahead of a fifth protocol as its own
 entry asked. The rule — buffer lifted content, flush before anything that is
 not a tool result, recognise the carrier again on the way back — lived in three
@@ -187,6 +205,25 @@ All three `MUST FIX` items among them are now done:
 First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
 object**, replacing the real failure with an unrelated exception. Loud, and no
 dearer to fix later.
+
+**Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
+catalogue, since Azure deployment names carry no model identity, but one claim
+to settle: a third-party report says the GPT-5.6 family rejects function tools
+together with `reasoning_effort` on Chat Completions, and another says GPT-6
+accepts them. Neither is Microsoft's documentation. A probe sending both to a
+deployment of each settles whether `docs/servers/AZURE.md` needs a note to use
+Responses for that combination. Held until the account's keys and endpoint
+are sorted.
+
+Two `WILL FIX` items came out of the model round. *Fable's reasoning is
+model-bound, and replays as if it were not* is the one with reach: `own?` keys
+on the vendor, so reasoning a Fable model produced replays `Exact` to another
+Claude model, which drops it unannounced. Whether the producing model belongs
+in a reasoning block's provenance is a format question, not a protocol one.
+The other is the shape option B would take — `CANNOT_DISABLE_THINKING` as one
+`Catalog` axis rather than two protocol lists — logged under *A model catalog,
+keyed independently of protocol*, to do when a third model or protocol needs
+it.
 
 **Tool execution's library half is built, and the library half is all this
 shard owes.** What an application declares and what it runs is its question, not
