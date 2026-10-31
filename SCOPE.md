@@ -127,30 +127,70 @@ check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
 redirect goes red rather than relabelling evidence. Found in
 `gemini_foreign_tool_call_35`'s re-recording.
 
-### Effort without thinking on Opus 4.6–4.8 and Sonnet 4.6
+### Effort without thinking on Opus 4.5–4.8 and Sonnet 4.6
 
-Anthropic documents that on `claude-opus-4-6`, `-4-7`, `-4-8` and
-`claude-sonnet-4-6` thinking is off until the request sets `thinking: {type:
-adaptive}`; `output_config.effort` alone does not enable it. The mapper sends
-effort alone for any effort-unit model, so `Reasoning::Effort` on those models
-asks for effort without thinking and reports no loss. Read from documentation;
-recorded only for Fable, where thinking is on regardless. Where:
-`anthropic/mapper.cr`'s `reasoning`, and `Catalog`. Likely fix: a list of
-models needing `adaptive` declared, as the other per-model lists are; a probe
-on one of them confirms the gap first. Opus 4.5, which takes both units, is
-not in Anthropic's list and is left alone.
+Anthropic's per-model table (*Thinking*, platform docs): with no `thinking`
+field, thinking is adaptive on every Claude 5 model and Mythos Preview, and
+off on Opus 4.5–4.8 and Sonnet 4.6. The mapper sends `output_config.effort`
+alone for any effort-unit model, so `Reasoning::Effort` there asks for effort
+without thinking and reports no loss. Two remedies, by model: Opus 4.6–4.8 and
+Sonnet 4.6 accept `thinking: {type: adaptive}`; Opus 4.5 rejects it with a 400
+and thinks only on `type: enabled` with a budget, beside which it also takes
+effort. Recorded only for Fable, where thinking is on regardless. Where:
+`anthropic/mapper.cr`'s `reasoning`, and `Catalog`. Designed with the next
+entry, since both set the same field.
 
-### Withheld thinking crosses vendors as empty reasoning
+### Liaison does not ask for withheld thinking text
 
-On Fable 5, Mythos 5, Opus 4.7 and 4.8, `thinking.display` defaults to
-`omitted`, so the Anthropic exporter records reasoning with empty text and a
-signature. On Anthropic it replays intact. Handed to another vendor, the
-signature is shed and nothing is left: the block reaches Gemini or the OpenAI
-protocols as empty reasoning text, `Restructured`, where `display: summarized`
-would have carried a summary for the same price. Where: `anthropic/mapper.cr`
-and `Options`. Fix: decide whether liaison requests `summarized` by default,
-on the grounds that portability is the shard's point, or leaves it to an
-option; and whether empty reasoning text should be dropped rather than sent.
+Decided: by `DEVELOPMENT.md`'s *capture as much as each API will return*,
+liaison asks for reasoning text where an API withholds it by default, and a
+caller may decline. On Anthropic, `thinking.display` defaults to `omitted` on
+every Claude 5 model, Opus 4.7 and 4.8 and Mythos Preview: the block arrives
+with empty text and a signature, which replays on Anthropic and carries
+nothing to another vendor. `display: summarized` returns a summary at the same
+price; the cost is latency to the first streamed token. `display` rides on
+`thinking.type` `adaptive` or `enabled`, so on models that think by default it
+means sending a `thinking` field where none is sent today. Open: the `Options`
+control's name and shape, which Gemini and Responses should share, and whether
+empty reasoning text should be dropped rather than sent across vendors.
+
+### Gemini may withhold thoughts when no reasoning option is set
+
+Predicted by reading. `includeThoughts` is sent only with a budget or level.
+Gemini 3 models think by default, so a request with no reasoning option may
+think, bill for it, and return neither thought text nor the signature a later
+turn needs. Where: `gemini/wire/request.cr`. Confirm with one call per case.
+
+### Responses may never ask for reasoning summaries
+
+Predicted by reading. The mapper writes `summary` only on replayed reasoning
+items and sends no `reasoning.summary` request parameter, which OpenAI's
+reasoning models need before they return readable reasoning. Where:
+`responses/mapper.cr`. Confirm against current documentation, then with one
+call on Azure.
+
+### Model-bound reasoning is a read matrix, not a producer list
+
+Anthropic now documents which models read which models' thinking, and it is
+asymmetric: Fable 5.1 reads Opus 5 and 5.5, neither reads Fable; Sonnet 5.5's
+blocks are read only by Opus 5.5; Haiku 5.5's only by Opus and Sonnet 5.5. The
+API drops a block the target cannot read, without error or charge.
+`Catalog::MODEL_BOUND_REASONING` covers Fable and Mythos as producers only, so
+a Sonnet 5.5 session continued on Haiku 5.5 still reports `Exact`. Likely fix:
+a producer-to-readers table replacing the set, with `rebound?` asking whether
+the target is among the readers. The `thinking-binding-controls` beta reports
+dropped blocks in the response as `input_transformations`, which is evidence a
+provider supplies rather than one liaison predicts: relevant to *A provider can
+ignore an exactly-mapped option*.
+
+### Retention trimming may invalidate later thinking
+
+Predicted by reading. From Claude 5.1, a thinking block stays valid only while
+the system prompt, tools and every earlier message are unchanged; otherwise it
+and every later one fail a prefix check. `ReasoningRetention::CompletedTurns`
+removes reasoning from completed turns, which changes earlier messages between
+requests. Whether that trips the check, and what liaison's own structural
+adaptations do to it, is unrecorded. Where: `Capability::Retention`.
 
 ### `MalformedResponseError` is defined twice
 

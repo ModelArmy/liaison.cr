@@ -244,7 +244,14 @@ handoff probe replays Fable's thinking turn from a recording. Fable and the
 other newest models also withhold thinking text by default (`display:
 omitted`), so their reasoning crosses vendors empty. Both are in `SCOPE.md`.
 
-Next in `WILL FIX`: **effort without thinking on Opus 4.6–4.8 and Sonnet 4.6**.
+Decided: liaison captures as much as each API returns by default, reasoning
+text above all (`DEVELOPMENT.md`, *What this shard is for*). Anthropic's
+per-model thinking table widened the work: Opus 4.5 is affected too, model-bound
+reasoning is a read matrix, and Gemini and Responses may withhold reasoning as
+well. All in `SCOPE.md`.
+
+Next in `WILL FIX`: **effort without thinking on Opus 4.5–4.8 and Sonnet 4.6**
+and **liaison does not ask for withheld thinking text**, designed together.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

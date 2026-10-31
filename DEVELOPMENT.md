@@ -55,6 +55,26 @@ one provider can be exported and resumed with a different one.**
 Portability is not a feature among features. Any change that trades it for
 convenience is the wrong change, however much nicer the resulting API looks.
 
+**Capture as much as each API will return, by default.** A session can only be
+resumed with what was captured, and what an API leaves out of a reply cannot
+be asked for afterwards. Where a vendor's default withholds content, reasoning
+text above all, liaison asks for it, and a caller may decline it at the cost
+of fidelity when the session is continued. Three limits keep this honest:
+
+- **The most an API returns is not everything.** Reasoning comes back as a
+  summary at best; the full thinking lives in an encrypted payload only its
+  issuer can read. Across vendors the summary is all that travels.
+- **The price of declining is fidelity, not money.** Vendors bill withheld and
+  returned reasoning alike; what returning it costs is latency to the first
+  streamed token, and the size of what is stored.
+- **Capturing is not showing.** Whether reasoning is displayed belongs to the
+  application, as `ReasoningRetention` governs replay and not display. What a
+  capture default does change is what is stored, which a caller with privacy
+  constraints should know.
+
+Gemini's `includeThoughts` was the first application, before the rule was
+written down; `SCOPE.md` tracks where it is not yet met.
+
 ## Layering
 
 ```mermaid
