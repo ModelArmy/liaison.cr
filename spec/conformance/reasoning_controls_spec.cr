@@ -381,6 +381,27 @@ describe "reasoning controls" do
       end
     end
 
+    # Azure is where the override is most needed, so the guard matters most
+    # there: an ignored `Budget` would look accepted.
+    it "refuses an override Azure's protocols never spelled" do
+      server = Liaison::Server.new("azure", "https://example.openai.azure.com")
+
+      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses}.each do |protocol|
+        expect_raises(ArgumentError) do
+          Liaison::Provider.for_azure(server, protocol, "2025-04-01-preview",
+            reasoning_unit: C::ReasoningUnit::Budget)
+        end
+      end
+    end
+
+    it "accepts the unit an Azure protocol already spells" do
+      server = Liaison::Server.new("azure", "https://example.openai.azure.com")
+      provider = Liaison::Provider.for_azure(server, Liaison::ProtocolKind::Responses,
+        "2025-04-01-preview", reasoning_unit: C::ReasoningUnit::Effort)
+
+      provider.profile("some-deployment").reasoning_unit.effort?.should be_true
+    end
+
     # The deployment whose model name says nothing about the model — Azure's
     # case, and the reason the override exists at all.
     it "lets an explicit unit overrule the catalog" do

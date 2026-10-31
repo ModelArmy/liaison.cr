@@ -114,15 +114,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### `Provider.for_azure` accepts any `reasoning_unit` and ignores it
-
-`Provider.for` raises `ArgumentError` for a unit the protocol does not spell;
-`for_azure` has no such check. Both Azure protocols declare `Effort`, so a
-`Budget` override is accepted and then silently ignored by `narrowed(model)`,
-which applies an override only to an `Either` unit. Where:
-`src/liaison/provider.cr`, `for_azure`. Likely fix: the same guard as `for`.
-Predicted by reading.
-
 ### A degraded tool call leaves its result behind as `unknown_function`
 
 When `Resolver` degrades a tool call because the target requires a signature it

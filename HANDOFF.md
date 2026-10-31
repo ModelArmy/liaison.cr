@@ -212,8 +212,13 @@ its status survives. Covered in `spec/conformance/layer_spec.cr`.
 of it, so a Gemini 3 model given an explicit unit still requires signed tool
 calls. Covered in `spec/conformance/reasoning_controls_spec.cr`.
 
-Next among the comments pass's findings: **`Provider.for_azure` accepts any
-`reasoning_unit` and ignores it**, where `Provider.for` raises.
+**`Provider.for_azure` now refuses a `reasoning_unit` its protocol cannot
+spell**, through the same guard as `Provider.for`, extracted so the two cannot
+drift.
+
+Next among the comments pass's findings: **a degraded tool call leaves its
+result behind as `unknown_function`**, so Gemini receives a `functionResponse`
+answering a call that is not there.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim
