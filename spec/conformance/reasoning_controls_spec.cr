@@ -74,12 +74,12 @@ private ALL = [Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Re
 describe "reasoning controls" do
   # The property that keeps committed transcripts valid. If this fails, live
   # recordings have to be re-cut, so it is asserted before anything else is.
-  # Anthropic's own models are the exception, by design: where a model thinks
-  # by default, liaison asks for its reasoning as text (`DEVELOPMENT.md`).
+  # Anthropic's own models and Gemini are the exceptions, by design: where a
+  # model thinks by default, liaison asks for its reasoning as text
+  # (`DEVELOPMENT.md`).
   describe "absence" do
     it "emits nothing at all when the caller asks for nothing" do
-      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses,
-       Liaison::ProtocolKind::Gemini}.each do |protocol|
+      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses}.each do |protocol|
         request = body(protocol, Liaison::Options.new)
 
         request["reasoning_effort"]?.should be_nil
@@ -99,6 +99,24 @@ describe "reasoning controls" do
       plain = JSON.parse(ollama.prepare(asked, "gemma4:26b", C::Policy::Lenient,
         C::ReasoningRetention::All, 4096, Liaison::Options.new).body)
       plain["thinking"]?.should be_nil
+    end
+
+    # Gemini thinks by default and returns thought text only when asked; the
+    # signatures come regardless.
+    it "asks Gemini for thought summaries, and nothing else" do
+      request = body(Liaison::ProtocolKind::Gemini, Liaison::Options.new)
+      request["generationConfig"].should eq JSON.parse(%({"thinkingConfig":{"includeThoughts":true}}))
+    end
+
+    it "emits nothing on Gemini when the caller declines reasoning text" do
+      declined = Liaison::Options.new(reasoning_text: Liaison::Reasoning::Text::Omitted)
+      body(Liaison::ProtocolKind::Gemini, declined)["generationConfig"]?.should be_nil
+
+      levelled = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Low,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      config = body(Liaison::ProtocolKind::Gemini, levelled)["generationConfig"]["thinkingConfig"]
+      config["thinkingLevel"]?.should_not be_nil
+      config["includeThoughts"]?.should be_nil
     end
 
     it "asks Anthropic's thinking-by-default models for their reasoning as text" do

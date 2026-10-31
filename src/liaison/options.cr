@@ -83,7 +83,7 @@ module Liaison
     getter reasoning : Reasoning::Request?
 
     # Whether reasoning comes back as text where the API withholds it by
-    # default. Honoured on Anthropic; Gemini and Responses do not yet act on
+    # default. Honoured on Anthropic and Gemini; Responses does not yet act on
     # it (`SCOPE.md`).
     getter reasoning_text : Reasoning::Text
 

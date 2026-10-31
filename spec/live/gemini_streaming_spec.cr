@@ -37,16 +37,15 @@ require "../spec_helper"
 #
 # **Already settled, the hard way.** The first recording asserted that a plain
 # streamed turn carries thoughts, on the assumption that Gemini 3 thinks by
-# default. It does think — and bill for it — but returns neither the thought
-# text nor the signature unless `includeThoughts` is requested, which the
-# mapper emits only alongside a thinking budget or level. So there are two
-# text transcripts here rather than one, and the no-thinking case keeps an
-# example asserting the silence, because a caller who never mentions reasoning
-# is paying for reasoning they cannot see.
+# default. It does think, and bills for it, but returns thought text only when
+# `includeThoughts` is requested; the signatures come regardless. Liaison now
+# requests it by default (`Options#reasoning_text`), so a caller who never
+# mentions reasoning sees the reasoning they pay for, and `STREAM_TEXT` asserts
+# what that first recording assumed.
 #
 # **What it cannot settle**, exactly as on Ollama: anything about incremental
 # arrival. Wiretap buffers a streamed body before handing it on.
-private MODEL = "gemini-3.5-flash"
+private MODEL = "gemini-3.6-flash"
 
 private STREAM_TEXT     = "gemini_stream_text"
 private STREAM_THINKING = "gemini_stream_thinking"
@@ -151,24 +150,15 @@ describe "Gemini streaming" do
       end
     end
 
-    it "streams no thoughts when none were asked for" do
-      # **A live finding, discovered by asserting the opposite.** Gemini 3
-      # reasons on this question regardless — and bills for it — but the API's
-      # default is to return neither the thought text nor the signature unless
-      # `includeThoughts` is set, which the mapper emits only alongside a
-      # thinking budget or level. `Options.new(max_output_tokens:)` sets
-      # neither, so a caller who never mentions reasoning silently gets a
-      # stream with none in it.
-      #
-      # Pinned rather than papered over, because the failure mode is quiet: the
-      # reasoning is happening and being paid for, and only the visibility is
-      # missing.
+    # Gemini thinks on this question unasked, and bills for it. It returned
+    # no thought text until liaison began asking for it by default.
+    it "streams the thoughts it has unasked, as liaison asks for them by default" do
       Wiretap.intercept(STREAM_TEXT) do
         seen = [] of S::Event
         reply, _ = streamed.send(asked, MODEL, options: plain) { |event, _| seen << event }
 
-        seen.select(S::ReasoningDelta).should be_empty
-        reply.content.select(M::ReasoningBlock).should be_empty
+        seen.select(S::ReasoningDelta).should_not be_empty
+        reply.content.select(M::ReasoningBlock).should_not be_empty
       end
     end
   end

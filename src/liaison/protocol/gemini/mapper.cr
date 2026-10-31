@@ -66,7 +66,8 @@ module Liaison::Protocol::Gemini
 
       {Wire::Request.new(model, contents, session.system_prompt, declarations(options),
         options.max_output_tokens, thinking_budget: budget, thinking_level: level,
-        tool_mode: options.tool_choice.try { |choice| TOOL_MODES[choice] }), report}
+        tool_mode: options.tool_choice.try { |choice| TOOL_MODES[choice] },
+        include_thoughts: options.reasoning_text.summarized?), report}
     end
 
     # The thinking budget or level; at most one, since both in one

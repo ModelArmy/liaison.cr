@@ -53,11 +53,13 @@ Two smaller divergences follow from it:
   is invented. A budget of 0 disables thinking and -1 asks for dynamic thinking,
   which is the protocol's own idiom for "no constraint" and better than any
   number this shard could pick.
-- **`includeThoughts` rides on the unit, not a separate option.** Without it,
-  thinking still happens — and is billed — but neither thought text nor the
-  signature a later turn needs to replay comes back; the API's default is to
-  omit both, silently. Sent whenever a budget or level is, since there is no
-  reason to ask for reasoning and not want to see it.
+- **`includeThoughts` follows `Options#reasoning_text`, not the unit.** Gemini
+  thinks dynamically by default, whether or not a budget or level is sent, and
+  bills for it; without `includeThoughts` the thought text does not come back.
+  The signatures do regardless (`gemini_foreign_tool_call_36` carries one with
+  no `thinkingConfig` at all). By `DEVELOPMENT.md`'s *capture* rule it is sent
+  by default, alone if no budget or level is, and left out under
+  `Reasoning::Text::Omitted`.
 
 Whether a budget of 0 disables thinking on the levels-preferring series, which
 has no `off` rung of its own, is **confirmed live, and the answer splits by
@@ -216,14 +218,10 @@ loss annotated. Its result is not dropped with it, and goes out as a
 the translation table: export pairs calls by counting them over the wire, so a
 call that never reached it must not take an ordinal. A result with no call
 before it is accepted in a closed turn and in the current turn alike, the one
-where Gemini checks signatures (`gemini_foreign_tool_call_35`,
-`gemini_foreign_tool_call_current_turn_35`), and the model answers from it.
-Keeping the result is therefore not a hazard, as far as recorded.
-
-Both were recorded with `gemini-3.5-flash` in the URL and answered by
-`gemini-3.6-flash` per `modelVersion`; earlier recordings under that name were
-answered by 3.5. `SCOPE.md`'s *`gemini-3.5-flash` is now served by 3.6* has
-what that does to the specs pinned to 3.5.
+where Gemini checks signatures (`gemini_foreign_tool_call_36`,
+`gemini_foreign_tool_call_current_turn_36`), and the model answers from it.
+Keeping the result is therefore not a hazard, as far as recorded on
+`gemini-3.6-flash`.
 
 The one thing that is *not* like the Anthropic fix is where the flag is
 declared. `reasoning_signature_required` sits on Anthropic's `PROFILE`, true
@@ -316,16 +314,12 @@ parts in that order rather than folding its text together.
 ### Live finding: thinking must be asked for, or it is invisible and still billed
 
 Discovered by asserting the opposite and being wrong. Gemini reasons on a
-question whether or not you ask it to, and bills for it — but returns neither
-the thought text nor the signature unless `includeThoughts` is set, which the
-mapper emits only alongside a thinking budget or level. So
-`Options.new(max_output_tokens:)` with no `reasoning` yields a stream with no
-thoughts in it at all, and a caller who never mentions reasoning is paying for
-reasoning they cannot see.
-
-`spec/live/gemini_streaming_spec.cr` keeps an example asserting that silence,
-because the failure mode is quiet: nothing errors, and the only symptom is an
-absence.
+question whether or not you ask it to, and bills for it, but returns no thought
+text unless `includeThoughts` is set, which the mapper then sent only beside a
+thinking budget or level. So a caller who never mentioned reasoning paid for
+reasoning they could not see, and nothing errored. The finding led to the
+*capture* rule in `DEVELOPMENT.md`: `includeThoughts` is now sent by default,
+and `gemini_streaming_spec.cr`'s plain turn asserts the thoughts arrive.
 
 ### Live finding: thought summaries need not fragment
 

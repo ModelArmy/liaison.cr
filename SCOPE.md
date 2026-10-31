@@ -114,29 +114,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### `gemini-3.5-flash` is now served by 3.6
-
-As of 31 October 2026, a request naming `gemini-3.5-flash` is answered by
-`gemini-3.6-flash`, per the response's `modelVersion`; every recording under
-that name before then was answered by 3.5. Replays are unaffected, since
-Wiretap matches the request. But `spec/live/gemini_spec.cr` pins to 3.5 so its
-findings stay comparable, and any re-recording now measures 3.6 under a 3.5
-label. Both current-turn findings that depend on the model — the signature
-check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
-`modelVersion` in the live specs that claim a model, so the next silent
-redirect goes red rather than relabelling evidence. Found in
-`gemini_foreign_tool_call_35`'s re-recording.
-
-### Gemini may withhold thoughts when no reasoning option is set
-
-Predicted by reading. Anthropic now asks for reasoning text by default, as
-`DEVELOPMENT.md`'s *capture* rule requires, through `Options#reasoning_text`;
-Gemini should honour the same option. `includeThoughts` is sent only with a
-budget or level.
-Gemini 3 models think by default, so a request with no reasoning option may
-think, bill for it, and return neither thought text nor the signature a later
-turn needs. Where: `gemini/wire/request.cr`. Confirm with one call per case.
-
 ### Responses may never ask for reasoning summaries
 
 Predicted by reading. The mapper writes `summary` only on replayed reasoning

@@ -1,0 +1,72 @@
+{
+  "name": "gemini_tool_choice_none_36",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "2bfa0b90efc5ac0be611067f0d4bc1aef256e0e1012a205fa290d757895932e4"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Sat, 31 Oct 2026 20:16:00 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=1944",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Thought Process: Checking the Weather in Paris**\\n\\nOkay, so the user needs the weather for Paris. They've made it perfectly clear they want a weather check and even pointed me to the `get_weather` tool. Excellent. Given their explicit request and my understanding of the tool's purpose, the next logical step is to call the `get_weather` tool. The parameter to provide is obviously the city they're interested in, which is Paris. Therefore, I will execute the `get_weather` tool and set the `city` parameter to \\\"Paris\\\". That should give the user the information they're looking for.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Paris\"\n              },\n              \"id\": \"call_540644\"\n            },\n            \"thoughtSignature\": \"EpcCCpQCAWkUfRMWod+5t1ItIftL3P0jqoTLxqB6Ex/OZ3GQWmT9XZ98r4jiJvbzNKzvhgFJj8RsCz53petnnHXM5sKw2T6sBxNi9qxKShRU9jIXhSuzy3DQRGWp1KQYEqlt6D6Juc7/Ga39LPaf+hlVI8B7VJ9VZGIn3l/+uPkj1XVQfVGomFn0dp/gpHhy1WgTHIJvsCb64sLvZW3ya7zHR+5kwu0B/BDYunnMgLvARIArhF8QKuMCXsJoBsgwXw+sDqdDpdffU1dt8ZiWD8X54Nh6ZfRXhcprcGycQsiQnEtOVQgvqp3xQrx/JAynpZRl6q2Xr5EOOskQ/lFmT+zTKwMJFeWtn9dkkiFMIKHhFxLPZ0zWXW8Y\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 132,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"thoughtsTokenCount\": 41,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"fkzmavqsGvOOytMP66bX2Ac\"\n}\n"
+      },
+      "recorded_at": "2026-10-31T20:16:00Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"model\",\"parts\":[{\"thought\":true,\"text\":\"**My Thought Process: Checking the Weather in Paris**\\n\\nOkay, so the user needs the weather for Paris. They've made it perfectly clear they want a weather check and even pointed me to the `get_weather` tool. Excellent. Given their explicit request and my understanding of the tool's purpose, the next logical step is to call the `get_weather` tool. The parameter to provide is obviously the city they're interested in, which is Paris. Therefore, I will execute the `get_weather` tool and set the `city` parameter to \\\"Paris\\\". That should give the user the information they're looking for.\\n\\n\\n\"},{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}},\"thoughtSignature\":\"EpcCCpQCAWkUfRMWod+5t1ItIftL3P0jqoTLxqB6Ex/OZ3GQWmT9XZ98r4jiJvbzNKzvhgFJj8RsCz53petnnHXM5sKw2T6sBxNi9qxKShRU9jIXhSuzy3DQRGWp1KQYEqlt6D6Juc7/Ga39LPaf+hlVI8B7VJ9VZGIn3l/+uPkj1XVQfVGomFn0dp/gpHhy1WgTHIJvsCb64sLvZW3ya7zHR+5kwu0B/BDYunnMgLvARIArhF8QKuMCXsJoBsgwXw+sDqdDpdffU1dt8ZiWD8X54Nh6ZfRXhcprcGycQsiQnEtOVQgvqp3xQrx/JAynpZRl6q2Xr5EOOskQ/lFmT+zTKwMJFeWtn9dkkiFMIKHhFxLPZ0zWXW8Y\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "f66a626d69912826826093298b19933eada70b48c1bca52e16f1f866ecb6cf9d"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Sat, 31 Oct 2026 20:16:02 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=2061",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Immediate Thoughts on the Berlin Weather Query**\\n\\nOkay, so the user's asking about Berlin's weather. \\\"And in Berlin?\\\" means I need to provide that information. No problem, that's straightforward. I've got the tools for this. Let me quickly grab the `get_weather` tool and configure it. The critical part is specifying the location, so I'll set the `city` parameter to \\\"Berlin\\\". I will be sure to remember this city parameter when making the API call. Now, let's get that data and present it back.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Berlin\"\n              },\n              \"id\": \"call_325133\"\n            },\n            \"thoughtSignature\": \"Ev4BCvsBAWkUfRMP/ZsF6uYfgkbeAfcecdsUzKd4ylI3WeENv0RhP/+mwSAblyUgzWbJ24W8mwQY9NY6B1kPPtmqDz/1EdVIEivVp/vkommP950LJ65BbLukyF6k0rbY9YpEOmp98XnU+OUVo11kC3uuO1cGJa/1vSBp8ThuI9Tevpm/wNV0IbNlKOIWJWYjyoUMTG1ckCcLdKMtRzmOOLlYBGdqHNFrfhBa8xefixxiAVkIiozqdwgQNMKatSDk/586mDmYV7FWx3QSymwZN8itPCMtTf1ejAHco+G8l38ay6s0bcFbnXCo8mIn5bhepX4/GEAM7NlCFXqy+SpSnb0=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 290,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 345,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 290\n      }\n    ],\n    \"thoughtsTokenCount\": 39,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"gEzmarzQHpCNytMPlozS8AE\"\n}\n"
+      },
+      "recorded_at": "2026-10-31T20:16:02Z"
+    }
+  ]
+}

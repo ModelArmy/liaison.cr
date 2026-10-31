@@ -259,9 +259,15 @@ Claude 5 request bodies changed even with no reasoning asked for, which the
 `absence` conformance spec now states as the one exception.
 `ANTHROPIC.md`, *Liaison asks for the reasoning as text*.
 
-Next in `WILL FIX`: **Gemini may withhold thoughts when no reasoning option is
-set**, then **Responses may never ask for reasoning summaries**: the same rule,
-on the other two protocols.
+**Gemini now asks for thought summaries by default**, honouring
+`Options#reasoning_text` as Anthropic does; its signatures were never at stake.
+**Every recorded Gemini reply must have been served by the model its request
+names** (`spec/live/served_model_spec.cr`), which closed *`gemini-3.5-flash` is
+now served by 3.6*. The Gemini specs re-recorded for the change are pinned to
+`gemini-3.6-flash`; `gemini_reasoning_off_35` stays as 3.5 evidence.
+
+Next in `WILL FIX`: **Responses may never ask for reasoning summaries**: the
+same rule, on the last protocol.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim
