@@ -388,6 +388,22 @@ describe "reasoning controls" do
       adapter.narrowed("some-deployment-name").reasoning_unit.budget?.should be_true
     end
 
+    it "lets an explicit unit overrule a catalogued unit" do
+      adapter = Liaison::AnthropicAdapter.new(nil, C::ReasoningUnit::Effort)
+      adapter.narrowed("claude-sonnet-4-5").reasoning_unit.effort?.should be_true
+    end
+
+    # The override answers one axis. Without this, an unsigned foreign tool
+    # call maps `Exact` to a Gemini 3 model and draws the 400 the entry
+    # exists to prevent.
+    it "still applies the catalog's other axes under an explicit unit" do
+      adapter = Liaison::GeminiAdapter.new(nil, C::ReasoningUnit::Effort)
+      profile = adapter.narrowed("gemini-3.5-flash")
+
+      profile.reasoning_unit.effort?.should be_true
+      profile.tool_call_signature_required?.should be_true
+    end
+
     it "keeps the metadata-key narrowing it already did" do
       adapter = Liaison::AnthropicAdapter.new("ollama")
       profile = adapter.narrowed("test-model")

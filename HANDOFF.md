@@ -207,9 +207,13 @@ All three `MUST FIX` items among them are now done:
 string `error` or a top-level array yields `nil` and the `TransportError` with
 its status survives. Covered in `spec/conformance/layer_spec.cr`.
 
-Next among the comments pass's findings: **a `reasoning_unit` override bypasses the
-signed-tool-call axis**, so a Gemini 3 model given an explicit unit draws the
-400 its catalog entry exists to prevent.
+**A `reasoning_unit` override now replaces only the unit axis.**
+`Adapter#narrowed(model)` applies it before `Catalog.narrow` rather than instead
+of it, so a Gemini 3 model given an explicit unit still requires signed tool
+calls. Covered in `spec/conformance/reasoning_controls_spec.cr`.
+
+Next among the comments pass's findings: **`Provider.for_azure` accepts any
+`reasoning_unit` and ignores it**, where `Provider.for` raises.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

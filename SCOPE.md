@@ -114,16 +114,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### A `reasoning_unit` override bypasses the signed-tool-call axis
-
-`Adapter#narrowed(model)` returns early when a `reasoning_unit` override is
-set, and so never calls `Catalog.narrow`, which applies both catalog axes. On a
-Gemini 3 model with an explicit unit, `tool_call_signature_required` is never
-switched on, so a foreign unsigned tool call maps `Exact` and draws the 400
-the catalog entry exists to prevent. Where: `src/liaison/adapters/adapter.cr`,
-`narrowed(model)`. Likely fix: let the override replace only the unit axis, then
-apply the rest of the catalog. Predicted by reading.
-
 ### `Provider.for_azure` accepts any `reasoning_unit` and ignores it
 
 `Provider.for` raises `ArgumentError` for a unit the protocol does not spell;

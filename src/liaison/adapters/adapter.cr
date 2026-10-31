@@ -106,14 +106,14 @@ module Liaison
       profile.with_metadata_key(key)
     end
 
-    # `narrowed`, then narrowed for one model. An explicit `reasoning_unit`
-    # resolves an `Either` unit and is otherwise ignored; without one,
-    # `Catalog.narrow` applies. The override replaces the catalog entirely, so
-    # the catalog's signed-tool-call axis is not applied either.
+    # `narrowed`, then narrowed for one model by `Catalog.narrow`. An explicit
+    # `reasoning_unit` resolves an `Either` unit first, so it takes the place
+    # of the catalog's unit and leaves its other axes to apply; on a protocol
+    # with a fixed unit it is ignored.
     def narrowed(model : String) : Capability::Profile
       base = narrowed
-      if unit = @reasoning_unit
-        return base.reasoning_unit.either? ? base.with_reasoning_unit(unit) : base
+      if (unit = @reasoning_unit) && base.reasoning_unit.either?
+        base = base.with_reasoning_unit(unit)
       end
       Capability::Catalog.narrow(base, model)
     end
