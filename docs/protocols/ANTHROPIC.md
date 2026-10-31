@@ -246,6 +246,30 @@ system prompt is present, which is `MoveSystemPrompt`'s doing and unrelated to
 reasoning entirely — see `spec/live/anthropic_spec.cr` for why the test checks
 annotations rather than `report.worst` for this reason.
 
+### A valid signature on the wrong model
+
+Anthropic documents that thinking from `claude-fable-5` and `claude-mythos-5`,
+and their point releases, is tied to the model that produced it: any other
+Claude model accepts the block and ignores it. Same vendor key, same valid
+signature, so `own?` alone would call it Exact. `Catalog::MODEL_BOUND_REASONING`
+lists the producers by exact name, and `Resolver` reads the producer from the
+message's `provenance.model`. Sent to another model, the block is
+`Restructured`:
+
+- **Sent unchanged.** Stripping it would save nothing the model was going to
+  use, and a missing signature is the 400 above.
+- **Not Refused mid-tool-call.** The target accepts it there too.
+- **Always annotated**, through `Report#record`'s `note:`, though a
+  rearrangement otherwise is not: *reasoning by claude-fable-5-1, which
+  claude-opus-5-5 ignores*. The note stays with the report and is not added to
+  the session, since back on Fable the reasoning is usable again.
+
+Not yet confirmed live: a first recording found Fable reporting its model as
+`claude-fable-5-1`, the plain alias the list holds, but returned no thinking to
+hand over (`SCOPE.md`, *Effort alone may not enable thinking*). A reply could
+not show whether reasoning was ignored in any case; that rests on the
+documentation.
+
 ## Streaming
 
 `Protocol::Anthropic::Assembler`, over `"stream": true` on the same path.

@@ -177,6 +177,49 @@ describe "capability resolution" do
     end
   end
 
+  # Anthropic documents that thinking from Fable and Mythos is tied to the
+  # model that wrote it and silently ignored by any other. Same vendor, same
+  # signature, so only the models tell it apart.
+  describe "model-bound reasoning" do
+    signed = M::ReasoningBlock.new("Thinking it over.")
+    signed.put_meta("anthropic", "signature", "EqQBCkYIARgCIkB")
+    top = C::Resolver::Nesting::TopLevel
+    mid = C::Resolver::Nesting::MidToolCall
+
+    it "is exact on the model that produced it" do
+      C::Resolver.outcome(signed, CLAUDE, top, "claude-fable-5-1", "claude-fable-5-1")
+        .should eq(M::Outcome::Exact)
+    end
+
+    # Not `Degraded`, which `Strict` would refuse; and the block is still
+    # sent, since the target ignores rather than rejects it.
+    it "restructures on any other model, even mid-tool-call" do
+      {top, mid}.each do |nesting|
+        C::Resolver.outcome(signed, CLAUDE, nesting, "claude-fable-5-1", "claude-opus-5-5")
+          .should eq(M::Outcome::Restructured)
+      end
+    end
+
+    it "treats point releases as different models" do
+      C::Resolver.outcome(signed, CLAUDE, top, "claude-fable-5", "claude-fable-5-1")
+        .should eq(M::Outcome::Restructured)
+    end
+
+    it "leaves an unlisted producer and an unknown producer alone" do
+      C::Resolver.outcome(signed, CLAUDE, top, "claude-opus-5-5", "claude-sonnet-5-5")
+        .should eq(M::Outcome::Exact)
+      C::Resolver.outcome(signed, CLAUDE, top, nil, "claude-opus-5-5")
+        .should eq(M::Outcome::Exact)
+    end
+
+    # The rule only demotes what would otherwise be `Exact`; foreign
+    # reasoning keeps its own outcomes, mid-tool-call refusal included.
+    it "does not soften the outcome of reasoning that is foreign anyway" do
+      C::Resolver.outcome(signed, GEMINI, mid, "claude-fable-5-1", "gemini-3.6-flash")
+        .should eq(M::Outcome::Refused)
+    end
+  end
+
   describe "refusal" do
     it "is exact where the protocol has a refusal channel" do
       session = Liaison::Fixtures.refusal_with_reason

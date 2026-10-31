@@ -67,6 +67,17 @@ module Liaison::Capability
       "gemini-4-argon",
     }
 
+    # Models whose reasoning only they can use: Anthropic documents that their
+    # thinking blocks are tied to the producing model and silently ignored by
+    # any other. Keyed on the producer, unlike the lists above, which are keyed
+    # on the target. Exact names; a point release is a different model.
+    MODEL_BOUND_REASONING = Set{
+      "claude-fable-5",
+      "claude-fable-5-1",
+      "claude-mythos-5",
+      "claude-mythos-5-1",
+    }
+
     # The unit this model needs, or `nil` where the catalog has no opinion,
     # leaving the default.
     def reasoning_unit?(model : String) : ReasoningUnit?
@@ -76,6 +87,11 @@ module Liaison::Capability
     # Whether this model requires signed tool calls.
     def tool_call_signature_required?(model : String) : Bool
       SIGNED_TOOL_CALLS.includes?(model.downcase)
+    end
+
+    # Whether reasoning this model produced is usable only by this model.
+    def reasoning_model_bound?(model : String) : Bool
+      MODEL_BOUND_REASONING.includes?(model.downcase)
     end
 
     # Narrows a profile for one model, one independent axis at a time. A no-op

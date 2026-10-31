@@ -43,7 +43,7 @@ module Liaison::Protocol::Anthropic
       end
 
       rendered = session.messages.map_with_index do |message, index|
-        Wire::Message.new(role_of(message), blocks_for(message, index, report, plan))
+        Wire::Message.new(role_of(message), blocks_for(message, index, report, plan, model))
       end
 
       messages = normalize(rendered, report)
@@ -174,14 +174,15 @@ module Liaison::Protocol::Anthropic
 
     private def blocks_for(message : MPSH::Message, index : Int32,
                            report : Capability::Report,
-                           plan : Capability::Retention::Plan) : Array(Wire::Block)
+                           plan : Capability::Retention::Plan,
+                           model : String) : Array(Wire::Block)
       blocks = [] of Wire::Block
 
       message.content.each do |block|
         case block
         in MPSH::ReasoningBlock
           next unless plan.retain?(index)
-          rendered = thinking(block, index, report)
+          rendered = thinking(block, index, report, message.provenance.try(&.model), model)
           blocks << rendered if rendered
         in MPSH::ToolCallBlock
           rendered = tool_use(block, index, report)
@@ -245,10 +246,19 @@ module Liaison::Protocol::Anthropic
       Wire::ToolUseBlock.new(provider_id, block.name, block.arguments.to_json)
     end
 
+    # `producer` and `target` are the models that wrote the block and will
+    # read it, for reasoning only its producer can use.
     private def thinking(block : MPSH::ReasoningBlock, index : Int32,
-                         report : Capability::Report) : Wire::Block?
-      outcome = Capability::Resolver.outcome(block, profile)
-      report.record(outcome, "reasoning as a thinking block", index, MPSH::BlockKind::Reasoning)
+                         report : Capability::Report,
+                         producer : String?, target : String) : Wire::Block?
+      outcome = Capability::Resolver.outcome(block, profile,
+        Capability::Resolver::Nesting::TopLevel, producer, target)
+      if outcome.restructured? && Capability::Resolver.rebound?(producer, target)
+        report.record(outcome, "reasoning by #{producer}, which #{target} ignores",
+          index, MPSH::BlockKind::Reasoning, note: true)
+      else
+        report.record(outcome, "reasoning as a thinking block", index, MPSH::BlockKind::Reasoning)
+      end
       return if outcome.lossy?
 
       meta = block.meta_for(profile.metadata_key)

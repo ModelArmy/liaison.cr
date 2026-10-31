@@ -1,5 +1,6 @@
 require "./profile"
 require "./policy"
+require "./catalog"
 require "../mpsh/block"
 
 module Liaison::Capability
@@ -16,8 +17,12 @@ module Liaison::Capability
       MidToolCall
     end
 
+    # `producer` is the model that wrote the block's message and `target` the
+    # model it is being sent to; only reasoning reads them, and either `nil`
+    # means unknown, which applies no model rule.
     def outcome(block : MPSH::Block, profile : Profile,
-                nesting : Nesting = Nesting::TopLevel) : MPSH::Outcome
+                nesting : Nesting = Nesting::TopLevel,
+                producer : String? = nil, target : String? = nil) : MPSH::Outcome
       case block
       in MPSH::TextBlock
         MPSH::Outcome::Exact
@@ -28,7 +33,7 @@ module Liaison::Capability
       in MPSH::ToolResultBlock
         tool_result_outcome(block, profile)
       in MPSH::ReasoningBlock
-        reasoning_outcome(block, profile, nesting)
+        reasoning_outcome(block, profile, nesting, producer, target)
       in MPSH::RefusalBlock
         # A past refusal is history: its text travels as text without loss. One
         # with no text has nothing to carry, which is the loss worth reporting.
@@ -42,8 +47,12 @@ module Liaison::Capability
     # the payload. As `Degraded` it would make `Strict` refuse every
     # cross-provider handoff of a reasoning session. Mid-tool-call it is
     # `Refused`, since some providers require it replayed unmodified there.
+    # Reasoning the target owns but whose producer binds it to itself is
+    # `Restructured` on any other model, mid-tool-call too: it is still sent,
+    # and the target ignores rather than rejects it.
     private def reasoning_outcome(block : MPSH::ReasoningBlock, profile : Profile,
-                                  nesting : Nesting) : MPSH::Outcome
+                                  nesting : Nesting, producer : String?,
+                                  target : String?) : MPSH::Outcome
       # Ownership is not enough: with nowhere to put reasoning in a request,
       # nothing can be replayed.
       return degrade_or_refuse(nesting) if profile.reasoning.none?
@@ -61,8 +70,17 @@ module Liaison::Capability
         return degrade_or_refuse(nesting)
       end
 
-      return MPSH::Outcome::Exact if own?(block, profile)
+      if own?(block, profile)
+        return rebound?(producer, target) ? MPSH::Outcome::Restructured : MPSH::Outcome::Exact
+      end
       nesting.mid_tool_call? ? MPSH::Outcome::Refused : MPSH::Outcome::Restructured
+    end
+
+    # Whether reasoning goes from a model that binds it to a different model,
+    # which will ignore it.
+    def rebound?(producer : String?, target : String?) : Bool
+      return false unless producer && target
+      Catalog.reasoning_model_bound?(producer) && producer.downcase != target.downcase
     end
 
     # For reasoning this wire cannot carry: a recorded loss, except mid-tool-
