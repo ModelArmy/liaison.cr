@@ -228,6 +228,23 @@ every re-recording of a spec pinned to 3.5 measures 3.6. Logged in `SCOPE.md`
 with a likely fix — assert `modelVersion` — and worth doing before the next
 Gemini re-recording.
 
+**Fable's and Mythos's reasoning is now `Restructured`, and annotated, on any
+other model.** The producing model was already in each message's
+`provenance`, so MPSH's format is unchanged; §7's ownership rule gains the
+condition (spec 1.8). `Catalog::MODEL_BOUND_REASONING` lists the producers;
+`Report#record`'s `note:` annotates this one rearrangement, for the request
+only. The wire is unchanged. Unconfirmed live: the probe's first recording
+showed Fable reports the plain alias, but Fable produced no thinking to hand
+over, which led to the finding below.
+
+**Effort alone may not enable thinking on Opus 4.6+ and Fable.** The mapper
+sends `output_config.effort` with no `thinking` field; Fable answered with
+`thinking_tokens: 0`, and the models' own 400s name `thinking.type.adaptive`
+and effort as a pair. A diagnostic probe is next, then a gated fix; the
+handoff probe waits on it. See `SCOPE.md`.
+
+Next in `WILL FIX`: **`MalformedResponseError` is defined twice**.
+
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim
 to settle: a third-party report says the GPT-5.6 family rejects function tools

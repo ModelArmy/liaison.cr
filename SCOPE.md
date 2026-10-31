@@ -127,19 +127,20 @@ check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
 redirect goes red rather than relabelling evidence. Found in
 `gemini_foreign_tool_call_35`'s re-recording.
 
-### Fable's reasoning is model-bound, and replays as if it were not
+### Effort alone may not enable thinking
 
-Anthropic documents that thinking blocks from `claude-fable-5` and
-`claude-mythos-5` are tied to the model that produced them, and that other
-Claude models silently ignore them. `Resolver#own?` keys on the vendor
-(`metadata_key` is `anthropic` for every Claude model), so a Fable session
-continued on Opus or Haiku maps that reasoning `Exact`, and the model drops it
-unannounced: the silent loss the capability model exists to report. Read from
-documentation, not yet recorded. Where: `Resolver#own?` and
-`Capability::Catalog`. Fix: decide whether the producing model belongs in the
-reasoning block's provenance, which is a question about MPSH, not only this
-protocol; then a probe, though "silently ignored" may show only as a reply
-that does not use the earlier reasoning.
+For effort-unit models the Anthropic mapper sends `output_config: {effort:}`
+and no `thinking` field. `claude-fable-5-1` answered such a request, a tool
+question at medium effort, with `thinking_tokens: 0`. The 400s Opus and Fable
+return for `thinking: disabled` name `thinking.type.adaptive` and
+`output_config.effort` as the pair to use, and no recording has an Anthropic
+model thinking on effort alone. If effort does not enable thinking,
+`Reasoning::Effort` has never produced reasoning on Opus 4.6+ or Fable, while
+reporting no loss. One response cannot tell thinking off from adaptive
+thinking choosing not to; a diagnostic probe asking the same question with
+and without `adaptive` would. Where: `anthropic/mapper.cr`'s
+`reasoning`. Likely fix: send `thinking: {type: adaptive}` with an effort, on
+the models that accept it, which Opus 4.5 may not.
 
 ### `MalformedResponseError` is defined twice
 
