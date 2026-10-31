@@ -137,7 +137,14 @@ with or without `adaptive` (`spec/transcripts/anthropic_adaptive_thinking_high.j
 `anthropic_adaptive_thinking_medium.json`); the identical high-effort request,
 repeated, spent none. Adaptive thinking is the model's call and not
 repeatable, so no spec relies on it occurring on an easy question.
-`anthropic_adaptive_thinking_sonnet46` records the other generation.
+
+Recorded for the other generation (`anthropic_adaptive_thinking_sonnet46`):
+asked a Pell equation at high effort with no `thinking` field,
+`claude-sonnet-4-6` returned no thinking block and worked the continued
+fraction in its answer instead; with `adaptive`, it thought for 887 tokens and
+answered apart. Effort alone there does not withhold reasoning so much as
+move it into the reply, where it is answer text to every protocol. Where
+nothing was thought, `usage` omits `output_tokens_details` entirely.
 
 **Liaison asks for the reasoning as text.** `thinking.display` defaults to
 `omitted` on every Claude 5 model, Opus 4.7 and 4.8 and Mythos Preview: the

@@ -80,8 +80,9 @@ private def effort_pair(question : String, effort : Liaison::Reasoning::Effort,
   {effort_only, adaptive.to_json}
 end
 
-# Posts `body` to `model` and returns the thinking tokens it reports spending,
-# which only Claude 5 models report.
+# Posts `body` to `model` and returns the thinking tokens it reports spending.
+# Raises where nothing was thought on a model that then omits the field, as
+# Sonnet 4.6 does.
 private def thinking_tokens(body : String, model : String = MODEL_FABLE_1) : Int64
   posted(body, model).dig("usage", "output_tokens_details", "thinking_tokens").as_i64
 end
@@ -228,8 +229,8 @@ describe "Anthropic" do
 
     # The generation before Claude 5: thinking off until asked for, which is
     # why the mapper sends `adaptive` with an effort on these models. Measured
-    # by thinking blocks: this generation reports no `thinking_tokens`, and
-    # returns its thinking text by default.
+    # by thinking blocks, since `usage` has no `output_tokens_details` at all
+    # when nothing was thought.
     it "does not think on Sonnet 4.6 without adaptive thinking" do
       Wiretap.intercept("anthropic_adaptive_thinking_sonnet46") do
         effort_only, adaptive = effort_pair(PELL, Liaison::Reasoning::Effort::High,
