@@ -51,11 +51,12 @@ module Liaison::Protocol::Anthropic
       # fallback this protocol requires.
       cap = options.max_output_tokens || max_tokens
       budget, effort, disabled = reasoning(options, model, cap, report)
+      display = adaptive_display(options, model, budget, effort, disabled)
 
       {Wire::Request.new(model, messages, cap,
         session.system_prompt, declarations(options),
         thinking_budget: budget, effort: effort, thinking_disabled: disabled,
-        tool_choice: options.tool_choice.try(&.wire_name)), report}
+        tool_choice: options.tool_choice.try(&.wire_name), thinking_display: display), report}
     end
 
     # The thinking budget, the effort rung, and whether thinking is off. At
@@ -96,6 +97,22 @@ module Liaison::Protocol::Anthropic
       in Capability::ReasoningControl::Rendering::Drop
         {nil, nil, false}
       end
+    end
+
+    # The `display` to send with adaptive thinking, or `nil` for none. Only on
+    # Anthropic's own models: a compatible endpoint serves models Anthropic's
+    # per-model table says nothing about. Never beside a budget or `disabled`,
+    # and never on a budget-unit model, which rejects `adaptive`. Where thinking
+    # is off by default it is sent only with an effort, to switch on the
+    # thinking the caller asked for; elsewhere, every Claude 5 model and any
+    # name the lists do not hold, it is always sent, since the model thinks
+    # anyway and only the text is in question.
+    private def adaptive_display(options : Options, model : String, budget : Int32?,
+                                 effort : String?, disabled : Bool) : String?
+      return unless profile.metadata_key == METADATA_KEY
+      return if budget || disabled || profile.reasoning_unit.budget?
+      return if THINKING_OFF_BY_DEFAULT.includes?(model.downcase) && effort.nil?
+      options.reasoning_text.summarized? ? "summarized" : "omitted"
     end
 
     # The budget must be at least 1,024 and below the output cap, which it

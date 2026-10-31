@@ -17,10 +17,12 @@ module Liaison::Capability
   module Catalog
     extend self
 
-    # Models that take a thinking budget and no named rung: Claude 3.7 Sonnet,
-    # the Claude 4 models up to Sonnet and Haiku 4.5, and the Gemini 2.5
-    # series. Claude Opus 4.5 takes both and is left to the default. A list of
-    # the past, so it only shrinks; confirm against current vendor docs.
+    # Models that think only on a budget: Claude 3.7 Sonnet, the Claude 4
+    # models up to 4.5, and the Gemini 2.5 series. Claude Opus 4.5 also takes
+    # an effort rung, but thinks only with `type: enabled` and a budget and
+    # rejects `adaptive`, so it is here: a requested rung becomes a budget. A
+    # list of the past, so it only shrinks; confirm against current vendor
+    # docs.
     BUDGET_ONLY = Set{
       "claude-3-7-sonnet",
       "claude-3-7-sonnet-latest",
@@ -35,6 +37,8 @@ module Liaison::Capability
       "claude-opus-4-20250514",
       "claude-opus-4-1",
       "claude-opus-4-1-20250805",
+      "claude-opus-4-5",
+      "claude-opus-4-5-20251101",
       "claude-haiku-4-5",
       "claude-haiku-4-5-20251001",
       "gemini-2.5-pro",

@@ -25,6 +25,14 @@ private MODEL_OPUS    = "claude-opus-5-5"
 private MODEL_FABLE   = "claude-fable-5"
 private MODEL_FABLE_1 = "claude-fable-5-1"
 
+# Off by default: thinks only when `thinking: {type: adaptive}` is sent.
+private MODEL_SONNET_46 = "claude-sonnet-4-6"
+
+# A question too involved to answer in a few visible lines, so adaptive
+# thinking declining is not a likely explanation for none.
+private PELL = "List every pair of positive integers (x, y) with x < 1000 and " \
+               "x^2 - 7y^2 = 1. Give only the pairs."
+
 # What `Client` sends a model the catalog does not list, addressed to `model`.
 #
 # Mapped under a model name no list holds, then readdressed, so the entry a
@@ -55,26 +63,38 @@ private def thinking_off_rejected(model : String) : Liaison::TransportError
   end
 end
 
-# The request the mapper builds for `question` at `effort` on Fable, which
-# carries no `thinking` field, and the same with `thinking: {type: adaptive}`.
-private def effort_pair(question : String, effort : Liaison::Reasoning::Effort) : {String, String}
+# A request for `question` at `effort` on `model` with no `thinking` field, and
+# the same with `thinking: {type: adaptive}`. Built from the mapper's body with
+# its own `thinking` removed, so the pair records the API and not the mapper.
+private def effort_pair(question : String, effort : Liaison::Reasoning::Effort,
+                        model : String = MODEL_FABLE_1) : {String, String}
   session = M::Session.new
   session << M::Message.user(question)
-  effort_only = unlisted_body(session, MODEL_FABLE_1,
-    Liaison::Options.new(reasoning: effort, max_output_tokens: 2048))
-  JSON.parse(effort_only)["thinking"]?.should be_nil
+  mapped = JSON.parse(unlisted_body(session, model,
+    Liaison::Options.new(reasoning: effort, max_output_tokens: 2048))).as_h
+  mapped.delete("thinking")
+  effort_only = mapped.to_json
 
-  adaptive = JSON.parse(effort_only).as_h
+  adaptive = mapped.dup
   adaptive["thinking"] = JSON.parse(%({"type":"adaptive"}))
   {effort_only, adaptive.to_json}
 end
 
-# Posts `body` to Fable and returns the thinking tokens it reports spending.
-private def thinking_tokens(body : String) : Int64
+# Posts `body` to `model` and returns the thinking tokens it reports spending,
+# which only Claude 5 models report.
+private def thinking_tokens(body : String, model : String = MODEL_FABLE_1) : Int64
+  posted(body, model).dig("usage", "output_tokens_details", "thinking_tokens").as_i64
+end
+
+# Posts `body` to `model` and counts the thinking blocks in its reply.
+private def thinking_blocks(body : String, model : String) : Int32
+  posted(body, model)["content"].as_a.count { |block| block["type"] == "thinking" }
+end
+
+private def posted(body : String, model : String) : JSON::Any
   adapter = Liaison::AnthropicAdapter.new
-  JSON.parse(anthropic.post(adapter.path(MODEL_FABLE_1),
+  JSON.parse(anthropic.post(adapter.path(model),
     adapter.headers(anthropic.credential), body, ->adapter.error_detail(String)))
-    .dig("usage", "output_tokens_details", "thinking_tokens").as_i64
 end
 
 private def anthropic : Liaison::Server
@@ -203,6 +223,38 @@ describe "Anthropic" do
           "Give only the number.", Liaison::Reasoning::Effort::High)
 
         thinking_tokens(effort_only).should be > 0
+      end
+    end
+
+    # The generation before Claude 5: thinking off until asked for, which is
+    # why the mapper sends `adaptive` with an effort on these models. Measured
+    # by thinking blocks: this generation reports no `thinking_tokens`, and
+    # returns its thinking text by default.
+    it "does not think on Sonnet 4.6 without adaptive thinking" do
+      Wiretap.intercept("anthropic_adaptive_thinking_sonnet46") do
+        effort_only, adaptive = effort_pair(PELL, Liaison::Reasoning::Effort::High,
+          MODEL_SONNET_46)
+
+        thinking_blocks(effort_only, MODEL_SONNET_46).should eq 0
+        thinking_blocks(adaptive, MODEL_SONNET_46).should be > 0
+      end
+    end
+  end
+
+  # Fable withholds reasoning text by default; the mapper asks for it.
+  describe "reasoning text on Fable" do
+    it "comes back as a summary, as liaison asks by default" do
+      Wiretap.intercept("anthropic_reasoning_text_summarized") do
+        session = M::Session.new
+        session << M::Message.user(PELL)
+
+        reply, _ = client.send(session, MODEL_FABLE_1,
+          options: Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::High,
+            max_output_tokens: 4096))
+
+        reasoning = reply.content.select(M::ReasoningBlock)
+        reasoning.should_not be_empty
+        reasoning.first.text.to_s.should_not be_empty
       end
     end
   end

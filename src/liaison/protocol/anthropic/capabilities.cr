@@ -16,6 +16,20 @@ module Liaison::Protocol::Anthropic
   # The API rejects a smaller budget outright.
   MIN_THINKING_BUDGET = 1024
 
+  # Models that take adaptive thinking but do not think unless asked, per
+  # Anthropic's per-model thinking table: with no `thinking` field, thinking is
+  # off here and adaptive on every Claude 5 model. So reasoning requested by
+  # effort is sent with `thinking: {type: adaptive}`, and with no reasoning
+  # requested nothing is, rather than switch thinking on uninvited. A list of
+  # the past, so it only shrinks. Budget-only models are in
+  # `Capability::Catalog::BUDGET_ONLY`.
+  THINKING_OFF_BY_DEFAULT = Set{
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6",
+  }
+
   # Models that reject `thinking: {type: "disabled"}` (`"thinking.type.disabled"
   # is not supported for this model`, recorded in `spec/live/anthropic_spec.cr`),
   # their thinking being always on. `Reasoning::Off` becomes the lowest rung,

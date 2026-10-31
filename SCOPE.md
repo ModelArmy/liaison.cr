@@ -127,36 +127,12 @@ check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
 redirect goes red rather than relabelling evidence. Found in
 `gemini_foreign_tool_call_35`'s re-recording.
 
-### Effort without thinking on Opus 4.5–4.8 and Sonnet 4.6
-
-Anthropic's per-model table (*Thinking*, platform docs): with no `thinking`
-field, thinking is adaptive on every Claude 5 model and Mythos Preview, and
-off on Opus 4.5–4.8 and Sonnet 4.6. The mapper sends `output_config.effort`
-alone for any effort-unit model, so `Reasoning::Effort` there asks for effort
-without thinking and reports no loss. Two remedies, by model: Opus 4.6–4.8 and
-Sonnet 4.6 accept `thinking: {type: adaptive}`; Opus 4.5 rejects it with a 400
-and thinks only on `type: enabled` with a budget, beside which it also takes
-effort. Recorded only for Fable, where thinking is on regardless. Where:
-`anthropic/mapper.cr`'s `reasoning`, and `Catalog`. Designed with the next
-entry, since both set the same field.
-
-### Liaison does not ask for withheld thinking text
-
-Decided: by `DEVELOPMENT.md`'s *capture as much as each API will return*,
-liaison asks for reasoning text where an API withholds it by default, and a
-caller may decline. On Anthropic, `thinking.display` defaults to `omitted` on
-every Claude 5 model, Opus 4.7 and 4.8 and Mythos Preview: the block arrives
-with empty text and a signature, which replays on Anthropic and carries
-nothing to another vendor. `display: summarized` returns a summary at the same
-price; the cost is latency to the first streamed token. `display` rides on
-`thinking.type` `adaptive` or `enabled`, so on models that think by default it
-means sending a `thinking` field where none is sent today. Open: the `Options`
-control's name and shape, which Gemini and Responses should share, and whether
-empty reasoning text should be dropped rather than sent across vendors.
-
 ### Gemini may withhold thoughts when no reasoning option is set
 
-Predicted by reading. `includeThoughts` is sent only with a budget or level.
+Predicted by reading. Anthropic now asks for reasoning text by default, as
+`DEVELOPMENT.md`'s *capture* rule requires, through `Options#reasoning_text`;
+Gemini should honour the same option. `includeThoughts` is sent only with a
+budget or level.
 Gemini 3 models think by default, so a request with no reasoning option may
 think, bill for it, and return neither thought text nor the signature a later
 turn needs. Where: `gemini/wire/request.cr`. Confirm with one call per case.

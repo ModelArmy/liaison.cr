@@ -72,12 +72,14 @@ private ALL = [Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Re
                Liaison::ProtocolKind::Anthropic, Liaison::ProtocolKind::Gemini]
 
 describe "reasoning controls" do
-  # The property that keeps every committed transcript valid. If this fails,
-  # every live recording has to be re-cut, so it is asserted before anything
-  # else is.
+  # The property that keeps committed transcripts valid. If this fails, live
+  # recordings have to be re-cut, so it is asserted before anything else is.
+  # Anthropic's own models are the exception, by design: where a model thinks
+  # by default, liaison asks for its reasoning as text (`DEVELOPMENT.md`).
   describe "absence" do
     it "emits nothing at all when the caller asks for nothing" do
-      ALL.each do |protocol|
+      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses,
+       Liaison::ProtocolKind::Gemini}.each do |protocol|
         request = body(protocol, Liaison::Options.new)
 
         request["reasoning_effort"]?.should be_nil
@@ -85,6 +87,25 @@ describe "reasoning controls" do
         request["thinking"]?.should be_nil
         request["output_config"]?.should be_nil
         request["generationConfig"]?.should be_nil
+      end
+    end
+
+    it "emits nothing on Anthropic where thinking is off by default, or on a compatible endpoint" do
+      request = body(Liaison::ProtocolKind::Anthropic, Liaison::Options.new, "claude-opus-4-8")
+      request["thinking"]?.should be_nil
+      request["output_config"]?.should be_nil
+
+      ollama = Liaison::AnthropicAdapter.new("ollama")
+      plain = JSON.parse(ollama.prepare(asked, "gemma4:26b", C::Policy::Lenient,
+        C::ReasoningRetention::All, 4096, Liaison::Options.new).body)
+      plain["thinking"]?.should be_nil
+    end
+
+    it "asks Anthropic's thinking-by-default models for their reasoning as text" do
+      {"claude-opus-5-5", "claude-fable-5-1", "test-model"}.each do |model|
+        request = body(Liaison::ProtocolKind::Anthropic, Liaison::Options.new, model)
+        request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"summarized"}))
+        request["output_config"]?.should be_nil
       end
     end
 
@@ -171,9 +192,29 @@ describe "reasoning controls" do
       result.report.annotations.any? { |a| a.detail.includes?("clamped") }.should be_true
     end
 
-    it "sends a rung on Anthropic without asking for a budget" do
-      request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High))
-      request["thinking"]?.should be_nil
+    # Adaptive, not a budget: on a model where thinking is off by default,
+    # effort alone would ask for effort without thinking.
+    it "sends a rung on Anthropic with adaptive thinking, not a budget" do
+      {"test-model", "claude-opus-4-8", "claude-sonnet-4-6"}.each do |model|
+        request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High), model)
+        request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"summarized"}))
+        request["output_config"]["effort"].as_s.should eq "high"
+      end
+    end
+
+    it "sends a budget, and no display, to Opus 4.5, which rejects adaptive" do
+      request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High),
+        "claude-opus-4-5")
+      request["thinking"]["type"].as_s.should eq "enabled"
+      request["thinking"]["display"]?.should be_nil
+      request["output_config"]?.should be_nil
+    end
+
+    it "asks for the reasoning to be omitted when the caller declines its text" do
+      declined = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::High,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      request = body(Liaison::ProtocolKind::Anthropic, declined)
+      request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"omitted"}))
     end
 
     it "is Exact where the unit matches, and costs the caller nothing" do
@@ -295,7 +336,7 @@ describe "reasoning controls" do
     it "sends the lowest rung on Anthropic, recorded as Degraded" do
       %w(claude-opus-5-5 claude-fable-5 claude-fable-5-1).each do |model|
         request = body(Liaison::ProtocolKind::Anthropic, off, model)
-        request["thinking"]?.should be_nil
+        request["thinking"]["type"].as_s.should eq "adaptive"
         request["output_config"]["effort"].as_s.should eq "low"
 
         control_loss(exchange(Liaison::ProtocolKind::Anthropic, off, model))

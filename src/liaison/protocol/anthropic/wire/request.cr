@@ -225,6 +225,9 @@ module Liaison::Protocol::Anthropic
       getter thinking_budget : Int32?
       getter effort : String?
       getter? thinking_disabled : Bool
+      # Adaptive thinking, and how its reasoning is returned: `summarized` or
+      # `omitted`. `nil` sends no adaptive `thinking`.
+      getter thinking_display : String?
       # An object with a `type`, where the OpenAI protocols take a bare string.
       getter tool_choice : String?
       # Asks for a frame stream. Set by the adapter through `with_stream`, not
@@ -238,14 +241,16 @@ module Liaison::Protocol::Anthropic
                      @effort : String? = nil,
                      @thinking_disabled : Bool = false,
                      @tool_choice : String? = nil,
-                     @stream : Bool = false)
+                     @stream : Bool = false,
+                     @thinking_display : String? = nil)
       end
 
       # The same request, streamed. A copy rather than a setter, since a setter
       # on a struct edits whichever copy the caller holds.
       def with_stream(value : Bool) : Request
         Request.new(@model, @messages, @max_tokens, @system, @tools,
-          @thinking_budget, @effort, @thinking_disabled, @tool_choice, value)
+          @thinking_budget, @effort, @thinking_disabled, @tool_choice, value,
+          @thinking_display)
       end
 
       def to_json(json : JSON::Builder)
@@ -275,6 +280,13 @@ module Liaison::Protocol::Anthropic
             end
           elsif @thinking_disabled
             json.field("thinking") { json.object { json.field "type", "disabled" } }
+          elsif display = @thinking_display
+            json.field("thinking") do
+              json.object do
+                json.field "type", "adaptive"
+                json.field "display", display
+              end
+            end
           end
           if level = @effort
             # Outside `thinking`: effort shapes the whole response, thinking or

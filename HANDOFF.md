@@ -250,8 +250,18 @@ per-model thinking table widened the work: Opus 4.5 is affected too, model-bound
 reasoning is a read matrix, and Gemini and Responses may withhold reasoning as
 well. All in `SCOPE.md`.
 
-Next in `WILL FIX`: **effort without thinking on Opus 4.5–4.8 and Sonnet 4.6**
-and **liaison does not ask for withheld thinking text**, designed together.
+**Anthropic now asks for reasoning as text, and for thinking where effort
+alone would not.** The mapper sends `thinking: {type: adaptive, display:
+summarized}` to every Claude 5 model, and to Opus 4.6–4.8 and Sonnet 4.6 when
+an effort is requested; Opus 4.5 joined `BUDGET_ONLY`; compatible endpoints
+such as Ollama get nothing new. `Options#reasoning_text` declines the text.
+Claude 5 request bodies changed even with no reasoning asked for, which the
+`absence` conformance spec now states as the one exception.
+`ANTHROPIC.md`, *Liaison asks for the reasoning as text*.
+
+Next in `WILL FIX`: **Gemini may withhold thoughts when no reasoning option is
+set**, then **Responses may never ask for reasoning summaries**: the same rule,
+on the other two protocols.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

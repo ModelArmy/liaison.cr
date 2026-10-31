@@ -129,24 +129,39 @@ suggested a minimum spend is enforced, only a minimum offer. See
 tool calls included, and works whether or not thinking is enabled.
 
 **Whether effort alone thinks depends on the generation.** Anthropic's
-documentation: on Opus 5, Sonnet 5, Fable 5 and Mythos 5 thinking is on and
-adaptive with no `thinking` field; on Opus 4.6, 4.7, 4.8 and Sonnet 4.6 it is
-off until the request says `thinking: {type: adaptive}`. The mapper sends no
-`thinking` field on the effort path, which is right for the first group and,
-for the second, a request for effort without thinking (`SCOPE.md`). Recorded
-for Fable only: `claude-fable-5-1` spent 69 thinking tokens on a question that
-warranted them, at high effort, and none on easier ones, at medium effort with
-or without `adaptive` (`spec/transcripts/anthropic_adaptive_thinking_high.json`,
-`anthropic_adaptive_thinking_medium.json`), and the identical high-effort
-request, repeated, spent none. Adaptive thinking is the model's call, not
-repeatable, and no specs should rely on it occurring.
+per-model table: with no `thinking` field, thinking is adaptive on every
+Claude 5 model and Mythos Preview, and off on Opus 4.5–4.8 and Sonnet 4.6.
+Recorded for Fable: `claude-fable-5-1` spent 69 thinking tokens on a question
+that warranted them, at high effort, and none on easier ones, at medium effort
+with or without `adaptive` (`spec/transcripts/anthropic_adaptive_thinking_high.json`,
+`anthropic_adaptive_thinking_medium.json`); the identical high-effort request,
+repeated, spent none. Adaptive thinking is the model's call and not
+repeatable, so no spec relies on it occurring on an easy question.
+`anthropic_adaptive_thinking_sonnet46` records the other generation.
 
-**Thinking text is withheld by default on newer models.** `thinking.display`
-defaults to `omitted` on Fable 5, Mythos 5, Opus 4.7 and 4.8: the block
-arrives with `"thinking": ""` and a signature holding the full thinking,
-encrypted. Liaison sends no `display`, so it exports such reasoning with empty
-text, which replays on Anthropic and carries nothing to another vendor
-(`SCOPE.md`).
+**Liaison asks for the reasoning as text.** `thinking.display` defaults to
+`omitted` on every Claude 5 model, Opus 4.7 and 4.8 and Mythos Preview: the
+block arrives with `"thinking": ""` and a signature holding the full thinking,
+encrypted, which replays on Anthropic and carries nothing to another vendor.
+By `DEVELOPMENT.md`'s *capture as much as each API will return*, the mapper
+sends `thinking: {type: adaptive, display: summarized}`, by model:
+
+- **Thinks by default** (every Claude 5 model, and any name the lists below do
+  not hold): always, with an effort or without, since the model thinks anyway
+  and only the text is in question.
+- **Off by default** (`THINKING_OFF_BY_DEFAULT`: Opus 4.6–4.8, Sonnet 4.6):
+  only with an effort, which switches on the thinking the caller asked for.
+  Without one, nothing, rather than switch thinking on uninvited.
+- **Budget only** (`Catalog::BUDGET_ONLY`, now with Opus 4.5, which rejects
+  `adaptive`): `type: enabled` with a budget, as before, and no `display`,
+  whose default there is already `summarized`.
+- **A compatible endpoint** (a profile whose `metadata_key` is not
+  `anthropic`, such as Ollama): nothing, since its models are not Claude.
+
+`Options#reasoning_text` set to `Reasoning::Text::Omitted` sends `display:
+omitted` instead, for a shorter wait to the first streamed token at the cost
+of fidelity when the session is continued. The text is a summary at best.
+`anthropic_reasoning_text_summarized` records Fable returning it.
 
 **Turning thinking off is model-dependent too.** `Reasoning::Off` is spelled
 `thinking: {type: disabled}`, and models whose thinking is always on reject it:
