@@ -330,6 +330,17 @@ either way — contiguous thoughts fold into a single reasoning block — with t
 merging arithmetic itself covered offline, where fragments can be arranged
 rather than hoped for.
 
+### Live finding: a streamed turn ending in a tool call returns no summary
+
+With `includeThoughts` set and 42–68 thinking tokens spent, every streamed turn
+that ended in a function call came back with the call and its signature but no
+thought part: four of four, on 3.5 and 3.6 (`gemini_stream_tools`, the first
+turn of `gemini_stream_resumed`, recorded on each). The unstreamed equivalent
+did return a summary (`gemini_tool_pairing_36`). Liaison already asks; there is
+nothing more to ask for, so the reasoning on those turns is captured only as
+the signature. Recorded, not documented by Google, and four samples, so read it
+as a tendency of these models rather than a rule.
+
 ### Live finding: a streamed `thoughtSignature` survives, and there is one of it
 
 This matters more than anything else here. Signatures must be replayed
