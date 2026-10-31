@@ -216,9 +216,17 @@ calls. Covered in `spec/conformance/reasoning_controls_spec.cr`.
 spell**, through the same guard as `Provider.for`, extracted so the two cannot
 drift.
 
-Next among the comments pass's findings: **a degraded tool call leaves its
-result behind as `unknown_function`**, so Gemini receives a `functionResponse`
-answering a call that is not there.
+**A degraded tool call's result is named after its call**, not
+`unknown_function`. The name is read from the session, not bound in the
+translation table, since a dropped call taking an ordinal would misalign
+export's pairing of every later call by that name. Keeping the result was
+already the decision in `Resolver`; two recordings now show Gemini accepts it,
+in the current turn too, so the `SCOPE.md` entry is closed.
+
+They also showed **`gemini-3.5-flash` now answered by `gemini-3.6-flash`**:
+every re-recording of a spec pinned to 3.5 measures 3.6. Logged in `SCOPE.md`
+with a likely fix — assert `modelVersion` — and worth doing before the next
+Gemini re-recording.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

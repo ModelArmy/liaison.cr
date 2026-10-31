@@ -212,8 +212,18 @@ by `Resolver` ahead of `own?`, reporting `Degraded` rather than sending a
 request that cannot succeed. Under `Strict` or the default `Compensating`
 policy that refuses the request; under `Lenient` the call is dropped and the
 loss annotated. Its result is not dropped with it, and goes out as a
-`functionResponse` named `unknown_function`, which `SCOPE.md` logs as a
-defect.
+`functionResponse` named after the call, read from the session rather than
+the translation table: export pairs calls by counting them over the wire, so a
+call that never reached it must not take an ordinal. A result with no call
+before it is accepted in a closed turn and in the current turn alike, the one
+where Gemini checks signatures (`gemini_foreign_tool_call_35`,
+`gemini_foreign_tool_call_current_turn_35`), and the model answers from it.
+Keeping the result is therefore not a hazard, as far as recorded.
+
+Both were recorded with `gemini-3.5-flash` in the URL and answered by
+`gemini-3.6-flash` per `modelVersion`; earlier recordings under that name were
+answered by 3.5. `SCOPE.md`'s *`gemini-3.5-flash` is now served by 3.6* has
+what that does to the specs pinned to 3.5.
 
 The one thing that is *not* like the Anthropic fix is where the flag is
 declared. `reasoning_signature_required` sits on Anthropic's `PROFILE`, true

@@ -272,6 +272,22 @@ describe "Gemini" do
         reply.content.select(M::TextBlock).should_not be_empty
       end
     end
+
+    # The handoff mid-loop: no follow-up question, so the result whose call
+    # was dropped sits in the current turn, the one Gemini validates. Accepted,
+    # and answered from the result. Recorded when Google served this model
+    # name with `gemini-3.6-flash`, so the evidence is about 3.6.
+    it "is accepted with the orphaned result in the current turn" do
+      Wiretap.intercept("gemini_foreign_tool_call_current_turn_35") do
+        reply, report = client(Liaison::Capability::Policy::Lenient)
+          .send(foreign_call_turn, MODEL_35, options: armed)
+
+        report.annotations
+          .select { |a| a.block_kind == M::BlockKind::ToolCall }
+          .map(&.outcome).should contain(M::Outcome::Degraded)
+        reply.content.should_not be_empty
+      end
+    end
   end
 
   # Catalog probes: whether each newer model needs an entry. Each sends the

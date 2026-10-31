@@ -46,9 +46,10 @@ module Liaison::Protocol::Gemini
       # Calls so far per function name; with the name, the ordinal is the
       # identifier.
       ordinals = Hash(String, Int32).new(0)
+      names = call_names(session)
 
       session.messages.each_with_index do |message, index|
-        parts = parts_for(message, index, report, plan, pending, ordinals)
+        parts = parts_for(message, index, report, plan, pending, ordinals, names)
         next if parts.empty?
 
         # Anything that is not a tool response ends the run, a model turn
@@ -150,7 +151,8 @@ module Liaison::Protocol::Gemini
                           report : Capability::Report,
                           plan : Capability::Retention::Plan,
                           pending : Array(Wire::Part),
-                          ordinals : Hash(String, Int32)) : Array(Wire::Part)
+                          ordinals : Hash(String, Int32),
+                          names : Hash(String, String)) : Array(Wire::Part)
       parts = [] of Wire::Part
 
       message.content.each do |block|
@@ -163,7 +165,7 @@ module Liaison::Protocol::Gemini
           rendered = function_call(block, index, report, ordinals)
           parts << rendered if rendered
         in MPSH::ToolResultBlock
-          rendered = function_response(block, index, report, pending)
+          rendered = function_response(block, index, report, pending, names)
           parts << rendered if rendered
         in MPSH::RefusalBlock
           outcome = Capability::Resolver.outcome(block, profile)
@@ -198,11 +200,13 @@ module Liaison::Protocol::Gemini
       Wire::FunctionCallPart.new(block.name, block.arguments.to_json, signature)
     end
 
-    # A response names the function it answers, recovered from the
-    # translation table, or `unknown_function` when its call was not mapped.
+    # A response names the function it answers: from the translation table,
+    # else from its call in the session (a call degraded and not sent), else
+    # `unknown_function`.
     private def function_response(block : MPSH::ToolResultBlock, index : Int32,
                                   report : Capability::Report,
-                                  pending : Array(Wire::Part)) : Wire::Part?
+                                  pending : Array(Wire::Part),
+                                  names : Hash(String, String)) : Wire::Part?
       outcome = Capability::Resolver.outcome(block, profile)
       report.record(outcome, "tool result as a functionResponse part",
         index, MPSH::BlockKind::ToolResult)
@@ -222,12 +226,26 @@ module Liaison::Protocol::Gemini
         end
       end
 
-      Wire::FunctionResponsePart.new(function_name(block), {output: text.join("\n")}.to_json)
+      Wire::FunctionResponsePart.new(function_name(block, names), {output: text.join("\n")}.to_json)
     end
 
-    private def function_name(block : MPSH::ToolResultBlock) : String
+    private def function_name(block : MPSH::ToolResultBlock, names : Hash(String, String)) : String
       key = calls.provider_id(block.call_id)
-      key ? key.rpartition('#')[0] : "unknown_function"
+      return key.rpartition('#')[0] if key
+      names[block.call_id]? || "unknown_function"
+    end
+
+    # Each tool call's name by its MPSH id. Kept apart from the translation
+    # table, which binds only calls sent, so a dropped call takes no ordinal
+    # and export's count over the wire still lines up.
+    private def call_names(session : MPSH::Session) : Hash(String, String)
+      names = {} of String => String
+      session.messages.each do |message|
+        message.content.each do |block|
+          names[block.call_id] = block.name if block.is_a?(MPSH::ToolCallBlock)
+        end
+      end
+      names
     end
 
     private def thought(block : MPSH::ReasoningBlock, index : Int32,

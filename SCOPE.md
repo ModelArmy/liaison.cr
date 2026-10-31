@@ -114,22 +114,18 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### A degraded tool call leaves its result behind as `unknown_function`
+### `gemini-3.5-flash` is now served by 3.6
 
-When `Resolver` degrades a tool call because the target requires a signature it
-does not carry (any foreign call sent to a Gemini 3 model), the Gemini mapper
-drops the call but still maps its result. With no binding in the `CallIdTable`,
-`function_name` falls back to `"unknown_function"`, so the request carries a
-`functionResponse` answering a call that is not there, under a name the model
-never used. Where: `src/liaison/protocol/gemini/mapper.cr`, `function_call`
-and `function_response`.
-
-Bounded by policy: `Degraded` exceeds the default `Compensating`, so this is
-sent only under `Lenient`. But `Lenient` is what a caller picks to hand a
-tool-using session to Gemini 3, which is this shard's defining move. Whether
-Gemini rejects the orphan or the model is merely confused is unrecorded.
-Likely fix: degrade the result with its call, rendering both as text, as a
-server-executed call is elsewhere. Predicted by reading; no spec covers it.
+As of 31 October 2026, a request naming `gemini-3.5-flash` is answered by
+`gemini-3.6-flash`, per the response's `modelVersion`; every recording under
+that name before then was answered by 3.5. Replays are unaffected, since
+Wiretap matches the request. But `spec/live/gemini_spec.cr` pins to 3.5 so its
+findings stay comparable, and any re-recording now measures 3.6 under a 3.5
+label. Both current-turn findings that depend on the model — the signature
+check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
+`modelVersion` in the live specs that claim a model, so the next silent
+redirect goes red rather than relabelling evidence. Found in
+`gemini_foreign_tool_call_35`'s re-recording.
 
 ### Fable's reasoning is model-bound, and replays as if it were not
 
