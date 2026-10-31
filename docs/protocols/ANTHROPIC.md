@@ -128,6 +128,26 @@ suggested a minimum spend is enforced, only a minimum offer. See
 `effort` is deliberately not inside `thinking`: it shapes the whole response,
 tool calls included, and works whether or not thinking is enabled.
 
+**Whether effort alone thinks depends on the generation.** Anthropic's
+documentation: on Opus 5, Sonnet 5, Fable 5 and Mythos 5 thinking is on and
+adaptive with no `thinking` field; on Opus 4.6, 4.7, 4.8 and Sonnet 4.6 it is
+off until the request says `thinking: {type: adaptive}`. The mapper sends no
+`thinking` field on the effort path, which is right for the first group and,
+for the second, a request for effort without thinking (`SCOPE.md`). Recorded
+for Fable only: `claude-fable-5-1` spent 69 thinking tokens on a question that
+warranted them, at high effort, and none on easier ones, at medium effort with
+or without `adaptive` (`spec/transcripts/anthropic_adaptive_thinking_high.json`,
+`anthropic_adaptive_thinking_medium.json`), and the identical high-effort
+request, repeated, spent none. Adaptive thinking is the model's call, not
+repeatable, and no specs should rely on it occurring.
+
+**Thinking text is withheld by default on newer models.** `thinking.display`
+defaults to `omitted` on Fable 5, Mythos 5, Opus 4.7 and 4.8: the block
+arrives with `"thinking": ""` and a signature holding the full thinking,
+encrypted. Liaison sends no `display`, so it exports such reasoning with empty
+text, which replays on Anthropic and carries nothing to another vendor
+(`SCOPE.md`).
+
 **Turning thinking off is model-dependent too.** `Reasoning::Off` is spelled
 `thinking: {type: disabled}`, and models whose thinking is always on reject it:
 `claude-opus-5-5`, `claude-fable-5` and `claude-fable-5-1` each answered with a
@@ -264,11 +284,10 @@ message's `provenance.model`. Sent to another model, the block is
   claude-opus-5-5 ignores*. The note stays with the report and is not added to
   the session, since back on Fable the reasoning is usable again.
 
-Not yet confirmed live: a first recording found Fable reporting its model as
-`claude-fable-5-1`, the plain alias the list holds, but returned no thinking to
-hand over (`SCOPE.md`, *Effort alone may not enable thinking*). A reply could
-not show whether reasoning was ignored in any case; that rests on the
-documentation.
+`spec/transcripts/anthropic_model_bound_reasoning_handoff.json` hands Fable's
+thinking to Opus: the Fable turn is taken from the recording in which Fable
+thought, since adaptive thinking cannot be relied on to recur. A reply cannot
+show whether it was ignored; that rests on the documentation.
 
 ## Streaming
 

@@ -233,17 +233,18 @@ other model.** The producing model was already in each message's
 `provenance`, so MPSH's format is unchanged; §7's ownership rule gains the
 condition (spec 1.8). `Catalog::MODEL_BOUND_REASONING` lists the producers;
 `Report#record`'s `note:` annotates this one rearrangement, for the request
-only. The wire is unchanged. Unconfirmed live: the probe's first recording
-showed Fable reports the plain alias, but Fable produced no thinking to hand
-over, which led to the finding below.
+only. The wire is unchanged. `anthropic_model_bound_reasoning_handoff` probes
+the handoff to Opus.
 
-**Effort alone may not enable thinking on Opus 4.6+ and Fable.** The mapper
-sends `output_config.effort` with no `thinking` field; Fable answered with
-`thinking_tokens: 0`, and the models' own 400s name `thinking.type.adaptive`
-and effort as a pair. A diagnostic probe is next, then a gated fix; the
-handoff probe waits on it. See `SCOPE.md`.
+**Whether effort alone thinks depends on the generation.** On Opus 5, Sonnet 5,
+Fable 5 and Mythos 5 it does, adaptively; Anthropic documents that Opus 4.6–4.8
+and Sonnet 4.6 need `thinking: {type: adaptive}`, which the mapper never sends.
+Recordings cover Fable only. Adaptive thinking is not repeatable, so the
+handoff probe replays Fable's thinking turn from a recording. Fable and the
+other newest models also withhold thinking text by default (`display:
+omitted`), so their reasoning crosses vendors empty. Both are in `SCOPE.md`.
 
-Next in `WILL FIX`: **`MalformedResponseError` is defined twice**.
+Next in `WILL FIX`: **effort without thinking on Opus 4.6–4.8 and Sonnet 4.6**.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

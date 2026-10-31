@@ -127,20 +127,30 @@ check and `NONE` being disregarded — were recorded on 3.5. Likely fix: assert
 redirect goes red rather than relabelling evidence. Found in
 `gemini_foreign_tool_call_35`'s re-recording.
 
-### Effort alone may not enable thinking
+### Effort without thinking on Opus 4.6–4.8 and Sonnet 4.6
 
-For effort-unit models the Anthropic mapper sends `output_config: {effort:}`
-and no `thinking` field. `claude-fable-5-1` answered such a request, a tool
-question at medium effort, with `thinking_tokens: 0`. The 400s Opus and Fable
-return for `thinking: disabled` name `thinking.type.adaptive` and
-`output_config.effort` as the pair to use, and no recording has an Anthropic
-model thinking on effort alone. If effort does not enable thinking,
-`Reasoning::Effort` has never produced reasoning on Opus 4.6+ or Fable, while
-reporting no loss. One response cannot tell thinking off from adaptive
-thinking choosing not to; a diagnostic probe asking the same question with
-and without `adaptive` would. Where: `anthropic/mapper.cr`'s
-`reasoning`. Likely fix: send `thinking: {type: adaptive}` with an effort, on
-the models that accept it, which Opus 4.5 may not.
+Anthropic documents that on `claude-opus-4-6`, `-4-7`, `-4-8` and
+`claude-sonnet-4-6` thinking is off until the request sets `thinking: {type:
+adaptive}`; `output_config.effort` alone does not enable it. The mapper sends
+effort alone for any effort-unit model, so `Reasoning::Effort` on those models
+asks for effort without thinking and reports no loss. Read from documentation;
+recorded only for Fable, where thinking is on regardless. Where:
+`anthropic/mapper.cr`'s `reasoning`, and `Catalog`. Likely fix: a list of
+models needing `adaptive` declared, as the other per-model lists are; a probe
+on one of them confirms the gap first. Opus 4.5, which takes both units, is
+not in Anthropic's list and is left alone.
+
+### Withheld thinking crosses vendors as empty reasoning
+
+On Fable 5, Mythos 5, Opus 4.7 and 4.8, `thinking.display` defaults to
+`omitted`, so the Anthropic exporter records reasoning with empty text and a
+signature. On Anthropic it replays intact. Handed to another vendor, the
+signature is shed and nothing is left: the block reaches Gemini or the OpenAI
+protocols as empty reasoning text, `Restructured`, where `display: summarized`
+would have carried a summary for the same price. Where: `anthropic/mapper.cr`
+and `Options`. Fix: decide whether liaison requests `summarized` by default,
+on the grounds that portability is the shard's point, or leaves it to an
+option; and whether empty reasoning text should be dropped rather than sent.
 
 ### `MalformedResponseError` is defined twice
 
