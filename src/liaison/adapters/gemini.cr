@@ -24,7 +24,7 @@ module Liaison
     end
 
     # The envelope the other protocols use. Gemini may also return a bare
-    # array of them, which `nested_error` does not handle.
+    # array of them, for which this returns `nil`.
     def error_detail(body : String) : String?
       nested_error(body)
     end

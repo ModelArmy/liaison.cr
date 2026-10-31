@@ -133,10 +133,12 @@ module Liaison
     end
 
     # Reads `{"error": {"message": ...}}`, the envelope both OpenAI protocols,
-    # Anthropic and Gemini use. Rescues unparseable JSON only, so it raises
-    # if the body or its `error` is not an object.
+    # Anthropic and Gemini use. Returns `nil` for unparseable JSON and for
+    # JSON of any other shape.
     private def nested_error(body : String) : String?
-      JSON.parse(body)["error"]?.try(&.["message"]?).try(&.as_s?)
+      JSON.parse(body).as_h?
+        .try(&.["error"]?).try(&.as_h?)
+        .try(&.["message"]?).try(&.as_s?)
     rescue JSON::ParseException
       nil
     end

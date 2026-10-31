@@ -202,9 +202,14 @@ All three `MUST FIX` items among them are now done:
    and `DEVELOPMENT.md` has the reasoning, including why repeats are counted
    rather than tested for.
 
-First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
-object**, replacing the real failure with an unrelated exception. Loud, and no
-dearer to fix later.
+**`error_detail` no longer raises on a JSON error body that is not an object.**
+`nested_error` checks the shape at each step instead of rescuing broadly, so a
+string `error` or a top-level array yields `nil` and the `TransportError` with
+its status survives. Covered in `spec/conformance/layer_spec.cr`.
+
+Next among the comments pass's findings: **a `reasoning_unit` override bypasses the
+signed-tool-call axis**, so a Gemini 3 model given an explicit unit draws the
+400 its catalog entry exists to prevent.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

@@ -114,19 +114,6 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### `error_detail` raises on a JSON error body that is not an object
-
-`Adapter#nested_error` reads `JSON.parse(body)["error"]?.try(&.["message"]?)`
-and rescues only `JSON::ParseException`. `JSON::Any#[]?(String)` raises a plain
-`Exception` on anything but a hash, so `{"error": "text"}` (a string `error`, as
-some OpenAI-compatible servers send) or a top-level array (which the Gemini
-adapter's own comment says Gemini may return) raises from inside
-`Server#post`. The `TransportError` with the status is replaced by an
-unrelated exception. Where: `src/liaison/adapters/adapter.cr`, `nested_error`,
-used by all four adapters. Likely fix: rescue broadly there and return `nil`,
-or check `as_h?` at each step. Predicted by reading the stdlib
-(`src/json/any.cr`); no spec covers it.
-
 ### A `reasoning_unit` override bypasses the signed-tool-call axis
 
 `Adapter#narrowed(model)` returns early when a `reasoning_unit` override is
