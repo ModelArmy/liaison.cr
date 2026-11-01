@@ -1,21 +1,20 @@
 {
   "name": "gemini_baseline_text",
-  "recorded_with": "wiretap/0.4.0",
+  "recorded_with": "wiretap/0.4.2",
   "interactions": [
     {
       "request": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "206",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in one short sentence.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]}],\"generationConfig\":{\"maxOutputTokens\":256}}",
-        "body_digest": "6e606290d3941d0b48707ff888dc5bc29280bdb698251442d7e0fa3a3bbf2986"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in one short sentence.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]}],\"generationConfig\":{\"maxOutputTokens\":256,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "e9b34f9e9b7e2d4c283703435b55a0f200edc5303b6cf136e87c49f762f7acce"
       },
       "response": {
         "status": 200,
@@ -23,18 +22,18 @@
           "X-Gemini-Service-Tier": "standard",
           "Content-Type": "application/json; charset=UTF-8",
           "Vary": "Origin, X-Origin, Referer",
-          "Date": "Wed, 26 Aug 2026 02:48:01 GMT",
+          "Date": "Sat, 31 Oct 2026 20:15:47 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=1546",
+          "Server-Timing": "gfet4t7; dur=3854",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "Transfer-Encoding": "chunked"
         },
-        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Mount Everest is the tallest mountain on Earth.\",\n            \"thoughtSignature\": \"EtQGCtEGARFNMg+9gghCT7iwD941pdgpCoplcLdyfWfjx4bCkKiv98XxXILNaGBpyLqB6quQ08RzJ97TYf67iBq048hKd6igovF0pI10uyEsbuxVCVuLL4aaIwL7DZFzaBAKknmFinloiz/tL4DTZ5f6Nb8SRp8ejEkI1vTYIBYfXCfSElJz7Xy+Yt0UCo3cozQVkCx+t0Uzzmlo/3TqQ8kOG2fq+f/jF97qy6K/7F5A2O5EQ3jkAJf7fOSyx8DPGvuN/fGhF/xWnmS/gPo5AqT8FTj6TMnvlFqu+3JK3fgYCLbNAM9Ggit0NH82an7Et1iUnnI1jtog7UN7d6BRpYm2feZzGdaG3BfFnBm7931ixPJzBRrRPPHaYPYKSoNTYOoGYiembVaY7MtZo1Sgs9BYg0Kumm4SNo0OmJnJKzHKoiC8/nmjZbD72h7QRgHLnd2b6ecgnCt/DK9zXGJc0tfP9j09J9S3iWg5hPCJ+u7bkfXPouROpa+aBFsu4Vr4hXlzVzicfnBphNfQHNQBK63hbFwF6BYB/VAY3HPTetu0bv2NIDiW7SgmNqZQqhxZqHoHo9NPDOCxgi5LebW5BumLmxEaCPL+SnVMfGwJAwsQ8/dRXYgmxVedN9V2giglokF+nQmh1ZjyXc3IxbiGfHJEtoDa2revUg1K9ETNhbo7Wcrpas5TtjUbl0IeqZn4biZC+CDM52gk7qVQ3Gf7oWmk1dngwlrv4idZQ3ElP5hU+qcw0jNG/SqfqUIBLd89hwmC9cM5tlppcW42VZ+yTrn0dPuH0//F8XvDB21PaVLs+rvtsL7oDjPnfgQQ23HItnfGYaM5XcwrFzft/0GYPWprym+KZgXdfF4dqhz3yWi+dHD3oxWrUjvYlMs4WHabi+JL1wriAFC3Leiso9QitNDdGAkz7jXTRl5zwsJIwhEjU0W5r5cVF9P+uM5LPu5z8sjpjZa0047Gr2vcw6vMDVdflzmy7SpFElScU/xa+sFHBEzpNh/wllEir2DlxpBIjaRFk4Y1KjIHNwNvElTlv0rCNCSUngWbp6LyEpue/A23+R45/Gb+vYUCRE8tPWIS4OkWI8SzZkSksKktXXX4HWKnjdnPW+i780Jxvgp+QHmUbwD7l8ef\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 15,\n    \"candidatesTokenCount\": 9,\n    \"totalTokenCount\": 208,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 15\n      }\n    ],\n    \"thoughtsTokenCount\": 184,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.5-flash\",\n  \"responseId\": \"4FOOaq2-Isbe_uMP9M-dIQ\"\n}\n"
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Thought Process: Defining \\\"Tallest Mountain\\\"**\\n\\nOkay, here's what's running through my mind. The user wants to know the \\\"tallest mountain,\\\" which, as a specialist in this domain, means I need to clarify what metric they're using. So I begin by unpacking the question.\\n\\nFirst, I consider the common understanding – the \\\"tallest\\\" in the typical sense means height above sea level. This immediately brings Mount Everest to mind, at 8,848.86 meters. Perfect. That's the benchmark.\\n\\nBut wait, I need to consider all angles. Then I'm thinking about 'overall height' from base to peak. Mauna Kea comes to mind. It has an immense overall height, but a large portion is submerged. Still, worth noting that this perspective is different.\\n\\nThen, there's the concept of distance from Earth's center – Mount Chimborazo. Another dimension of \\\"tallest,\\\" and while technically correct, it's not the usual interpretation.\\n\\nSo, now I've got to formulate an answer that's short and clear, as the prompt specifies. I'm going to lean towards the conventional definition, the one most relevant and widely understood by experts. The goal is a concise and definitive response. I'll stick to a classic formulation, keeping in mind the need for brevity and precision: \\\"The tallest mountain on Earth above sea level is Mount Everest.\\\"\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"The tallest mountain on Earth above sea level is Mount\",\n            \"thoughtSignature\": \"EucHCuQHAWkUfRNxdpRHiFZ+9W34RtHCZmVoCaV+SHAJtiL7/SlE2lwvvh0e1H9DmGqzuSw67FyV7ReV5hqvmvo+6+Dqe4C+xEsiMoAsCSmhdVGlNRKmT81PD/74nOCym4WfB9AsCwwJnlWRyUDXHlKzEuLbft1udvZCSdV9Iy3UfBG4OKj1VF/n9lJVAkrtd/p5gzdCqLeY0fwgd83CkPg09/PwsZG1+YqgTFvcjM1DFvR0M7mQD9bBFMrAc7R6RqP/OArj7KcBV2q/eqxPbEyMvFI4BaU2ZB3GIhbfZ41EvRn5kzAQSGG0fniOUUpK3jiaF6PTU3YDaiVXjdxC2yiQgWOhZYl2HGVfD+ryM4nO8zXde2vBA/shgixtyPXxl3FtrzVPkXIiZS8SmSQBeLdx37/BiafhmJkz0xUuSrw5oBV+f2nBFrGTnNhdzS5GN3WMKCFXT17DJsHCxTD50qLDQgvANhtevuCaHXsMn02bxwOKIuayGLdh8/gbmNdvpAyVHpKL664Zr1lWK6cGm6DQg09AbYuzCeeWvVwHHPUvqJJuYdCZp4CPoGTvGfThedx5iiK+8Y5bRLFBZRl+Qhgoer7mlYEmoGX3tXqMHrp4hxtAfSrFbjGComzMtZnH1PfeeRmD/CSJ4e9emMUayXzMD/JxKnkbcQ1/5W0FVokp9nOub8M/+w+sv4BmgZk6CDhKrOp7+FMxiQ8Y/Fa+5J74fbAghc2SxUsz1olTzWCG0416Zcogr9Ad/tpZ73JpyMUAMDgTR1+ox+Wc+Z8FPD9e0GFMCll7N/+QeXdV9WZ1EMvnIMzRg3MgsML1zGgUi91NC89N3WxsNL7nMEBmydaTWQg3nMFYQuzjcvwf3PvcNAwJcRC2dMNJJAv+H1xo06LTQO4bKB/kYM09/JtfC5aFUx/OaybLpXjRmePQDuNpH1vkXT1kk3g1dJRVusnIlx6fIvg+ziHNU87wwCLzNcC3n2OQSN/tIoyYgFT14EFslfvhZgZfDf4Id09gHlNX3U8/vSCZZ0fhHJMOpPUi+1CxaXPGbd0PQIPOzWGNFXB56Q5HmcqwREclnqXJxcMxAyWGdmW2cL18yeI7yM15rjMLBUXZL96VZ95vONWz3KY+0cgeN3cfaa/05jkFx9tuXgBw3ocUxl2+s2mZZeWEk4ZHfsmXzxuy28yNsSQFMH1Khp0nGS6YTLSwvbnqedMbFwtMxlTUdHHSW19ZEULUOod+k1IPSGVGy7ZxpBuB+Dudfc5Hsszb5eUHX2eIMIGeZ+LQ+xpNM3Kr8fQCxy1UkAdChez7b3PJXd2qN9F9XQSgutOAqK9Djgvc\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"MAX_TOKENS\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 15,\n    \"candidatesTokenCount\": 10,\n    \"totalTokenCount\": 267,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 15\n      }\n    ],\n    \"thoughtsTokenCount\": 242,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"b0zmavf1FfGbo_UP9q7LoQI\"\n}\n"
       },
-      "recorded_at": "2026-08-26T02:48:02Z"
+      "recorded_at": "2026-10-31T20:15:46Z"
     }
   ]
 }

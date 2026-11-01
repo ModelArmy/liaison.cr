@@ -128,6 +128,48 @@ suggested a minimum spend is enforced, only a minimum offer. See
 `effort` is deliberately not inside `thinking`: it shapes the whole response,
 tool calls included, and works whether or not thinking is enabled.
 
+**Whether effort alone thinks depends on the generation.** Anthropic's
+per-model table: with no `thinking` field, thinking is adaptive on every
+Claude 5 model and Mythos Preview, and off on Opus 4.5–4.8 and Sonnet 4.6.
+Recorded for Fable: `claude-fable-5-1` spent 69 thinking tokens on a question
+that warranted them, at high effort, and none on easier ones, at medium effort
+with or without `adaptive` (`spec/transcripts/anthropic_adaptive_thinking_high.json`,
+`anthropic_adaptive_thinking_medium.json`); the identical high-effort request,
+repeated, spent none. Adaptive thinking is the model's call and not
+repeatable, so no spec relies on it occurring on an easy question.
+
+Recorded for the other generation (`anthropic_adaptive_thinking_sonnet46`):
+asked a Pell equation at high effort with no `thinking` field,
+`claude-sonnet-4-6` returned no thinking block and worked the continued
+fraction in its answer instead; with `adaptive`, it thought for 887 tokens and
+answered apart. Effort alone there does not withhold reasoning so much as
+move it into the reply, where it is answer text to every protocol. Where
+nothing was thought, `usage` omits `output_tokens_details` entirely.
+
+**Liaison asks for the reasoning as text.** `thinking.display` defaults to
+`omitted` on every Claude 5 model, Opus 4.7 and 4.8 and Mythos Preview: the
+block arrives with `"thinking": ""` and a signature holding the full thinking,
+encrypted, which replays on Anthropic and carries nothing to another vendor.
+By `DEVELOPMENT.md`'s *capture as much as each API will return*, the mapper
+sends `thinking: {type: adaptive, display: summarized}`, by model:
+
+- **Thinks by default** (every Claude 5 model, and any name the lists below do
+  not hold): always, with an effort or without, since the model thinks anyway
+  and only the text is in question.
+- **Off by default** (`THINKING_OFF_BY_DEFAULT`: Opus 4.6–4.8, Sonnet 4.6):
+  only with an effort, which switches on the thinking the caller asked for.
+  Without one, nothing, rather than switch thinking on uninvited.
+- **Budget only** (`Catalog::BUDGET_ONLY`, now with Opus 4.5, which rejects
+  `adaptive`): `type: enabled` with a budget, as before, and no `display`,
+  whose default there is already `summarized`.
+- **A compatible endpoint** (a profile whose `metadata_key` is not
+  `anthropic`, such as Ollama): nothing, since its models are not Claude.
+
+`Options#reasoning_text` set to `Reasoning::Text::Omitted` sends `display:
+omitted` instead, for a shorter wait to the first streamed token at the cost
+of fidelity when the session is continued. The text is a summary at best.
+`anthropic_reasoning_text_summarized` records Fable returning it.
+
 **Turning thinking off is model-dependent too.** `Reasoning::Off` is spelled
 `thinking: {type: disabled}`, and models whose thinking is always on reject it:
 `claude-opus-5-5`, `claude-fable-5` and `claude-fable-5-1` each answered with a
@@ -245,6 +287,29 @@ for the block itself; the turn as a whole reads Restructured only because a
 system prompt is present, which is `MoveSystemPrompt`'s doing and unrelated to
 reasoning entirely — see `spec/live/anthropic_spec.cr` for why the test checks
 annotations rather than `report.worst` for this reason.
+
+### A valid signature on the wrong model
+
+Anthropic documents that thinking from `claude-fable-5` and `claude-mythos-5`,
+and their point releases, is tied to the model that produced it: any other
+Claude model accepts the block and ignores it. Same vendor key, same valid
+signature, so `own?` alone would call it Exact. `Catalog::MODEL_BOUND_REASONING`
+lists the producers by exact name, and `Resolver` reads the producer from the
+message's `provenance.model`. Sent to another model, the block is
+`Restructured`:
+
+- **Sent unchanged.** Stripping it would save nothing the model was going to
+  use, and a missing signature is the 400 above.
+- **Not Refused mid-tool-call.** The target accepts it there too.
+- **Always annotated**, through `Report#record`'s `note:`, though a
+  rearrangement otherwise is not: *reasoning by claude-fable-5-1, which
+  claude-opus-5-5 ignores*. The note stays with the report and is not added to
+  the session, since back on Fable the reasoning is usable again.
+
+`spec/transcripts/anthropic_model_bound_reasoning_handoff.json` hands Fable's
+thinking to Opus: the Fable turn is taken from the recording in which Fable
+thought, since adaptive thinking cannot be relied on to recur. A reply cannot
+show whether it was ignored; that rests on the documentation.
 
 ## Streaming
 

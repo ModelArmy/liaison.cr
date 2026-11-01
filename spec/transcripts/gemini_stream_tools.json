@@ -5,11 +5,10 @@
     {
       "request": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse",
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "531",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
@@ -24,17 +23,17 @@
           "Content-Disposition": "attachment",
           "Vary": "Origin, X-Origin, Referer",
           "Transfer-Encoding": "chunked",
-          "Date": "Mon, 07 Sep 2026 00:08:36 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:29 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=968",
+          "Server-Timing": "gfet4t7; dur=1259",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
         },
-        "body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"functionCall\": {\"name\": \"get_weather\",\"args\": {\"city\": \"Paris\"},\"id\": \"call_1757718\"},\"thoughtSignature\": \"ErwDCrkDARFNMg/L6OSlYokEY/BUEFEy8KJtZK/4IPlgTKWP0jQomrHCPHGI9Vsx51EWCRVLR5cH7HYyeB16RZ8yWWWCN2F9M7yRz4JY6tZl6gmBXWYihSDSbKPMMA4L1Rdx5Rfioo0LJMogKMc5jDuVDkUnjhKaZ357TVgqkxtUVbPDqkPpqJSzA5rIMgmpTvJY+r2suBMBb4XrELt8YqSpv/A8MZqzeGDzk2Z15wn3eEoRI0bs2XMJuXdI8p1cwspyT+4ya+yEQN5Eobd2p4QthqrWL71HXU6ldCsf6hTH+LgDBczAe+hLic3dDw9todL0opuN5kcngklPm3OxBc3b7AsIq8G7mKEmz2Y8KGoHTFin84XmDq1SIAMVBFmA4+bMhTxDxuy5pQB/L5DXU5P+H1f3+Hq81NwR6bIKde8TdnmX7qQ4auSKm6tyAFfgwMbsH629vR98heXmUyByRVmvEz9auWDMIJvo6R8nJED0QcXC2QLfhLtyb2fqFsoHHIrrxZ/sB6Ixww0kG3Bl9x7uSBS41ys7t0TKyt6SkEa7Q2TlaRAMJPbvHXbYGi5qIZv4UDJ4OSHaht7JvcxG\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 75,\"candidatesTokenCount\": 16,\"totalTokenCount\": 159,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 75}],\"thoughtsTokenCount\": 68,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.5-flash\",\"responseId\": \"gwCeasDyDKaajMcP1PKV0Q4\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"\"}],\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 75,\"candidatesTokenCount\": 16,\"totalTokenCount\": 159,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 75}],\"thoughtsTokenCount\": 68,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.5-flash\",\"responseId\": \"gwCeasDyDKaajMcP1PKV0Q4\"}\r\n\r\n"
+        "body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"functionCall\": {\"name\": \"get_weather\",\"args\": {\"city\": \"Paris\"},\"id\": \"call_377361\"},\"thoughtSignature\": \"EvsCCvgCAWkUfROYSwgUYT4rvbS7fwXjFlhdrT0PQnIGtXUah5oaV0LRipc+JlpPe4MyKOogqkpuAglT0nxhQYRrVf38pHqS13p0vAm8OK2PoagTeobnqP6YumYQfiRRl2rqZ7SkIdl/mmN3gEB/MUqe1YUJCo+F3VercnrujOx9cSlKojFzlMYvSG0VUOLBedotSczmoaS9xjHpETF60LEH6ZOb4maKH6LiOaxiOBB2XT7mIP8YEuL5m+otLc1it9KW4Tpno/S1aXfU7jJAl1fEDkd9t7b0sHK5oX9ClepwK22twhQ59cY/11ojNzR5atMxn6BmGy3D6QHyR0Z660okjlC5+YchWzjvE3pdWJJhQ7DinIU6BEoUt9DYDdbDTkSKthgYhVAynt984uKrKIK8hKZMU45BIhMWAri8a0esuAnDiaVG+rezY2noX5ZaEXKK7c18uKCuHOQboBS6LTJJ7JKxhjftGPCYiywzJHz1LtrJp/g6sF6zQYXtnA==\"}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 75,\"candidatesTokenCount\": 16,\"totalTokenCount\": 152,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 75}],\"thoughtsTokenCount\": 61,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.6-flash\",\"responseId\": \"nEzmapLQF7De0_gP363y-Qg\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"\"}],\"role\": \"model\"},\"finishReason\": \"STOP\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 75,\"candidatesTokenCount\": 16,\"totalTokenCount\": 152,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 75}],\"thoughtsTokenCount\": 61,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.6-flash\",\"responseId\": \"nEzmapLQF7De0_gP363y-Qg\"}\r\n\r\n"
       },
-      "recorded_at": "2026-09-07T00:08:36Z"
+      "recorded_at": "2026-10-31T20:16:29Z"
     }
   ]
 }

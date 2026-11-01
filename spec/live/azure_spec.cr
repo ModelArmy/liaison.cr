@@ -143,6 +143,53 @@ describe "Azure OpenAI" do
   # than `CAP` above: this is a reasoning model, and 64 tokens is a budget
   # thinking alone can exhaust, which would produce an empty reply for reasons
   # having nothing to do with tool choice.
+  # Whether Responses returns reasoning liaison can keep. The same request
+  # twice, at medium effort: as the mapper builds it, and with
+  # `reasoning.summary: auto` and `include: ["reasoning.encrypted_content"]`
+  # added by hand. OpenAI documents both as opt-in. Azure returned the
+  # encrypted payload unasked, so replay never depended on `include` here; the
+  # summary it withheld.
+  describe "reasoning a Responses turn can keep" do
+    it "carries a summary only when asked, and the encrypted payload regardless" do
+      Wiretap.intercept("azure_responses_reasoning_capture") do
+        provider = Liaison::Provider.for_azure(azure, Liaison::ProtocolKind::Responses, API_VERSION)
+        adapter = provider.adapter
+        session = M::Session.new
+        session << M::Message.user(
+          "List every pair of positive integers (x, y) with x < 1000 and " \
+          "x^2 - 7y^2 = 1. Give only the pairs.")
+        options = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Medium,
+          max_output_tokens: 4096)
+        # The mapper's body with its own summary and `include` removed, so the
+        # pair records the API and not the mapper, which now asks for both.
+        mapped = JSON.parse(adapter.prepare(session, DEPLOYMENT, C::Policy::Lenient,
+          C::ReasoningRetention::All, 4096, options).body).as_h
+        mapped.delete("include")
+        mapped["reasoning"] = JSON::Any.new(mapped["reasoning"].as_h.reject("summary"))
+        as_sent = mapped.to_json
+
+        asked = JSON.parse(as_sent).as_h
+        reasoning = asked["reasoning"].as_h.merge({"summary" => JSON::Any.new("auto")})
+        asked["reasoning"] = JSON::Any.new(reasoning)
+        asked["include"] = JSON.parse(%(["reasoning.encrypted_content"]))
+
+        reasoning_items = ->(body : String) do
+          JSON.parse(azure.post(adapter.path(DEPLOYMENT), adapter.headers(azure.credential), body,
+            ->adapter.error_detail(String)))["output"].as_a.select { |item| item["type"] == "reasoning" }
+        end
+
+        plain = reasoning_items.call(as_sent)
+        plain.should_not be_empty
+        plain.all? { |item| item["summary"].as_a.empty? }.should be_true
+        plain.all? { |item| item["encrypted_content"]?.try(&.as_s?) }.should be_true
+
+        kept = reasoning_items.call(asked.to_json)
+        kept.any? { |item| !item["summary"].as_a.empty? }.should be_true
+        kept.all? { |item| item["encrypted_content"]?.try(&.as_s?) }.should be_true
+      end
+    end
+  end
+
   describe "a turn that may not call a tool" do
     it "withholds the call over Chat Completions" do
       Wiretap.intercept("azure_tool_choice_none_chat_completions") do

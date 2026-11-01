@@ -31,16 +31,20 @@ module Liaison::MPSH
       end
     end
 
-    # Raises `FormatError` for a missing or unrecognised format, and for an
-    # unrecognised block kind, ending or outcome.
+    # Raises `FormatError` for anything that is not a well-formed archive: a
+    # missing or unrecognised format, an unrecognised block kind, ending or
+    # outcome, and any structural fault — unparseable text, a missing field, a
+    # field of the wrong type — with the underlying exception as `cause`.
     def read(source : String) : Session
       root = JSON.parse(source)
-      format = root["format"]?.try(&.as_s?)
+      format = root.as_h?.try(&.["format"]?).try(&.as_s?)
       raise FormatError.new("not an MPSH archive (missing or unrecognised 'format')") unless format == FORMAT
 
       messages = root["messages"].as_a.map { |message| read_message(message) }
       annotations = (root["annotations"]?.try(&.as_a) || [] of JSON::Any).map { |note| read_annotation(note) }
       Session.new(root["system_prompt"]?.try(&.as_s?), messages, annotations)
+    rescue error : JSON::ParseException | KeyError | TypeCastError | IndexError
+      raise FormatError.new("malformed MPSH archive: #{error.message}", error)
     end
 
     # -- Message ----------------------------------------------------------

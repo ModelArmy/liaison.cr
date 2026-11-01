@@ -13,16 +13,6 @@ module Liaison::Protocol
       super("#{@provider}: #{detail}")
     end
   end
-end
-
-module Liaison::Protocol
-  class MalformedResponseError < Exception
-    getter provider : String
-
-    def initialize(@provider : String, detail : String)
-      super("#{@provider}: #{detail}")
-    end
-  end
 
   # A streamed generation that failed after its 200: an in-band error frame.
   # Not a `TransportError`, whose `status` and `transient?` would have nothing

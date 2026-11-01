@@ -114,75 +114,52 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### `error_detail` raises on a JSON error body that is not an object
+### Responses asks for no summary when no rung is set
 
-`Adapter#nested_error` reads `JSON.parse(body)["error"]?.try(&.["message"]?)`
-and rescues only `JSON::ParseException`. `JSON::Any#[]?(String)` raises a plain
-`Exception` on anything but a hash, so `{"error": "text"}` (a string `error`, as
-some OpenAI-compatible servers send) or a top-level array (which the Gemini
-adapter's own comment says Gemini may return) raises from inside
-`Server#post`. The `TransportError` with the status is replaced by an
-unrelated exception. Where: `src/liaison/adapters/adapter.cr`, `nested_error`,
-used by all four adapters. Likely fix: rescue broadly there and return `nil`,
-or check `as_h?` at each step. Predicted by reading the stdlib
-(`src/json/any.cr`); no spec covers it.
+The mapper asks for `reasoning.summary` only beside a reasoning rung, since a
+non-reasoning deployment may reject a `reasoning` object and its name cannot
+say which it is. A model that reasons with no rung set, as some OpenAI models
+do by default, therefore reasons without its summary being asked for, against
+`DEVELOPMENT.md`'s *capture* rule. Recorded: `gpt5.4mini` with no rung
+returned no reasoning item at all, so its default effort appears to be `none`
+and the gap does not arise there. Likely fix, if a model where it does is
+found: a deployment-level declaration, as `reasoning_unit` and
+`max_tokens_field` are.
 
-### A `reasoning_unit` override bypasses the signed-tool-call axis
+### Responses requests are stored at the provider
 
-`Adapter#narrowed(model)` returns early when a `reasoning_unit` override is
-set, and so never calls `Catalog.narrow`, which applies both catalog axes. On a
-Gemini 3 model with an explicit unit, `tool_call_signature_required` is never
-switched on, so a foreign unsigned tool call maps `Exact` and draws the 400
-the catalog entry exists to prevent. Where: `src/liaison/adapters/adapter.cr`,
-`narrowed(model)`. Likely fix: let the override replace only the unit axis, then
-apply the rest of the catalog. Predicted by reading.
+Liaison sends no `store`, so OpenAI's default applies. Recorded on Azure: every
+reply echoes `"store": true`, with a response header
+`x-ms-aoai-configured-data-retention-days: 30`. Each liaison request therefore
+leaves a copy of the conversation at the provider for 30 days, which liaison
+never uses, since it keeps the history itself and replays it in full. A caller
+with privacy constraints would not expect it. Fix: send `store: false` by
+default, with an option to keep it; it changes every Responses request body,
+so every Responses transcript is re-recorded, and replay after it needs a
+probe, since stored items may be what some replays lean on.
 
-### `Provider.for_azure` accepts any `reasoning_unit` and ignores it
+### Model-bound reasoning is a read matrix, not a producer list
 
-`Provider.for` raises `ArgumentError` for a unit the protocol does not spell;
-`for_azure` has no such check. Both Azure protocols declare `Effort`, so a
-`Budget` override is accepted and then silently ignored by `narrowed(model)`,
-which applies an override only to an `Either` unit. Where:
-`src/liaison/provider.cr`, `for_azure`. Likely fix: the same guard as `for`.
-Predicted by reading.
+Anthropic now documents which models read which models' thinking, and it is
+asymmetric: Fable 5.1 reads Opus 5 and 5.5, neither reads Fable; Sonnet 5.5's
+blocks are read only by Opus 5.5; Haiku 5.5's only by Opus and Sonnet 5.5. The
+API drops a block the target cannot read, without error or charge.
+`Catalog::MODEL_BOUND_REASONING` covers Fable and Mythos as producers only, so
+a Sonnet 5.5 session continued on Haiku 5.5 still reports `Exact`. Likely fix:
+a producer-to-readers table replacing the set, with `rebound?` asking whether
+the target is among the readers. The `thinking-binding-controls` beta reports
+dropped blocks in the response as `input_transformations`, which is evidence a
+provider supplies rather than one liaison predicts: relevant to *A provider can
+ignore an exactly-mapped option*.
 
-### A degraded tool call leaves its result behind as `unknown_function`
+### Retention trimming may invalidate later thinking
 
-When `Resolver` degrades a tool call because the target requires a signature it
-does not carry (any foreign call sent to a Gemini 3 model), the Gemini mapper
-drops the call but still maps its result. With no binding in the `CallIdTable`,
-`function_name` falls back to `"unknown_function"`, so the request carries a
-`functionResponse` answering a call that is not there, under a name the model
-never used. Where: `src/liaison/protocol/gemini/mapper.cr`, `function_call`
-and `function_response`.
-
-Bounded by policy: `Degraded` exceeds the default `Compensating`, so this is
-sent only under `Lenient`. But `Lenient` is what a caller picks to hand a
-tool-using session to Gemini 3, which is this shard's defining move. Whether
-Gemini rejects the orphan or the model is merely confused is unrecorded.
-Likely fix: degrade the result with its call, rendering both as text, as a
-server-executed call is elsewhere. Predicted by reading; no spec covers it.
-
-### Fable's reasoning is model-bound, and replays as if it were not
-
-Anthropic documents that thinking blocks from `claude-fable-5` and
-`claude-mythos-5` are tied to the model that produced them, and that other
-Claude models silently ignore them. `Resolver#own?` keys on the vendor
-(`metadata_key` is `anthropic` for every Claude model), so a Fable session
-continued on Opus or Haiku maps that reasoning `Exact`, and the model drops it
-unannounced: the silent loss the capability model exists to report. Read from
-documentation, not yet recorded. Where: `Resolver#own?` and
-`Capability::Catalog`. Fix: decide whether the producing model belongs in the
-reasoning block's provenance, which is a question about MPSH, not only this
-protocol; then a probe, though "silently ignored" may show only as a reply
-that does not use the earlier reasoning.
-
-### `MalformedResponseError` is defined twice
-
-`src/liaison/protocol/errors.cr` declares `Liaison::Protocol::MalformedResponseError`
-in two identical `module Liaison::Protocol` blocks. Crystal reads the second
-as a reopening, so it compiles and behaves the same, but an edit to one copy
-alone would be silently overridden or duplicated. Fix: delete the first block.
+Predicted by reading. From Claude 5.1, a thinking block stays valid only while
+the system prompt, tools and every earlier message are unchanged; otherwise it
+and every later one fail a prefix check. `ReasoningRetention::CompletedTurns`
+removes reasoning from completed turns, which changes earlier messages between
+requests. Whether that trips the check, and what liaison's own structural
+adaptations do to it, is unrecorded. Where: `Capability::Retention`.
 
 ### `Structural.required` predicts half the structural adaptations
 
@@ -192,20 +169,6 @@ It answers from the profile alone, so it can report `PrependUserPlaceholder`,
 calls it; only `spec/mpsh/capability_spec.cr` does. A caller using it as a
 preflight check is told less than mapping will report. Likely fix: delete it,
 or document it as partial (its comment now does). Predicted by reading.
-
-### `Archive.read` raises more than `FormatError` on a malformed archive
-
-`FormatError` covers a missing or unrecognised `format`, and unrecognised block
-kinds, endings and outcomes. Anything else structurally wrong escapes as
-whatever the JSON accessor raises: a missing `messages` key is a `KeyError`
-(`root["messages"]`), a `messages` that is not an array a `TypeCastError`
-(`.as_a`), and unparseable text a `JSON::ParseException`. Where:
-`src/liaison/mpsh/archive.cr`, `read` and the `read_*` helpers.
-
-It matters to an application loading archives from disk: a corrupt file
-should be one rescuable error, not four. Likely fix: wrap the body of `read` and
-re-raise the accessor exceptions as `FormatError` with the original as
-`cause`. Predicted by reading; no spec covers it.
 
 ### Retention governs replay, not display and not storage
 

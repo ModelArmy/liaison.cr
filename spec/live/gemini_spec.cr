@@ -9,8 +9,8 @@ require "../spec_helper"
 # cut a transcript. Once committed it replays offline like every other live
 # spec.
 #
-# **Model.** `gemini-3.5-flash` for everything except one test. This started
-# as a two-model file — a 2.5-series control alongside it, to isolate what's
+# **Model.** `gemini-3.6-flash` for nearly everything. This started as a
+# two-model file — a 2.5-series control alongside it, to isolate what's
 # specific to Gemini 3 from what's a general liaison bug. Both
 # `gemini-2.5-flash-lite` and `gemini-2.5-flash` came back 404 with a message
 # pointing at successively newer replacements (`gemini-3.5-flash-lite`, then
@@ -21,20 +21,22 @@ require "../spec_helper"
 # third-party bug reports hitting the identical error text (see
 # `docs/protocols/GEMINI.md`).
 #
+# The file was pinned to `gemini-3.5-flash` until Google began answering that
+# name with 3.6 (31 October 2026). `served_model_spec.cr` now holds every
+# recording to the model its request names, so the specs re-recorded since are
+# pinned to the model that answers. `MODEL_35` remains for the one recording
+# made on 3.5 and not re-cut; git history holds the rest of the 3.5 evidence.
+#
 # `gemini-3.1-pro-preview` appears once, for the one claim specific to a tier
 # rather than a generation: Google's docs say thinking cannot be turned off on
 # Gemini 3 Pro at all, only lowered — the opposite of what Flash confirmed.
 #
-# `MODEL_CURRENT` appears once too, and for the same reason in reverse: a
-# claim specific to a *generation* rather than a protocol. `gemini-3.5-flash`
-# is now three Flash generations behind (3.6 in July 2026, 3.7 in August, 3.8
-# current), and Google's model page calls that tier previous-generation. The
-# file is deliberately **not** migrated wholesale — every other transcript
-# here is pinned to 3.5 and re-recording them all would cost a pile of live
-# calls to re-prove claims already settled. A newer model is introduced only
-# where the model generation is itself the question.
-private MODEL_35  = "gemini-3.5-flash"
-private MODEL_PRO = "gemini-3.1-pro-preview"
+# `MODEL_CURRENT` appears where a claim is specific to a *generation* rather
+# than a protocol. A newer model is introduced only where the model generation
+# is itself the question.
+private MODEL_FLASH = "gemini-3.6-flash"
+private MODEL_35    = "gemini-3.5-flash"
+private MODEL_PRO   = "gemini-3.1-pro-preview"
 # Confirm against `GET /v1beta/models` before recording — that call is free,
 # and this ID is the one thing here taken from documentation rather than from
 # a response this key actually received.
@@ -67,9 +69,16 @@ end
 # profile with a model name no list holds, then posted directly, so the entry a
 # probe argues for, once added, leaves its transcript matching. A Gemini body
 # carries no model name; the model goes only in the path.
+#
+# Thought summaries are asked for only beside a reasoning option, as the mapper
+# did when these probes were recorded: they record rejections, which
+# `includeThoughts` does not bear on.
 private def unlisted_body(session : M::Session, options : Liaison::Options) : String
   profile = P::Gemini::PROFILE.with_reasoning_unit(C::ReasoningUnit::Effort)
-  request, _ = P::Gemini::Mapper.new(profile).map(session, "unlisted", options: options)
+  text = options.reasoning ? Liaison::Reasoning::Text::Summarized : Liaison::Reasoning::Text::Omitted
+  as_recorded = Liaison::Options.new(options.tools, options.max_output_tokens,
+    options.reasoning, options.tool_choice, text)
+  request, _ = P::Gemini::Mapper.new(profile).map(session, "unlisted", options: as_recorded)
   request.to_json
 end
 
@@ -182,7 +191,7 @@ describe "Gemini" do
         session = M::Session.new("Answer in one short sentence.")
         session << M::Message.user("What is the tallest mountain on Earth?")
 
-        reply, report = client.send(session, MODEL_35,
+        reply, report = client.send(session, MODEL_FLASH,
           options: Liaison::Options.new(max_output_tokens: 256))
 
         reply.content.select(M::TextBlock).should_not be_empty
@@ -205,9 +214,9 @@ describe "Gemini" do
   # in `SCOPE.md`.
   describe "a tool call, paired without an identifier" do
     it "carries its thought signature and pairs correctly" do
-      Wiretap.intercept("gemini_tool_pairing_35") do
+      Wiretap.intercept("gemini_tool_pairing_36") do
         session = tool_question
-        reply, _ = client.send(session, MODEL_35, options: armed)
+        reply, _ = client.send(session, MODEL_FLASH, options: armed)
         session << reply
 
         calls = reply.content.select(M::ToolCallBlock)
@@ -218,7 +227,7 @@ describe "Gemini" do
             [M::TextBlock.new("18C, light rain").as(M::Block)]).as(M::Block)
         })
 
-        answer, report = client.send(session, MODEL_35, options: armed)
+        answer, report = client.send(session, MODEL_FLASH, options: armed)
         answer.content.select(M::TextBlock).should_not be_empty
         report.annotations.map(&.outcome).should_not contain(M::Outcome::Refused)
       end
@@ -245,7 +254,7 @@ describe "Gemini" do
   # opts out of it to observe what the degraded request actually does.
   describe "a tool call handed over from another protocol" do
     it "degrades the unsignable call rather than sending an invalid request" do
-      Wiretap.intercept("gemini_foreign_tool_call_35") do
+      Wiretap.intercept("gemini_foreign_tool_call_36") do
         session = tool_question
 
         call = M::ToolCallBlock.new("call_ext_1", "get_weather",
@@ -260,7 +269,7 @@ describe "Gemini" do
         session << M::Message.user("Given that, what should I wear?")
 
         reply, report = client(Liaison::Capability::Policy::Lenient)
-          .send(session, MODEL_35, options: armed)
+          .send(session, MODEL_FLASH, options: armed)
 
         # The check fired, and named the block kind it fired on.
         report.annotations
@@ -270,6 +279,22 @@ describe "Gemini" do
         # And the request was still accepted, which is the whole point: the
         # 400 this replaces was not recoverable, a degradation is.
         reply.content.select(M::TextBlock).should_not be_empty
+      end
+    end
+
+    # The handoff mid-loop: no follow-up question, so the result whose call
+    # was dropped sits in the current turn, the one Gemini validates. Accepted,
+    # and answered from the result. Recorded when Google served this model
+    # name with `gemini-3.6-flash`, so the evidence is about 3.6.
+    it "is accepted with the orphaned result in the current turn" do
+      Wiretap.intercept("gemini_foreign_tool_call_current_turn_36") do
+        reply, report = client(Liaison::Capability::Policy::Lenient)
+          .send(foreign_call_turn, MODEL_FLASH, options: armed)
+
+        report.annotations
+          .select { |a| a.block_kind == M::BlockKind::ToolCall }
+          .map(&.outcome).should contain(M::Outcome::Degraded)
+        reply.content.should_not be_empty
       end
     end
   end
@@ -333,9 +358,9 @@ describe "Gemini" do
     #
     # Asserted as observed, not endorsed. A replay cannot notice Google
     # changing this; a re-recording that disagrees goes red.
-    it "sends `NONE` correctly and is ignored on 3.5 Flash" do
-      Wiretap.intercept("gemini_tool_choice_none_35") do
-        reply, report = tool_choice_loop(MODEL_35)
+    it "sends `NONE` correctly and is ignored on 3.6 Flash" do
+      Wiretap.intercept("gemini_tool_choice_none_36") do
+        reply, report = tool_choice_loop(MODEL_FLASH)
 
         # Nothing refused, nothing degraded: the mapping is exact and the
         # request was accepted. The shard did its whole job.
@@ -496,7 +521,7 @@ describe "Gemini" do
         ])
         session << M::Message.user("And the deepest ocean trench?")
 
-        reply, report = client.send(session, MODEL_35,
+        reply, report = client.send(session, MODEL_FLASH,
           options: Liaison::Options.new(max_output_tokens: 256))
 
         reply.content.select(M::TextBlock).should_not be_empty

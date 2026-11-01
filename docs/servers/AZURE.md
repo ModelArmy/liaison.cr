@@ -73,7 +73,9 @@ portal. Two consequences, both already handled rather than newly found here:
   arbitrary deployment name simply falls through to the default. Inert for
   both these protocols regardless, since neither has an ambiguous unit to
   resolve (`reasoning_unit: Effort` on both) — the problem is real for
-  Anthropic and Gemini behind a gateway, not here.
+  Anthropic and Gemini behind a gateway, not here. `Provider.for_azure`
+  accordingly refuses a `Budget` override with `ArgumentError`, as
+  `Provider.for` does for any protocol that cannot spell the unit asked for.
 - The new `max_tokens` vs `max_completion_tokens` choice has the identical
   shape and the identical fix: an explicit per-deployment override
   (`Wire::MaxTokensField`), not a catalog lookup, because a deployment name

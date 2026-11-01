@@ -72,12 +72,14 @@ private ALL = [Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Re
                Liaison::ProtocolKind::Anthropic, Liaison::ProtocolKind::Gemini]
 
 describe "reasoning controls" do
-  # The property that keeps every committed transcript valid. If this fails,
-  # every live recording has to be re-cut, so it is asserted before anything
-  # else is.
+  # The property that keeps committed transcripts valid. If this fails, live
+  # recordings have to be re-cut, so it is asserted before anything else is.
+  # Anthropic's own models and Gemini are the exceptions, by design: where a
+  # model thinks by default, liaison asks for its reasoning as text
+  # (`DEVELOPMENT.md`).
   describe "absence" do
     it "emits nothing at all when the caller asks for nothing" do
-      ALL.each do |protocol|
+      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses}.each do |protocol|
         request = body(protocol, Liaison::Options.new)
 
         request["reasoning_effort"]?.should be_nil
@@ -85,6 +87,43 @@ describe "reasoning controls" do
         request["thinking"]?.should be_nil
         request["output_config"]?.should be_nil
         request["generationConfig"]?.should be_nil
+      end
+    end
+
+    it "emits nothing on Anthropic where thinking is off by default, or on a compatible endpoint" do
+      request = body(Liaison::ProtocolKind::Anthropic, Liaison::Options.new, "claude-opus-4-8")
+      request["thinking"]?.should be_nil
+      request["output_config"]?.should be_nil
+
+      ollama = Liaison::AnthropicAdapter.new("ollama")
+      plain = JSON.parse(ollama.prepare(asked, "gemma4:26b", C::Policy::Lenient,
+        C::ReasoningRetention::All, 4096, Liaison::Options.new).body)
+      plain["thinking"]?.should be_nil
+    end
+
+    # Gemini thinks by default and returns thought text only when asked; the
+    # signatures come regardless.
+    it "asks Gemini for thought summaries, and nothing else" do
+      request = body(Liaison::ProtocolKind::Gemini, Liaison::Options.new)
+      request["generationConfig"].should eq JSON.parse(%({"thinkingConfig":{"includeThoughts":true}}))
+    end
+
+    it "emits nothing on Gemini when the caller declines reasoning text" do
+      declined = Liaison::Options.new(reasoning_text: Liaison::Reasoning::Text::Omitted)
+      body(Liaison::ProtocolKind::Gemini, declined)["generationConfig"]?.should be_nil
+
+      levelled = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Low,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      config = body(Liaison::ProtocolKind::Gemini, levelled)["generationConfig"]["thinkingConfig"]
+      config["thinkingLevel"]?.should_not be_nil
+      config["includeThoughts"]?.should be_nil
+    end
+
+    it "asks Anthropic's thinking-by-default models for their reasoning as text" do
+      {"claude-opus-5-5", "claude-fable-5-1", "test-model"}.each do |model|
+        request = body(Liaison::ProtocolKind::Anthropic, Liaison::Options.new, model)
+        request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"summarized"}))
+        request["output_config"]?.should be_nil
       end
     end
 
@@ -135,6 +174,28 @@ describe "reasoning controls" do
   end
 
   describe "a named rung" do
+    # Recorded on Azure: a summary only when asked, the encrypted payload
+    # regardless; OpenAI documents both as opt-in, so both are asked for.
+    it "asks Responses for the reasoning's summary and encrypted payload" do
+      request = body(Liaison::ProtocolKind::Responses, effort(Liaison::Reasoning::Effort::Medium))
+      request["reasoning"].should eq JSON.parse(%({"effort":"medium","summary":"auto"}))
+      request["include"].should eq JSON.parse(%(["reasoning.encrypted_content"]))
+    end
+
+    it "keeps the encrypted payload on Responses when the caller declines the text" do
+      declined = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Medium,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      request = body(Liaison::ProtocolKind::Responses, declined)
+      request["reasoning"].should eq JSON.parse(%({"effort":"medium"}))
+      request["include"].should eq JSON.parse(%(["reasoning.encrypted_content"]))
+    end
+
+    it "asks Responses for neither with reasoning off" do
+      request = body(Liaison::ProtocolKind::Responses, Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new))
+      request["reasoning"].should eq JSON.parse(%({"effort":"none"}))
+      request["include"]?.should be_nil
+    end
+
     it "spells the rung four ways" do
       options = effort(Liaison::Reasoning::Effort::Medium)
 
@@ -171,9 +232,29 @@ describe "reasoning controls" do
       result.report.annotations.any? { |a| a.detail.includes?("clamped") }.should be_true
     end
 
-    it "sends a rung on Anthropic without asking for a budget" do
-      request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High))
-      request["thinking"]?.should be_nil
+    # Adaptive, not a budget: on a model where thinking is off by default,
+    # effort alone would ask for effort without thinking.
+    it "sends a rung on Anthropic with adaptive thinking, not a budget" do
+      {"test-model", "claude-opus-4-8", "claude-sonnet-4-6"}.each do |model|
+        request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High), model)
+        request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"summarized"}))
+        request["output_config"]["effort"].as_s.should eq "high"
+      end
+    end
+
+    it "sends a budget, and no display, to Opus 4.5, which rejects adaptive" do
+      request = body(Liaison::ProtocolKind::Anthropic, effort(Liaison::Reasoning::Effort::High),
+        "claude-opus-4-5")
+      request["thinking"]["type"].as_s.should eq "enabled"
+      request["thinking"]["display"]?.should be_nil
+      request["output_config"]?.should be_nil
+    end
+
+    it "asks for the reasoning to be omitted when the caller declines its text" do
+      declined = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::High,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      request = body(Liaison::ProtocolKind::Anthropic, declined)
+      request["thinking"].should eq JSON.parse(%({"type":"adaptive","display":"omitted"}))
     end
 
     it "is Exact where the unit matches, and costs the caller nothing" do
@@ -295,7 +376,7 @@ describe "reasoning controls" do
     it "sends the lowest rung on Anthropic, recorded as Degraded" do
       %w(claude-opus-5-5 claude-fable-5 claude-fable-5-1).each do |model|
         request = body(Liaison::ProtocolKind::Anthropic, off, model)
-        request["thinking"]?.should be_nil
+        request["thinking"]["type"].as_s.should eq "adaptive"
         request["output_config"]["effort"].as_s.should eq "low"
 
         control_loss(exchange(Liaison::ProtocolKind::Anthropic, off, model))
@@ -381,11 +462,48 @@ describe "reasoning controls" do
       end
     end
 
+    # Azure is where the override is most needed, so the guard matters most
+    # there: an ignored `Budget` would look accepted.
+    it "refuses an override Azure's protocols never spelled" do
+      server = Liaison::Server.new("azure", "https://example.openai.azure.com")
+
+      {Liaison::ProtocolKind::ChatCompletions, Liaison::ProtocolKind::Responses}.each do |protocol|
+        expect_raises(ArgumentError) do
+          Liaison::Provider.for_azure(server, protocol, "2025-04-01-preview",
+            reasoning_unit: C::ReasoningUnit::Budget)
+        end
+      end
+    end
+
+    it "accepts the unit an Azure protocol already spells" do
+      server = Liaison::Server.new("azure", "https://example.openai.azure.com")
+      provider = Liaison::Provider.for_azure(server, Liaison::ProtocolKind::Responses,
+        "2025-04-01-preview", reasoning_unit: C::ReasoningUnit::Effort)
+
+      provider.profile("some-deployment").reasoning_unit.effort?.should be_true
+    end
+
     # The deployment whose model name says nothing about the model — Azure's
     # case, and the reason the override exists at all.
     it "lets an explicit unit overrule the catalog" do
       adapter = Liaison::AnthropicAdapter.new(nil, C::ReasoningUnit::Budget)
       adapter.narrowed("some-deployment-name").reasoning_unit.budget?.should be_true
+    end
+
+    it "lets an explicit unit overrule a catalogued unit" do
+      adapter = Liaison::AnthropicAdapter.new(nil, C::ReasoningUnit::Effort)
+      adapter.narrowed("claude-sonnet-4-5").reasoning_unit.effort?.should be_true
+    end
+
+    # The override answers one axis. Without this, an unsigned foreign tool
+    # call maps `Exact` to a Gemini 3 model and draws the 400 the entry
+    # exists to prevent.
+    it "still applies the catalog's other axes under an explicit unit" do
+      adapter = Liaison::GeminiAdapter.new(nil, C::ReasoningUnit::Effort)
+      profile = adapter.narrowed("gemini-3.5-flash")
+
+      profile.reasoning_unit.effort?.should be_true
+      profile.tool_call_signature_required?.should be_true
     end
 
     it "keeps the metadata-key narrowing it already did" do

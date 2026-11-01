@@ -245,6 +245,17 @@ describe "the live layer" do
       adapter.error_detail("").should be_nil
       adapter.error_detail(%({"unexpected": true})).should be_nil
     end
+
+    # Valid JSON in the wrong shape must not raise either: a string `error`,
+    # as some OpenAI-compatible servers send, or a top-level array.
+    it "gives up quietly on a JSON error body that is not the envelope" do
+      adapter = Liaison::ChatCompletionsAdapter.new
+
+      adapter.error_detail(%({"error": "model not found"})).should be_nil
+      adapter.error_detail(%([{"error": {"message": "quota exceeded"}}])).should be_nil
+      adapter.error_detail(%("bad gateway")).should be_nil
+      adapter.error_detail(%({"error": {"message": 42}})).should be_nil
+    end
   end
 
   describe "the exchange seam" do

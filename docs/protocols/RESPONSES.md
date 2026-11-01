@@ -56,6 +56,20 @@ whose `reasoning_content` is a string with nothing to hold.
 Same fixture, same suite, opposite outcomes, decided by declared capability with
 no protocol-specific test code anywhere.
 
+**What comes back depends on what is asked.** OpenAI documents both the
+summary and the encrypted payload as opt-in: `reasoning.summary` and `include:
+["reasoning.encrypted_content"]`. Recorded on Azure's `gpt5.4mini` at medium
+effort (`spec/transcripts/azure_responses_reasoning_capture.json`): without
+either, a reasoning item with an empty summary and, unasked, the encrypted
+payload; with both, a summary in two parts as well, `auto` echoed back as
+`detailed`. Every reasoning item recorded before that came from Ollama, which
+returns both unasked, so the round trip above was confirmed for Azure only
+then. By `DEVELOPMENT.md`'s *capture* rule the mapper asks for both wherever
+a reasoning rung other than `none` is requested; `Reasoning::Text::Omitted`
+drops the summary and keeps `include`, which is replay rather than text. With
+no rung it asks for neither, since a deployment that does not reason may reject
+a `reasoning` object and its name cannot say which it is (`SCOPE.md`).
+
 ## Tool choice
 
 Spelled exactly as on Chat Completions: `tool_choice`, a bare string, `"auto"`

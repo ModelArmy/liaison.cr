@@ -79,4 +79,22 @@ describe "MPSH::Archive" do
   it "rejects a source that isn't an MPSH archive" do
     expect_raises(M::Archive::FormatError) { M::Archive.read(%({"hello": "world"})) }
   end
+
+  # A corrupt file is one rescuable error, whatever is wrong with it, with the
+  # underlying exception kept as its cause.
+  it "raises FormatError for any structural fault, keeping the cause" do
+    {
+      %({"format": "mpsh-archive-v1", "messages": [{"role": "user", "content": [{"kind": "text"}]}]}),
+      %({"format": "mpsh-archive-v1"}),
+      %({"format": "mpsh-archive-v1", "messages": "none"}),
+      %({"format": "mpsh-archive-v1", "messages": [),
+    }.each do |source|
+      error = expect_raises(M::Archive::FormatError) { M::Archive.read(source) }
+      error.cause.should_not be_nil
+    end
+  end
+
+  it "rejects JSON that is not an object as not an archive" do
+    expect_raises(M::Archive::FormatError, /not an MPSH archive/) { M::Archive.read(%([1, 2, 3])) }
+  end
 end

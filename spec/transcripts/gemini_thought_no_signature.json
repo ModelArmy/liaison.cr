@@ -1,21 +1,20 @@
 {
   "name": "gemini_thought_no_signature",
-  "recorded_with": "wiretap/0.4.0",
+  "recorded_with": "wiretap/0.4.2",
   "interactions": [
     {
       "request": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "431",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"You are terse.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"model\",\"parts\":[{\"thought\":true,\"text\":\"The user is asking about the tallest mountain. It's Everest.\"},{\"text\":\"The tallest mountain on Earth is Mount Everest.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And the deepest ocean trench?\"}]}],\"generationConfig\":{\"maxOutputTokens\":256}}",
-        "body_digest": "c9cf66e0488b296ee5686d1ab0bd29510e4382eca5969ca6f01d16a7c48dc5fe"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"You are terse.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]},{\"role\":\"model\",\"parts\":[{\"thought\":true,\"text\":\"The user is asking about the tallest mountain. It's Everest.\"},{\"text\":\"The tallest mountain on Earth is Mount Everest.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And the deepest ocean trench?\"}]}],\"generationConfig\":{\"maxOutputTokens\":256,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "4ac153be9942d0b27d0ad3ceb7b8015bc83b5e869c33dacc98f6240c0120907f"
       },
       "response": {
         "status": 200,
@@ -23,18 +22,18 @@
           "X-Gemini-Service-Tier": "standard",
           "Content-Type": "application/json; charset=UTF-8",
           "Vary": "Origin, X-Origin, Referer",
-          "Date": "Wed, 26 Aug 2026 02:48:05 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:21 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=772",
+          "Server-Timing": "gfet4t7; dur=2248",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "Transfer-Encoding": "chunked"
         },
-        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"The deepest ocean trench is the Mariana Trench.\",\n            \"thoughtSignature\": \"ErQBCrEBARFNMg/naGHNiXOl/akUJJ+RhStZsRgK2SHC8GASx3nO/QJT7BVl7u/cgfADttUqsFLu/r+W/8gEv+yAT258qra/g1ylVRuUhYko5Tcr9SRx4r1MM7bAPcInc+2Zmt1xL6obS2wdE3NSseUMWwgTbg0M1TJ3T1vFI9P31FR7LyACvHiLPsCRfQ3Utw+wSyfHx0QEsCBbtpwblBsBsSSuWB/XFpxm0z0RhhSdqosOt2sp\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 58,\n    \"candidatesTokenCount\": 9,\n    \"totalTokenCount\": 84,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 58\n      }\n    ],\n    \"thoughtsTokenCount\": 17,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.5-flash\",\n  \"responseId\": \"5VOOauqUCd2u_uMP25j76AM\"\n}\n"
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Immediate Response**\\n\\nOkay, here's what the user wants: the name of the deepest ocean trench. That's a straightforward query. My knowledge base instantly flags the Mariana Trench, specifically Challenger Deep, as the answer. Given the direction to be terse, I should keep it to the bare minimum. Therefore, I'll reply with, \\\"The Mariana Trench.\\\" Or, if more precision is warranted, \\\"The Mariana Trench (Challenger Deep).\\\" The key is directness and brevity.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"The Mariana Trench.\",\n            \"thoughtSignature\": \"ErAECq0EAWkUfRPAxj+tD76cT0o+rPvePTu2pbP3G0dIRXdkqdR9G3Uk+mfxGINUXPYHbrn3FlzxHVgIgrM3867Ph7IfpSQNNVZ659CDHX0RS91JdOr3+vLxSM/RoQI4cawaubyV2xh9EqOjtDzGbmOaw7XU/KoFEVWB3xIL2gm2zc2oHvYjpM5A8M25lSkWDCm4fYHH1hRDfTkkDuqv+wKsD1BjlgnDTqcoJxJihcCTSBR+FB6BgBSqrQfcfivMnN+W084i/LIqay154hzX8toMLyg+WqXpzOOykKXUJMZYtMVJbAVsjhIPbam0IN3ZpJPYYTMnTZFjaYU4CBa6jqQkgAuiMsYR/IJ/MffDxCr0I/Z4yerso7nak74l8Z5DRdIV02FwlZxx1fQu1jCPk0wSd7srnkdtFApVJRAP42DUELiX57t4Dv/vPMpLRCuKPBdfrg71hh3dxWnyfs/tUfqABcdv8zyD0hUZrTcs4uDOashgW2StWCup7MeM27eM+3Iv8CnWvNCsXtagAxPdDdiY7TR6gDmZQBe1Y5njwR6JIpbjUvrxe0UZSeAFx9fGi/KV9nt7Hn+DgAAvGzIXkBmxR22skAlgFg1vZF/F+EQuVQZipjxDuucBiKvZ4mmwljjVDQQlLxCqRaUEUbUgUSpA/a5n871WFLGQIG9uuiA2TPm7hNsY5WbdYU3zEnSaHZHq1+puQ9zRiM3CpDoiuFouQIFQnr+nvakvNs3H0+pnVgQ=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 44,\n    \"candidatesTokenCount\": 4,\n    \"totalTokenCount\": 152,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 44\n      }\n    ],\n    \"thoughtsTokenCount\": 104,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"k0zmapacLtGRytMPu-7ewAU\"\n}\n"
       },
-      "recorded_at": "2026-08-26T02:48:05Z"
+      "recorded_at": "2026-10-31T20:16:21Z"
     }
   ]
 }

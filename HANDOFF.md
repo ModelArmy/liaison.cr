@@ -202,9 +202,82 @@ All three `MUST FIX` items among them are now done:
    and `DEVELOPMENT.md` has the reasoning, including why repeats are counted
    rather than tested for.
 
-First in `WILL FIX`: **`error_detail` raises on a JSON error body that is not an
-object**, replacing the real failure with an unrelated exception. Loud, and no
-dearer to fix later.
+**`error_detail` no longer raises on a JSON error body that is not an object.**
+`nested_error` checks the shape at each step instead of rescuing broadly, so a
+string `error` or a top-level array yields `nil` and the `TransportError` with
+its status survives. Covered in `spec/conformance/layer_spec.cr`.
+
+**A `reasoning_unit` override now replaces only the unit axis.**
+`Adapter#narrowed(model)` applies it before `Catalog.narrow` rather than instead
+of it, so a Gemini 3 model given an explicit unit still requires signed tool
+calls. Covered in `spec/conformance/reasoning_controls_spec.cr`.
+
+**`Provider.for_azure` now refuses a `reasoning_unit` its protocol cannot
+spell**, through the same guard as `Provider.for`, extracted so the two cannot
+drift.
+
+**A degraded tool call's result is named after its call**, not
+`unknown_function`. The name is read from the session, not bound in the
+translation table, since a dropped call taking an ordinal would misalign
+export's pairing of every later call by that name. Keeping the result was
+already the decision in `Resolver`; two recordings now show Gemini accepts it,
+in the current turn too, so the `SCOPE.md` entry is closed.
+
+They also showed **`gemini-3.5-flash` now answered by `gemini-3.6-flash`**:
+every re-recording of a spec pinned to 3.5 measures 3.6. Logged in `SCOPE.md`
+with a likely fix — assert `modelVersion` — and worth doing before the next
+Gemini re-recording.
+
+**Fable's and Mythos's reasoning is now `Restructured`, and annotated, on any
+other model.** The producing model was already in each message's
+`provenance`, so MPSH's format is unchanged; §7's ownership rule gains the
+condition (spec 1.8). `Catalog::MODEL_BOUND_REASONING` lists the producers;
+`Report#record`'s `note:` annotates this one rearrangement, for the request
+only. The wire is unchanged. `anthropic_model_bound_reasoning_handoff` probes
+the handoff to Opus.
+
+**Whether effort alone thinks depends on the generation.** On Opus 5, Sonnet 5,
+Fable 5 and Mythos 5 it does, adaptively; Anthropic documents that Opus 4.6–4.8
+and Sonnet 4.6 need `thinking: {type: adaptive}`, which the mapper never sends.
+Recordings cover Fable only. Adaptive thinking is not repeatable, so the
+handoff probe replays Fable's thinking turn from a recording. Fable and the
+other newest models also withhold thinking text by default (`display:
+omitted`), so their reasoning crosses vendors empty. Both are in `SCOPE.md`.
+
+Decided: liaison captures as much as each API returns by default, reasoning
+text above all (`DEVELOPMENT.md`, *What this shard is for*). Anthropic's
+per-model thinking table widened the work: Opus 4.5 is affected too, model-bound
+reasoning is a read matrix, and Gemini and Responses may withhold reasoning as
+well. All in `SCOPE.md`.
+
+**Anthropic now asks for reasoning as text, and for thinking where effort
+alone would not.** The mapper sends `thinking: {type: adaptive, display:
+summarized}` to every Claude 5 model, and to Opus 4.6–4.8 and Sonnet 4.6 when
+an effort is requested; Opus 4.5 joined `BUDGET_ONLY`; compatible endpoints
+such as Ollama get nothing new. `Options#reasoning_text` declines the text.
+Claude 5 request bodies changed even with no reasoning asked for, which the
+`absence` conformance spec now states as the one exception.
+`ANTHROPIC.md`, *Liaison asks for the reasoning as text*.
+
+**Gemini now asks for thought summaries by default**, honouring
+`Options#reasoning_text` as Anthropic does; its signatures were never at stake.
+**Every recorded Gemini reply must have been served by the model its request
+names** (`spec/live/served_model_spec.cr`), which closed *`gemini-3.5-flash` is
+now served by 3.6*. The Gemini specs re-recorded for the change are pinned to
+`gemini-3.6-flash`; `gemini_reasoning_off_35` stays as 3.5 evidence.
+
+**Responses now asks for the reasoning's summary and encrypted payload**
+wherever a rung is requested, completing the *capture* rule across all four
+protocols' reasoning. Recorded on Azure: the summary is withheld unless asked;
+the encrypted payload came unasked, so replay never depended on it there. The
+same recording shows every Responses request stored at the provider for 30
+days, now in `SCOPE.md`.
+
+**The hygiene pair is done**: `MalformedResponseError` is declared once, and
+`Archive.read` raises `FormatError` for any structural fault, with the
+underlying exception as its `cause`.
+
+Next in `WILL FIX`: **Responses requests are stored at the provider**.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

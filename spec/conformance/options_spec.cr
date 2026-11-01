@@ -139,7 +139,7 @@ describe "request options" do
 
       body(Liaison::ProtocolKind::ChatCompletions, options)["max_tokens"]?.should be_nil
       body(Liaison::ProtocolKind::Responses, options)["max_output_tokens"]?.should be_nil
-      body(Liaison::ProtocolKind::Gemini, options)["generationConfig"]?.should be_nil
+      body(Liaison::ProtocolKind::Gemini, options)["generationConfig"]["maxOutputTokens"]?.should be_nil
       body(Liaison::ProtocolKind::Anthropic, options)["max_tokens"].as_i.should eq 4096
     end
 
