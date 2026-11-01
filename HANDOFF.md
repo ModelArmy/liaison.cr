@@ -273,9 +273,11 @@ the encrypted payload came unasked, so replay never depended on it there. The
 same recording shows every Responses request stored at the provider for 30
 days, now in `SCOPE.md`.
 
-Next in `WILL FIX`: the hygiene pair, **`MalformedResponseError` is defined
-twice** and **`Archive.read` raises four kinds of error**; then **Responses
-requests are stored at the provider**.
+**The hygiene pair is done**: `MalformedResponseError` is declared once, and
+`Archive.read` raises `FormatError` for any structural fault, with the
+underlying exception as its `cause`.
+
+Next in `WILL FIX`: **Responses requests are stored at the provider**.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim
