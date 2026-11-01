@@ -266,8 +266,16 @@ names** (`spec/live/served_model_spec.cr`), which closed *`gemini-3.5-flash` is
 now served by 3.6*. The Gemini specs re-recorded for the change are pinned to
 `gemini-3.6-flash`; `gemini_reasoning_off_35` stays as 3.5 evidence.
 
-Next in `WILL FIX`: **Responses may never ask for reasoning summaries**: the
-same rule, on the last protocol.
+**Responses now asks for the reasoning's summary and encrypted payload**
+wherever a rung is requested, completing the *capture* rule across all four
+protocols' reasoning. Recorded on Azure: the summary is withheld unless asked;
+the encrypted payload came unasked, so replay never depended on it there. The
+same recording shows every Responses request stored at the provider for 30
+days, now in `SCOPE.md`.
+
+Next in `WILL FIX`: the hygiene pair, **`MalformedResponseError` is defined
+twice** and **`Archive.read` raises four kinds of error**; then **Responses
+requests are stored at the provider**.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim

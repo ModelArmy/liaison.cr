@@ -50,12 +50,20 @@ module Liaison::Protocol::Responses
       end
 
       flush_compensation(items, pending, report)
+      effort = reasoning_effort(options, report)
+      reasoning = !effort.nil? && effort != "none"
+      summary = "auto" if reasoning && options.reasoning_text.summarized?
       {Wire::Request.new(model, items, session.system_prompt, declarations(options),
-        options.max_output_tokens, reasoning_effort(options, report),
-        options.tool_choice.try(&.wire_name)), report}
+        options.max_output_tokens, effort, options.tool_choice.try(&.wire_name),
+        reasoning_summary: summary, include_encrypted_reasoning: reasoning), report}
     end
 
-    # The named rung, as on Chat Completions, sent under `reasoning`.
+    # The named rung, as on Chat Completions, sent under `reasoning`. Wherever
+    # one asks for reasoning, `map` also asks for its summary, unless the
+    # caller declines the text (`Options#reasoning_text`), and for its
+    # encrypted payload, which is replay rather than text and so is asked for
+    # either way. Not with no rung: a deployment that does not reason may
+    # reject a `reasoning` object, and its name cannot say which it is.
     private def reasoning_effort(options : Options,
                                  report : Capability::Report) : String?
       request = options.reasoning

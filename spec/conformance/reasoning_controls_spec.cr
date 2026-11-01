@@ -174,6 +174,28 @@ describe "reasoning controls" do
   end
 
   describe "a named rung" do
+    # Recorded on Azure: a summary only when asked, the encrypted payload
+    # regardless; OpenAI documents both as opt-in, so both are asked for.
+    it "asks Responses for the reasoning's summary and encrypted payload" do
+      request = body(Liaison::ProtocolKind::Responses, effort(Liaison::Reasoning::Effort::Medium))
+      request["reasoning"].should eq JSON.parse(%({"effort":"medium","summary":"auto"}))
+      request["include"].should eq JSON.parse(%(["reasoning.encrypted_content"]))
+    end
+
+    it "keeps the encrypted payload on Responses when the caller declines the text" do
+      declined = Liaison::Options.new(reasoning: Liaison::Reasoning::Effort::Medium,
+        reasoning_text: Liaison::Reasoning::Text::Omitted)
+      request = body(Liaison::ProtocolKind::Responses, declined)
+      request["reasoning"].should eq JSON.parse(%({"effort":"medium"}))
+      request["include"].should eq JSON.parse(%(["reasoning.encrypted_content"]))
+    end
+
+    it "asks Responses for neither with reasoning off" do
+      request = body(Liaison::ProtocolKind::Responses, Liaison::Options.new(reasoning: Liaison::Reasoning::Off.new))
+      request["reasoning"].should eq JSON.parse(%({"effort":"none"}))
+      request["include"]?.should be_nil
+    end
+
     it "spells the rung four ways" do
       options = effort(Liaison::Reasoning::Effort::Medium)
 

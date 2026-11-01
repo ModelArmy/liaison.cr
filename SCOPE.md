@@ -114,13 +114,29 @@ model must call. It carries an argument, so adopting it turns `ToolChoice` from
 an enum into a closed union and changes every caller's `case`. Additive in
 meaning, breaking in shape. No caller in view.
 
-### Responses may never ask for reasoning summaries
+### Responses asks for no summary when no rung is set
 
-Predicted by reading. The mapper writes `summary` only on replayed reasoning
-items and sends no `reasoning.summary` request parameter, which OpenAI's
-reasoning models need before they return readable reasoning. Where:
-`responses/mapper.cr`. Confirm against current documentation, then with one
-call on Azure.
+The mapper asks for `reasoning.summary` only beside a reasoning rung, since a
+non-reasoning deployment may reject a `reasoning` object and its name cannot
+say which it is. A model that reasons with no rung set, as some OpenAI models
+do by default, therefore reasons without its summary being asked for, against
+`DEVELOPMENT.md`'s *capture* rule. Recorded: `gpt5.4mini` with no rung
+returned no reasoning item at all, so its default effort appears to be `none`
+and the gap does not arise there. Likely fix, if a model where it does is
+found: a deployment-level declaration, as `reasoning_unit` and
+`max_tokens_field` are.
+
+### Responses requests are stored at the provider
+
+Liaison sends no `store`, so OpenAI's default applies. Recorded on Azure: every
+reply echoes `"store": true`, with a response header
+`x-ms-aoai-configured-data-retention-days: 30`. Each liaison request therefore
+leaves a copy of the conversation at the provider for 30 days, which liaison
+never uses, since it keeps the history itself and replays it in full. A caller
+with privacy constraints would not expect it. Fix: send `store: false` by
+default, with an option to keep it; it changes every Responses request body,
+so every Responses transcript is re-recorded, and replay after it needs a
+probe, since stored items may be what some replays lean on.
 
 ### Model-bound reasoning is a read matrix, not a producer list
 
