@@ -19,7 +19,12 @@ module Liaison::Protocol::ChatCompletions
   class Exporter
     getter calls : MPSH::CallIdTable
 
-    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME))
+    # The key `provider_metadata` is written under: the deployment's, which
+    # is the protocol's own unless the provider was narrowed to a vendor.
+    getter metadata_key : String
+
+    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME),
+                   @metadata_key : String = METADATA_KEY)
     end
 
     def export(request : Wire::Request) : MPSH::Session
@@ -47,11 +52,11 @@ module Liaison::Protocol::ChatCompletions
       # a reloaded session knows the turn was cut without knowing this
       # protocol's spelling.
       choice.finish_reason.try do |value|
-        reply.put_meta(METADATA_KEY, "finish_reason", value)
+        reply.put_meta(metadata_key, "finish_reason", value)
         reply.ending = MPSH::Ending::Truncated if value == "length"
       end
-      response.id.try { |value| reply.put_meta(METADATA_KEY, "response_id", value) }
-      response.usage.try { |usage| reply.put_meta(METADATA_KEY, "usage", usage.to_metadata) }
+      response.id.try { |value| reply.put_meta(metadata_key, "response_id", value) }
+      response.usage.try { |usage| reply.put_meta(metadata_key, "usage", usage.to_metadata) }
 
       reply
     end

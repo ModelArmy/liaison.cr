@@ -208,7 +208,7 @@ describe "Ollama streaming over the Responses API" do
         # The load-bearing part: this came from the accumulation, not from a
         # terminal frame that never arrived. A stopped turn on the shortcut
         # assembler would have produced nothing at all.
-        key = Liaison::Protocol::Responses::METADATA_KEY
+        key = ollama.name
         reply.meta?(key, "status").should eq "incomplete"
 
         # And canonically `Stopped`, not `Truncated` — which is the ordering

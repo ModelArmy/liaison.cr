@@ -17,7 +17,12 @@ module Liaison::Protocol::Gemini
   class Exporter
     getter calls : MPSH::CallIdTable
 
-    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME))
+    # The key `provider_metadata` is written under: the deployment's, which
+    # is the protocol's own unless the provider was narrowed to a vendor.
+    getter metadata_key : String
+
+    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME),
+                   @metadata_key : String = METADATA_KEY)
     end
 
     def export(request : Wire::Request) : MPSH::Session
@@ -80,10 +85,10 @@ module Liaison::Protocol::Gemini
       # `MAX_TOKENS` means the output cap cut the turn short: normalised onto
       # `Message#ending`, and kept verbatim.
       candidate.finish_reason.try do |value|
-        reply.put_meta(METADATA_KEY, "finishReason", value)
+        reply.put_meta(metadata_key, "finishReason", value)
         reply.ending = MPSH::Ending::Truncated if value == "MAX_TOKENS"
       end
-      response.usage.try { |usage| reply.put_meta(METADATA_KEY, "usage", usage.to_metadata) }
+      response.usage.try { |usage| reply.put_meta(metadata_key, "usage", usage.to_metadata) }
 
       reply
     end
@@ -134,7 +139,7 @@ module Liaison::Protocol::Gemini
       arguments = Arguments.read(part.args, NAME, part.name)
       block = MPSH::ToolCallBlock.new(mpsh_id, part.name, arguments)
       if value = part.thought_signature
-        block.put_meta(METADATA_KEY, "thought_signature", value)
+        block.put_meta(metadata_key, "thought_signature", value)
       end
       block
     end
@@ -152,7 +157,7 @@ module Liaison::Protocol::Gemini
       text = part.text.try { |value| value.empty? ? nil : value }
       block = MPSH::ReasoningBlock.new(text, redacted: text.nil?)
       if value = part.signature
-        block.put_meta(METADATA_KEY, "thought_signature", value)
+        block.put_meta(metadata_key, "thought_signature", value)
       end
       block
     end

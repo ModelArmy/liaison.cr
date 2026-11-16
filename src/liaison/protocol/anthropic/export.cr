@@ -12,7 +12,12 @@ module Liaison::Protocol::Anthropic
   class Exporter
     getter calls : MPSH::CallIdTable
 
-    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME))
+    # The key `provider_metadata` is written under: the deployment's, which
+    # is the protocol's own unless the provider was narrowed to a vendor.
+    getter metadata_key : String
+
+    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME),
+                   @metadata_key : String = METADATA_KEY)
     end
 
     def export(request : Wire::Request) : MPSH::Session
@@ -43,12 +48,12 @@ module Liaison::Protocol::Anthropic
       # `max_tokens` means the output cap cut the turn short: normalised onto
       # `Message#ending`, and kept verbatim.
       response.stop_reason.try do |value|
-        reply.put_meta(METADATA_KEY, "stop_reason", value)
+        reply.put_meta(metadata_key, "stop_reason", value)
         reply.ending = MPSH::Ending::Truncated if value == "max_tokens"
       end
-      response.stop_sequence.try { |value| reply.put_meta(METADATA_KEY, "stop_sequence", value) }
-      response.id.try { |value| reply.put_meta(METADATA_KEY, "response_id", value) }
-      response.usage.try { |usage| reply.put_meta(METADATA_KEY, "usage", usage.to_metadata) }
+      response.stop_sequence.try { |value| reply.put_meta(metadata_key, "stop_sequence", value) }
+      response.id.try { |value| reply.put_meta(metadata_key, "response_id", value) }
+      response.usage.try { |usage| reply.put_meta(metadata_key, "usage", usage.to_metadata) }
 
       reply
     end
@@ -105,7 +110,7 @@ module Liaison::Protocol::Anthropic
         calls.mpsh_id(block.tool_use_id),
         block.content.compact_map { |nested| to_block(nested).as(MPSH::Block?) },
         server_executed: true)
-      exported.put_meta(METADATA_KEY, "result_type", block.block_type)
+      exported.put_meta(metadata_key, "result_type", block.block_type)
       exported
     end
 
@@ -117,10 +122,10 @@ module Liaison::Protocol::Anthropic
       exported = MPSH::ReasoningBlock.new(text, redacted: redacted || text.nil?)
 
       if value = block.signature
-        exported.put_meta(METADATA_KEY, "signature", value)
+        exported.put_meta(metadata_key, "signature", value)
       end
       if value = block.redacted_data
-        exported.put_meta(METADATA_KEY, "redacted_data", value)
+        exported.put_meta(metadata_key, "redacted_data", value)
       end
 
       exported

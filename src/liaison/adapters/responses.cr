@@ -45,7 +45,7 @@ module Liaison
                       options : Options)
       mapper = Protocol::Responses::Mapper.new(narrowed(model))
       request, report = mapper.map(session, model, policy, retention, options)
-      {request, report, Protocol::Responses::Exporter.new(mapper.calls)}
+      {request, report, Protocol::Responses::Exporter.new(mapper.calls, mapper.profile.metadata_key)}
     end
   end
 end

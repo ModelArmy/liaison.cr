@@ -58,7 +58,7 @@ module Liaison
                       options : Options)
       mapper = Protocol::Gemini::Mapper.new(narrowed(model))
       request, report = mapper.map(session, model, policy, retention, options)
-      {request, report, Protocol::Gemini::Exporter.new(mapper.calls)}
+      {request, report, Protocol::Gemini::Exporter.new(mapper.calls, mapper.profile.metadata_key)}
     end
   end
 end

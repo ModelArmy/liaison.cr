@@ -63,7 +63,7 @@ private def tool_question : M::Session
 end
 
 private def chat_meta(reply, key : String)
-  reply.meta?(Liaison::Protocol::ChatCompletions::METADATA_KEY, key)
+  reply.meta?(ollama.name, key)
 end
 
 describe "Ollama streaming over the Chat Completions API" do

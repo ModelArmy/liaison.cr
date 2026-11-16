@@ -13,7 +13,12 @@ module Liaison::Protocol::Responses
   class Exporter
     getter calls : MPSH::CallIdTable
 
-    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME))
+    # The key `provider_metadata` is written under: the deployment's, which
+    # is the protocol's own unless the provider was narrowed to a vendor.
+    getter metadata_key : String
+
+    def initialize(@calls : MPSH::CallIdTable = MPSH::CallIdTable.new(NAME),
+                   @metadata_key : String = METADATA_KEY)
     end
 
     def export(request : Wire::Request) : MPSH::Session
@@ -83,11 +88,11 @@ module Liaison::Protocol::Responses
       # output cap and a cut stream; for a cut stream, `Client` then sets
       # `Interrupted` or `Stopped`.
       response.status.try do |value|
-        reply.put_meta(METADATA_KEY, "status", value)
+        reply.put_meta(metadata_key, "status", value)
         reply.ending = MPSH::Ending::Truncated if value == "incomplete"
       end
-      response.id.try { |value| reply.put_meta(METADATA_KEY, "response_id", value) }
-      response.usage.try { |usage| reply.put_meta(METADATA_KEY, "usage", usage.to_metadata) }
+      response.id.try { |value| reply.put_meta(metadata_key, "response_id", value) }
+      response.usage.try { |usage| reply.put_meta(metadata_key, "usage", usage.to_metadata) }
 
       reply
     end
@@ -152,10 +157,10 @@ module Liaison::Protocol::Responses
       block = MPSH::ReasoningBlock.new(text, redacted: text.nil?)
 
       if value = item.encrypted_content
-        block.put_meta(METADATA_KEY, "encrypted_content", value)
+        block.put_meta(metadata_key, "encrypted_content", value)
       end
       if value = item.id
-        block.put_meta(METADATA_KEY, "item_id", value)
+        block.put_meta(metadata_key, "item_id", value)
       end
 
       block
