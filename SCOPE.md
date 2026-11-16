@@ -17,81 +17,39 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 Vulnerabilities (V) first, then correctness (C). Labels are stable: a fixed
 item is deleted, and the rest keep their numbers.
 
-### V1. A tool's JSON Schema is spliced into the request unparsed
-
-`Tool#parameters` is text, and every protocol's `ToolDeclaration#to_json`
-writes it with `json.raw`. A schema that closes its own object can add keys to
-the request: a scratch spec replaced `model` and `messages` on Chat
-Completions, and `model` and `system` on Anthropic, under Crystal's
-last-key-wins parsing. Which duplicate a server honours is the server's
-choice, so the safe assumption is the attacker's. Schemas typically come from
-MCP servers and configuration files, which is to say from someone else.
-`Tool.new` also accepts text that is not JSON at all, which surfaces later as
-a provider's 400.
-
-Where: `src/liaison/options.cr`, `Tool#initialize`; the four
-`wire/request.cr` files. Fix: parse in `Tool#initialize` and raise
-`ArgumentError` unless the text is a JSON object. A valid object cannot break
-out of its field, so the `json.raw` calls can stay. Reproduced by a scratch
-spec; no spec covers it.
-
-### V2. Exporters file opaque data under the protocol's vendor, not the deployment's
-
-Mappers read `provider_metadata` under the narrowed `profile.metadata_key`;
-exporters write it under the protocol's `METADATA_KEY` constant. On a
-narrowed provider the two differ. Replaying the `ollama_responses_text`
-transcript, Ollama's `encrypted_content` lands under `openai`. Handed to a
-real OpenAI provider it maps `Exact` under `Strict` and is sent; handed back
-to Ollama it reads as foreign. `docs/servers/OLLAMA.md` says it is stored
-under `ollama`. Narrowing is enforced in one direction and bypassed in the
-other, and the cost is one deployment's opaque payload sent to another
-vendor.
-
-Where: the four `export.cr` files, every `put_meta(METADATA_KEY, ...)`; the
-adapters' `build`. Fix: construct each exporter with the narrowed key and
-write under it. Changes request bodies for multi-turn Ollama Responses
-transcripts that replay reasoning, so those need re-recording (local, free).
-Reproduced by a scratch spec; no spec covers it.
-
 ### V3. Readers index JSON without checking it is an object
 
 `JSON::Any#[]?(String)` raises a plain `Exception` on anything but a hash.
 Every reader indexes first and asks later, so a body or frame of the wrong
-shape escapes as an untyped exception instead of `MalformedResponseError`,
-`StreamError` or `nil`. Ten cases reproduced, all raising: each protocol's
-`export_reply` on a non-object body; a Chat Completions choice or `tool_calls`
-entry that is not an object; a Chat Completions or Anthropic stream frame
-that is an array or number; and `error_detail` on `{"error": "text"}` (a
-string `error`, as some OpenAI-compatible servers send) or on a top-level
-array (which the Gemini adapter's own comment says Gemini may return).
-
-The `error_detail` case is the worst: it runs inside `Server#post` while
-building a `TransportError`, so the status code is lost behind an unrelated
-exception.
+shape escapes as an untyped exception instead of `MalformedResponseError` or
+`StreamError`. Reproduced: each protocol's `export_reply` on a non-object
+body; a Chat Completions choice or `tool_calls` entry that is not an object;
+a Chat Completions or Anthropic stream frame that is an array or number. The
+same holds for nested fields read as objects, such as `function`, `delta`,
+`source` and `error`: about 160 reads across the readers and assemblers.
 
 Where: `Wire::Response.from_json` and its helpers in all four protocols; the
-assemblers' `absorb`; `Adapter#nested_error`. Fix: one shared helper that
-returns the object or raises `MalformedResponseError`, called at each
-reader's entry and wherever an array element is indexed; `nested_error`
-returns `nil` instead. Reading the first element of a Gemini array of error
-envelopes is a few lines more, with no recording to test it against; left
-out unless wanted. Reproduced by a scratch spec; no spec covers it.
+assemblers' `absorb`. `Adapter#nested_error` is already fixed, by checking
+`as_h?` at each step.
 
-### V4. `Toolbox` sends an unexpected exception's message to the model
+**Open: the shape of the fix.** Three candidates:
 
-A `Function#call` that raises anything but `Function::Failure` is reported to
-the model as `"the tool raised: #{error.message}"`. Exception messages carry
-paths, SQL, hostnames and occasionally credentials, and the model is a third
-party. `Failure` already exists for messages meant to be seen. Where:
-`src/liaison/toolbox.cr`, `run`. Fix: send fixed text ("the tool failed")
-and keep the detail in `exception`, which only `Archive` stores. Predicted by
-reading.
+1. Check at each reader's entry and each array element only. Small, but a
+   nested field of the wrong type still escapes.
+2. A safe accessor (`Json.at(any, "key")`) at every read, as `nested_error`
+   does inline. Complete, and every changed line is plain; a mechanical edit
+   to about 160 lines.
+3. Rescue the stdlib's exception once per reader and re-raise it typed. Small,
+   but it must tell that exception apart by its class (plain `Exception`),
+   which is exact today and tied to how the stdlib raises.
+
+The lean is the second. Reproduced by a scratch spec; no spec covers it.
 
 ### V5. Committed transcripts hold account and deployment identifiers
 
 Credentials are filtered. Response headers are not: the Anthropic
-organization id (14 transcripts), the Azure resource hostname and region (6),
-and request ids (`request-id`, `x-request-id`, `apim-request-id`). The
+organization id (17 transcripts), the Azure resource hostname and region
+(7), and request ids (24) (`request-id`, `x-request-id`, `apim-request-id`). The
 repository is public.
 
 **Open: whether this is acceptable.** If not, a Wiretap filter for these
@@ -110,10 +68,10 @@ a placeholder server name. Checked by grep.
 - **`Server` holds one `HTTP::Client`**, which is unsafe for two fibers. Either
   document it as one-fiber-at-a-time or guard it.
 - **`Archive.read` reads any role but `"user"` as assistant**, so a corrupt or
-  hand-edited archive silently changes speaker. Belongs with *`Archive.read`
-  raises more than `FormatError`* below, and is fixed by the same pass.
+  hand-edited archive silently changes speaker. Raise `FormatError` for a role
+  other than `user` or `assistant`, as for an unrecognised block kind.
 
-Predicted by reading.
+Predicted by reading; the archive role reproduced by a scratch spec.
 
 ### C1. The mid-tool-call rule is never applied
 
@@ -129,28 +87,30 @@ some cross-provider handoffs of a tool loop refuse that currently go through.
 No recording shows the rule is wrong, so the lean is to enforce. Reproduced by
 a scratch spec.
 
-### C2. A degraded tool exchange produces a request with half a pair
+### C2. A degraded block inside a tool result drops the whole result
 
 Under `Lenient` only, since `Degraded` exceeds the default `Compensating`.
 But `Lenient` is what a caller picks to hand a tool-using session to a
-stricter target, which is this shard's defining move. Three shapes:
+stricter target, which is this shard's defining move.
 
-- **Anthropic and Gemini drop a whole tool result** when one nested block
-  degrades, text included. A result holding text and an audio clip with a
-  transcript vanished entirely on Anthropic, its message was emptied and
-  removed, and the `tool_use` went unanswered.
-- **Chat Completions and Responses drop a degraded call and keep its
-  result**, so a `role: "tool"` message answers a call that is not there.
-- **Gemini maps the result of a dropped call as `unknown_function`**, since
-  the `CallIdTable` holds no binding for it. A degraded call is any foreign
-  call sent to a Gemini 3 model, which requires a signature.
+Anthropic and Gemini return nothing for a tool result once `Resolver` reports
+it lossy, which it does when one nested block degrades, text included. A
+result holding text and an audio clip with a transcript vanished entirely on
+Anthropic, its message was emptied and removed, and the `tool_use` went
+unanswered. Gemini's `function_response` has the same early return; it is
+unreproduced only because Gemini accepts the audio.
 
-Where: each mapper's `tool_call` / `tool_use` / `function_call` and its
-tool-result method. Fix: degrade a call and its result together, rendering
-both as text, on every protocol; within a kept result, degrade the nested
-block and keep the rest. Whether each provider rejects an orphan or merely
-confuses the model is unrecorded; the fix is right either way. Reproduced by
-a scratch spec for the first two shapes; the third predicted by reading.
+The decision already taken for a *degraded call* points the way: `Resolver`
+keeps the result, the Gemini mapper names it after its call, and two
+recordings show Gemini accepts the orphan. A degraded *block* should cost that
+block, not the result around it. Where: each mapper's tool-result method.
+Fix: render the result, and let each nested block degrade (to its
+`text_fallback`) or drop on its own.
+
+Still unrecorded: whether Anthropic and the OpenAI pair accept a result whose
+call was degraded, as Gemini does. Chat Completions and Responses already send
+one; Anthropic would once its call can degrade. Reproduced by a scratch spec
+for Anthropic.
 
 ### C3. `audio/mpeg` is sent with format `mpeg`
 
@@ -204,48 +164,46 @@ The first is smaller and honest about what the code does. Checked by grep.
 
 Predicted by reading.
 
-### C8. `Provider` construction is duplicated, and the copies have drifted
-
-`Provider.for` and `Provider.for_azure` repeat each other's logic, and
-`Adapter#narrowed(model)` does two jobs, returning early from one. Two defects
-follow:
-
-- **A `reasoning_unit` override bypasses the signed-tool-call axis.**
-  `narrowed(model)` returns early when an override is set, so it never calls
-  `Catalog.narrow`, which applies both catalog axes. On a Gemini 3 model with
-  an explicit unit, `tool_call_signature_required` is never switched on, so a
-  foreign unsigned tool call maps `Exact` and draws the 400 the catalog entry
-  exists to prevent.
-- **`for_azure` accepts any `reasoning_unit` and ignores it.** `for` raises
-  `ArgumentError` for a unit the protocol does not spell; `for_azure` has no
-  such check. Both Azure protocols declare `Effort`, so a `Budget` override is
-  accepted and then silently ignored, since `narrowed(model)` applies an
-  override only to an `Either` unit.
-
-Where: `src/liaison/provider.cr`; `src/liaison/adapters/adapter.cr`,
-`narrowed(model)`. Fix: one construction path that `for_azure` delegates to,
-with the guard; narrowing as two steps, catalog first and then the override
-replacing only the unit axis. Predicted by reading.
-
 ---
 
 ## WILL FIX
 
 Ordered by urgency, most urgent first.
 
-### `Archive.read` raises more than `FormatError` on a malformed archive
+### Responses requests are stored at the provider
 
-`FormatError` covers a missing or unrecognised `format`, and unrecognised block
-kinds, endings and outcomes. Anything else structurally wrong escapes as
-whatever the JSON accessor raises: a missing `messages` key is a `KeyError`
-(`root["messages"]`), a `messages` that is not an array a `TypeCastError`
-(`.as_a`), and unparseable text a `JSON::ParseException`. Where:
-`src/liaison/mpsh/archive.cr`, `read` and the `read_*` helpers.
+Liaison sends no `store`, so OpenAI's default applies. Recorded on Azure: every
+reply echoes `"store": true`, with a response header
+`x-ms-aoai-configured-data-retention-days: 30`. Each liaison request therefore
+leaves a copy of the conversation at the provider for 30 days, which liaison
+never uses, since it keeps the history itself and replays it in full. A caller
+with privacy constraints would not expect it. Fix: send `store: false` by
+default, with an option to keep it; it changes every Responses request body,
+so every Responses transcript is re-recorded, and replay after it needs a
+probe, since stored items may be what some replays lean on.
 
-It matters to an application loading archives from disk: a corrupt file
-should be one rescuable error, not four. Likely fix: wrap the body of `read` and
-re-raise the accessor exceptions as `FormatError` with the original as
-`cause`. Predicted by reading; no spec covers it.
+### Model-bound reasoning is a read matrix, not a producer list
+
+Anthropic now documents which models read which models' thinking, and it is
+asymmetric: Fable 5.1 reads Opus 5 and 5.5, neither reads Fable; Sonnet 5.5's
+blocks are read only by Opus 5.5; Haiku 5.5's only by Opus and Sonnet 5.5. The
+API drops a block the target cannot read, without error or charge.
+`Catalog::MODEL_BOUND_REASONING` covers Fable and Mythos as producers only, so
+a Sonnet 5.5 session continued on Haiku 5.5 still reports `Exact`. Likely fix:
+a producer-to-readers table replacing the set, with `rebound?` asking whether
+the target is among the readers. The `thinking-binding-controls` beta reports
+dropped blocks in the response as `input_transformations`, which is evidence a
+provider supplies rather than one liaison predicts: relevant to *A provider can
+ignore an exactly-mapped option*.
+
+### Retention trimming may invalidate later thinking
+
+Predicted by reading. From Claude 5.1, a thinking block stays valid only while
+the system prompt, tools and every earlier message are unchanged; otherwise it
+and every later one fail a prefix check. `ReasoningRetention::CompletedTurns`
+removes reasoning from completed turns, which changes earlier messages between
+requests. Whether that trips the check, and what liaison's own structural
+adaptations do to it, is unrecorded. Where: `Capability::Retention`.
 
 ### `Profile` copies itself by hand
 
@@ -257,19 +215,14 @@ its default on every narrowed provider. Where:
 overrides, which the three methods call; or make `Profile` a struct and use
 Crystal's `copy_with`. Do it after C6, which may remove four of the fields.
 
-### Fable's reasoning is model-bound, and replays as if it were not
+### `Provider.for` and `for_azure` still repeat each other
 
-Anthropic documents that thinking blocks from `claude-fable-5` and
-`claude-mythos-5` are tied to the model that produced them, and that other
-Claude models silently ignore them. `Resolver#own?` keys on the vendor
-(`metadata_key` is `anthropic` for every Claude model), so a Fable session
-continued on Opus or Haiku maps that reasoning `Exact`, and the model drops it
-unannounced: the silent loss the capability model exists to report. Read from
-documentation, not yet recorded. Where: `Resolver#own?` and
-`Capability::Catalog`. Fix: decide whether the producing model belongs in the
-reasoning block's provenance, which is a question about MPSH, not only this
-protocol; then a probe, though "silently ignored" may show only as a reply
-that does not use the earlier reasoning.
+The two defects that came from the duplication are fixed, and the
+`reasoning_unit` guard is shared. The rest is still written twice: the
+vendor's canonical key, the resolved vendor, and the `max_tokens_field`
+guard. Where: `src/liaison/provider.cr`. Fix: one private method returning
+the resolved vendor and checking the shared arguments, which both call before
+building their adapter. Predicted by reading.
 
 ### A provider can ignore an exactly-mapped option, and nothing says so
 
@@ -334,6 +287,18 @@ this one describes something a provider did. A separate channel on `Report`
 may be the more honest shape, at the cost of a second thing for callers to
 check.
 
+### Responses asks for no summary when no rung is set
+
+The mapper asks for `reasoning.summary` only beside a reasoning rung, since a
+non-reasoning deployment may reject a `reasoning` object and its name cannot
+say which it is. A model that reasons with no rung set, as some OpenAI models
+do by default, therefore reasons without its summary being asked for, against
+`DEVELOPMENT.md`'s *capture* rule. Recorded: `gpt5.4mini` with no rung
+returned no reasoning item at all, so its default effort appears to be `none`
+and the gap does not arise there. Likely fix, if a model where it does is
+found: a deployment-level declaration, as `reasoning_unit` and
+`max_tokens_field` are.
+
 ### Mappers, assemblers and adapters repeat their leaf helpers
 
 The protocols differ in structure, so a shared base mapper would be the wrong
@@ -382,10 +347,6 @@ helper that widens). Cosmetic, but these are the lines a reader trips on.
 
 ### Dead code
 
-- `MalformedResponseError` is declared twice, in two identical
-  `module Liaison::Protocol` blocks in `src/liaison/protocol/errors.cr`.
-  Crystal reads the second as a reopening, so an edit to one copy alone would
-  be silently overridden or duplicated. Delete the first.
 - The Chat Completions mapper's `refusal_text` takes a `parts` it never uses.
 - Three `COMPENSATION_PLACEHOLDER` aliases of
   `Capability::Carrier::PLACEHOLDER`, one per protocol. Use the original.
@@ -400,7 +361,7 @@ sweep.
 
 ### `HANDOFF.md` has outgrown its purpose
 
-It describes itself as deliberately short and runs to 531 lines, much of it
+It describes itself as deliberately short and runs to 604 lines, much of it
 the history of how things were found. `DEVELOPMENT.md`'s own rule sends
 history to commits and settled decisions to code comments or
 `DEVELOPMENT.md`. Fix: keep State, Next and pointers; move anything still
