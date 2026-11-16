@@ -3,6 +3,7 @@ require "./export"
 require "./wire/response"
 require "../../streaming/assembler"
 require "../errors"
+require "../fields"
 
 module Liaison::Protocol::ChatCompletions
   # Chunks from a Chat Completions stream, assembled into a `Wire::Response`.
@@ -48,31 +49,31 @@ module Liaison::Protocol::ChatCompletions
         return
       end
 
-      payload = decode(frame.data)
+      payload = Fields.parse_object?(frame.data)
       return unless payload
-      raise mid_stream(payload) if payload["error"]?
+      raise mid_stream(payload) if Fields.at(payload, "error")
 
       delta = absorb_metadata(payload)
       return unless delta
 
-      @role = delta["role"]?.try(&.as_s?) || @role
-      @refusal = delta["refusal"]?.try(&.as_s?) || @refusal
+      @role = Fields.string(delta, "role") || @role
+      @refusal = Fields.string(delta, "refusal") || @refusal
 
-      delta["content"]?.try(&.as_s?).try do |text|
+      Fields.string(delta, "content").try do |text|
         next if text.empty?
         @content += text
         yield Streaming::TextDelta.new(text)
       end
 
       # Both spellings; see `Wire::Response.message`.
-      reasoning = delta["reasoning_content"]?.try(&.as_s?) || delta["reasoning"]?.try(&.as_s?)
+      reasoning = Fields.string(delta, "reasoning_content") || Fields.string(delta, "reasoning")
       reasoning.try do |text|
         next if text.empty?
         @reasoning += text
         yield Streaming::ReasoningDelta.new(text)
       end
 
-      delta["tool_calls"]?.try(&.as_a?).try do |fragments|
+      Fields.array(delta, "tool_calls").try do |fragments|
         fragments.each do |fragment|
           announced = accumulate(fragment)
           announced.try { |name| yield Streaming::ToolCallStarted.new(name) }
@@ -101,32 +102,32 @@ module Liaison::Protocol::ChatCompletions
     # Folds a chunk's per-stream metadata into the assembler and returns the
     # delta left to absorb, or `nil` when the chunk carried no choice.
     private def absorb_metadata(payload : JSON::Any) : JSON::Any?
-      @id = payload["id"]?.try(&.as_s?) || @id
-      @model = payload["model"]?.try(&.as_s?) || @model
-      Wire::Usage.parse(payload["usage"]?).try { |value| @usage = value }
+      @id = Fields.string(payload, "id") || @id
+      @model = Fields.string(payload, "model") || @model
+      Wire::Usage.parse(Fields.at(payload, "usage")).try { |value| @usage = value }
 
-      choice = payload["choices"]?.try(&.as_a?).try(&.first?)
+      choice = Fields.array(payload, "choices").try(&.first?)
       return unless choice
 
-      choice["finish_reason"]?.try(&.as_s?).try { |value| @finish_reason = value }
-      choice["delta"]?
+      Fields.string(choice, "finish_reason").try { |value| @finish_reason = value }
+      Fields.object(choice, "delta")
     end
 
     # Folds one tool-call fragment into the call at its index, returning the
     # name when this fragment introduced the call, so `absorb` announces each
     # call once.
     private def accumulate(fragment : JSON::Any) : String?
-      index = fragment["index"]?.try(&.as_i?) || 0
+      index = Fields.int(fragment, "index") || 0
       pending = @calls[index] ||= Pending.new
 
-      pending.id = fragment["id"]?.try(&.as_s?) || pending.id
+      pending.id = Fields.string(fragment, "id") || pending.id
 
-      function = fragment["function"]?
+      function = Fields.object(fragment, "function")
       return unless function
 
-      function["arguments"]?.try(&.as_s?).try { |chunk| pending.arguments += chunk }
+      Fields.string(function, "arguments").try { |chunk| pending.arguments += chunk }
 
-      name = function["name"]?.try(&.as_s?)
+      name = Fields.string(function, "name")
       return unless name && pending.name.nil?
 
       pending.name = name
@@ -167,17 +168,11 @@ module Liaison::Protocol::ChatCompletions
       end
     end
 
-    private def decode(data : String) : JSON::Any?
-      JSON.parse(data)
-    rescue JSON::ParseException
-      nil
-    end
-
     private def mid_stream(payload : JSON::Any) : StreamError
-      error = payload["error"]?
+      error = Fields.at(payload, "error")
       StreamError.new(NAME,
-        error.try(&.["message"]?).try(&.as_s?) || "the provider sent an error chunk",
-        error.try(&.["type"]?).try(&.as_s?))
+        Fields.string(error, "message") || "the provider sent an error chunk",
+        Fields.string(error, "type"))
     end
   end
 end

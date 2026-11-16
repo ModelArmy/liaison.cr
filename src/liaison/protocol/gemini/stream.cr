@@ -3,6 +3,7 @@ require "./export"
 require "./wire/response"
 require "../../streaming/assembler"
 require "../errors"
+require "../fields"
 
 module Liaison::Protocol::Gemini
   # Chunks from `:streamGenerateContent?alt=sse`, assembled into a
@@ -24,17 +25,17 @@ module Liaison::Protocol::Gemini
     end
 
     def absorb(frame : Streaming::Sse::Frame, & : Streaming::Event ->) : Nil
-      payload = decode(frame.data)
+      payload = Fields.parse_object?(frame.data)
       return unless payload
 
       # A mid-stream failure is an `error` object in place of a candidate.
-      raise mid_stream(payload) if payload["error"]?
+      raise mid_stream(payload) if Fields.at(payload, "error")
 
       # Usually on the last chunk; kept whenever seen.
-      payload["modelVersion"]?.try(&.as_s?).try { |value| @model_version = value }
-      Wire::Usage.parse(payload["usageMetadata"]?).try { |value| @usage = value }
+      Fields.string(payload, "modelVersion").try { |value| @model_version = value }
+      Wire::Usage.parse(Fields.at(payload, "usageMetadata")).try { |value| @usage = value }
 
-      return unless payload["candidates"]?
+      return unless Fields.at(payload, "candidates")
       candidate = Wire::Response.from_any(payload).candidate
       return unless candidate
 
@@ -104,17 +105,11 @@ module Liaison::Protocol::Gemini
     # A chunk that does not parse is skipped. If it held the finish reason,
     # `complete?` stays false and `Client#send` marks the reply
     # `Interrupted`.
-    private def decode(data : String) : JSON::Any?
-      JSON.parse(data)
-    rescue JSON::ParseException
-      nil
-    end
-
     private def mid_stream(payload : JSON::Any) : StreamError
-      error = payload["error"]?
+      error = Fields.at(payload, "error")
       StreamError.new(NAME,
-        error.try(&.["message"]?).try(&.as_s?) || "the provider sent an error chunk",
-        error.try(&.["status"]?).try(&.as_s?))
+        Fields.string(error, "message") || "the provider sent an error chunk",
+        Fields.string(error, "status"))
     end
   end
 end

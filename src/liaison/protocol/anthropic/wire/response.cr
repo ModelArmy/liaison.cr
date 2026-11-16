@@ -2,6 +2,7 @@ require "json"
 require "./request"
 require "../capabilities"
 require "../../errors"
+require "../../fields"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Anthropic
@@ -20,12 +21,10 @@ module Liaison::Protocol::Anthropic
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
-        # absent instead of being indexed as a hash.
-        fields = any.try(&.as_h?)
-        return unless fields
+        # An explicit JSON `null` reads as absent.
+        return unless any.try(&.as_h?)
 
-        new(fields["input_tokens"]?.try(&.as_i?), fields["output_tokens"]?.try(&.as_i?))
+        new(Fields.int(any, "input_tokens"), Fields.int(any, "output_tokens"))
       end
 
       def to_metadata : MPSH::Object
@@ -51,24 +50,20 @@ module Liaison::Protocol::Anthropic
       end
 
       def self.from_json(body : String) : Response
-        parsed = begin
-          JSON.parse(body)
-        rescue error : JSON::ParseException
-          raise MalformedResponseError.new(NAME, "response body is not JSON: #{error.message}")
-        end
+        parsed = Fields.parse_object(body, NAME)
 
-        raw = parsed["content"]?.try(&.as_a?)
+        raw = Fields.array(parsed, "content")
         unless raw
           raise MalformedResponseError.new(NAME, "response has no `content` array")
         end
 
         new(raw.compact_map { |entry| block(entry).as(Block?) },
-          id: parsed["id"]?.try(&.as_s?),
-          model: parsed["model"]?.try(&.as_s?),
-          role: parsed["role"]?.try(&.as_s?) || "assistant",
-          stop_reason: parsed["stop_reason"]?.try(&.as_s?),
-          stop_sequence: parsed["stop_sequence"]?.try(&.as_s?),
-          usage: Usage.parse(parsed["usage"]?))
+          id: Fields.string(parsed, "id"),
+          model: Fields.string(parsed, "model"),
+          role: Fields.string(parsed, "role") || "assistant",
+          stop_reason: Fields.string(parsed, "stop_reason"),
+          stop_sequence: Fields.string(parsed, "stop_sequence"),
+          usage: Usage.parse(Fields.at(parsed, "usage")))
       end
 
       # One content block, from an object someone else assembled. The stream
@@ -81,12 +76,12 @@ module Liaison::Protocol::Anthropic
       # Reads every block type the protocol defines, not only those a model is
       # expected to emit.
       private def self.block(any : JSON::Any) : Block?
-        type = any["type"]?.try(&.as_s?)
+        type = Fields.string(any, "type")
         return unless type
 
         case type
         when "text"
-          any["text"]?.try(&.as_s?).try { |text| TextBlock.new(text) }
+          Fields.string(any, "text").try { |text| TextBlock.new(text) }
         when "thinking", "redacted_thinking"
           thinking(any)
         when "tool_use"
@@ -98,7 +93,7 @@ module Liaison::Protocol::Anthropic
           binary(any).try { |parts| ImageBlock.new(*parts) }
         when "document"
           binary(any).try do |parts|
-            DocumentBlock.new(parts[0], parts[1], any["title"]?.try(&.as_s?))
+            DocumentBlock.new(parts[0], parts[1], Fields.string(any, "title"))
           end
         when "tool_result"
           tool_result(any)
@@ -110,37 +105,37 @@ module Liaison::Protocol::Anthropic
       end
 
       private def self.tool_use(any : JSON::Any) : {String, String, String}?
-        name = any["name"]?.try(&.as_s?)
+        name = Fields.string(any, "name")
         return unless name
 
         # `input` is a structured object here. It is re-serialized to raw JSON
         # text, and parsed once, on export.
-        {any["id"]?.try(&.as_s?) || "", name, (any["input"]? || JSON::Any.new({} of String => JSON::Any)).to_json}
+        {Fields.string(any, "id") || "", name, (Fields.at(any, "input") || JSON::Any.new({} of String => JSON::Any)).to_json}
       end
 
       private def self.binary(any : JSON::Any) : {String, String}?
-        source = any["source"]?
+        source = Fields.object(any, "source")
         return unless source
         # Inline base64 only. A URL source names bytes this reader does not
         # have, and it does not invent a payload.
-        return unless source["type"]?.try(&.as_s?) == "base64"
+        return unless Fields.string(source, "type") == "base64"
 
-        media_type = source["media_type"]?.try(&.as_s?)
-        data = source["data"]?.try(&.as_s?)
+        media_type = Fields.string(source, "media_type")
+        data = Fields.string(source, "data")
         return unless media_type && data
 
         {media_type, data}
       end
 
       private def self.tool_result(any : JSON::Any) : Block?
-        id = any["tool_use_id"]?.try(&.as_s?)
+        id = Fields.string(any, "tool_use_id")
         return unless id
 
-        ToolResultBlock.new(id, nested(any), any["is_error"]?.try(&.as_bool?) || false)
+        ToolResultBlock.new(id, nested(any), Fields.bool(any, "is_error") || false)
       end
 
       private def self.server_tool_result(any : JSON::Any, type : String) : Block?
-        id = any["tool_use_id"]?.try(&.as_s?)
+        id = Fields.string(any, "tool_use_id")
         return unless id
 
         ServerToolResultBlock.new(id, nested(any), type)
@@ -149,7 +144,7 @@ module Liaison::Protocol::Anthropic
       # `content` nests, so this recurses: an image-bearing tool result is
       # native here.
       private def self.nested(any : JSON::Any) : Array(Block)
-        body = any["content"]?
+        body = Fields.at(any, "content")
         return [] of Block unless body
 
         if text = body.as_s?
@@ -165,9 +160,9 @@ module Liaison::Protocol::Anthropic
       # as a block, so reasoning that occurred is never dropped.
       private def self.thinking(any : JSON::Any) : Block
         ThinkingBlock.new(
-          any["thinking"]?.try(&.as_s?),
-          signature: any["signature"]?.try(&.as_s?),
-          redacted_data: any["data"]?.try(&.as_s?))
+          Fields.string(any, "thinking"),
+          signature: Fields.string(any, "signature"),
+          redacted_data: Fields.string(any, "data"))
       end
     end
   end

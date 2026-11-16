@@ -136,11 +136,7 @@ module Liaison
     # Anthropic and Gemini use. Returns `nil` for unparseable JSON and for
     # JSON of any other shape.
     private def nested_error(body : String) : String?
-      JSON.parse(body).as_h?
-        .try(&.["error"]?).try(&.as_h?)
-        .try(&.["message"]?).try(&.as_s?)
-    rescue JSON::ParseException
-      nil
+      Protocol::Fields.string(Protocol::Fields.parse_object?(body), "error", "message")
     end
   end
 end

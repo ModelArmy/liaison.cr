@@ -2,6 +2,7 @@ require "json"
 require "./request"
 require "../capabilities"
 require "../../errors"
+require "../../fields"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Responses
@@ -20,14 +21,12 @@ module Liaison::Protocol::Responses
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
-        # absent instead of being indexed as a hash.
-        fields = any.try(&.as_h?)
-        return unless fields
+        # An explicit JSON `null` reads as absent.
+        return unless any.try(&.as_h?)
 
-        new(fields["input_tokens"]?.try(&.as_i?),
-          fields["output_tokens"]?.try(&.as_i?),
-          fields["total_tokens"]?.try(&.as_i?))
+        new(Fields.int(any, "input_tokens"),
+          Fields.int(any, "output_tokens"),
+          Fields.int(any, "total_tokens"))
       end
 
       def to_metadata : MPSH::Object
@@ -51,11 +50,7 @@ module Liaison::Protocol::Responses
       end
 
       def self.from_json(body : String) : Response
-        parsed = begin
-          JSON.parse(body)
-        rescue error : JSON::ParseException
-          raise MalformedResponseError.new(NAME, "response body is not JSON: #{error.message}")
-        end
+        parsed = Fields.parse_object(body, NAME)
 
         from_any(parsed)
       end
@@ -63,16 +58,16 @@ module Liaison::Protocol::Responses
       # Reads a response already parsed, such as the one a terminal stream
       # frame nests under `response`, by the same rules as a body.
       def self.from_any(parsed : JSON::Any) : Response
-        raw = parsed["output"]?.try(&.as_a?)
+        raw = Fields.array(parsed, "output")
         unless raw
           raise MalformedResponseError.new(NAME, "response has no `output` array")
         end
 
         new(from_items(raw),
-          id: parsed["id"]?.try(&.as_s?),
-          model: parsed["model"]?.try(&.as_s?),
-          status: parsed["status"]?.try(&.as_s?),
-          usage: Usage.parse(parsed["usage"]?))
+          id: Fields.string(parsed, "id"),
+          model: Fields.string(parsed, "model"),
+          status: Fields.string(parsed, "status"),
+          usage: Usage.parse(Fields.at(parsed, "usage")))
       end
 
       # Reads items with no envelope, for an assembler collecting finished
@@ -86,7 +81,7 @@ module Liaison::Protocol::Responses
       # One wire item may yield several `Item`s: a message holding output text
       # and a refusal becomes a message and a refusal item.
       private def self.items(any : JSON::Any, into : Array(Item)) : Nil
-        case any["type"]?.try(&.as_s?)
+        case Fields.string(any, "type")
         when "message"
           message(any, into)
         when "function_call"
@@ -99,16 +94,16 @@ module Liaison::Protocol::Responses
       end
 
       private def self.message(any : JSON::Any, into : Array(Item)) : Nil
-        role = any["role"]?.try(&.as_s?) || "assistant"
+        role = Fields.string(any, "role") || "assistant"
         parts = [] of Part
         refusals = [] of String
 
-        any["content"]?.try(&.as_a?).try &.each do |entry|
-          case entry["type"]?.try(&.as_s?)
+        Fields.array(any, "content").try &.each do |entry|
+          case Fields.string(entry, "type")
           when "output_text", "input_text", "text"
-            entry["text"]?.try(&.as_s?).try { |text| parts << TextPart.new(text, role) }
+            Fields.string(entry, "text").try { |text| parts << TextPart.new(text, role) }
           when "refusal"
-            entry["refusal"]?.try(&.as_s?).try { |reason| refusals << reason }
+            Fields.string(entry, "refusal").try { |reason| refusals << reason }
           end
         end
 
@@ -117,29 +112,29 @@ module Liaison::Protocol::Responses
       end
 
       private def self.function_call(any : JSON::Any) : Item?
-        name = any["name"]?.try(&.as_s?)
+        name = Fields.string(any, "name")
         return unless name
 
         FunctionCallItem.new(
-          any["call_id"]?.try(&.as_s?) || any["id"]?.try(&.as_s?) || "",
+          Fields.string(any, "call_id") || Fields.string(any, "id") || "",
           name,
           # As on Chat Completions: a JSON string, or any other value as its
           # JSON text, so export judges it rather than this reading it as
           # empty.
-          any["arguments"]?.try { |value| value.as_s? || value.to_json } || "{}")
+          Fields.at(any, "arguments").try { |value| value.as_s? || value.to_json } || "{}")
       end
 
       # Keeps `encrypted_content` byte-identical, so the trace replays over
       # either OpenAI protocol.
       private def self.reasoning(any : JSON::Any) : Item
         summary = [] of String
-        any["summary"]?.try(&.as_a?).try &.each do |entry|
-          entry["text"]?.try(&.as_s?).try { |text| summary << text }
+        Fields.array(any, "summary").try &.each do |entry|
+          Fields.string(entry, "text").try { |text| summary << text }
         end
 
         ReasoningItem.new(summary,
-          id: any["id"]?.try(&.as_s?),
-          encrypted_content: any["encrypted_content"]?.try(&.as_s?))
+          id: Fields.string(any, "id"),
+          encrypted_content: Fields.string(any, "encrypted_content"))
       end
     end
   end

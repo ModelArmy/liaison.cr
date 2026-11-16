@@ -2,6 +2,7 @@ require "json"
 require "./request"
 require "../capabilities"
 require "../../errors"
+require "../../fields"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::Gemini
@@ -24,15 +25,13 @@ module Liaison::Protocol::Gemini
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a nil check, so an explicit JSON `null` reads as
-        # absent instead of being indexed as a hash.
-        fields = any.try(&.as_h?)
-        return unless fields
+        # An explicit JSON `null` reads as absent.
+        return unless any.try(&.as_h?)
 
-        new(fields["promptTokenCount"]?.try(&.as_i?),
-          fields["candidatesTokenCount"]?.try(&.as_i?),
-          fields["thoughtsTokenCount"]?.try(&.as_i?),
-          fields["totalTokenCount"]?.try(&.as_i?))
+        new(Fields.int(any, "promptTokenCount"),
+          Fields.int(any, "candidatesTokenCount"),
+          Fields.int(any, "thoughtsTokenCount"),
+          Fields.int(any, "totalTokenCount"))
       end
 
       def to_metadata : MPSH::Object
@@ -69,11 +68,7 @@ module Liaison::Protocol::Gemini
       end
 
       def self.from_json(body : String) : Response
-        parsed = begin
-          JSON.parse(body)
-        rescue error : JSON::ParseException
-          raise MalformedResponseError.new(NAME, "response body is not JSON: #{error.message}")
-        end
+        parsed = Fields.parse_object(body, NAME)
 
         from_any(parsed)
       end
@@ -81,50 +76,50 @@ module Liaison::Protocol::Gemini
       # Reads a response already parsed. Every stream chunk is a whole
       # response, so the assembler reads each with this, by the same rules.
       def self.from_any(parsed : JSON::Any) : Response
-        raw = parsed["candidates"]?.try(&.as_a?)
+        raw = Fields.array(parsed, "candidates")
         unless raw
           raise MalformedResponseError.new(NAME, "response has no `candidates` array")
         end
 
         new(raw.map_with_index { |entry, index| candidate(entry, index) },
-          model_version: parsed["modelVersion"]?.try(&.as_s?),
-          usage: Usage.parse(parsed["usageMetadata"]?))
+          model_version: Fields.string(parsed, "modelVersion"),
+          usage: Usage.parse(Fields.at(parsed, "usageMetadata")))
       end
 
       private def self.candidate(any : JSON::Any, position : Int32) : Candidate
-        body = any["content"]?
+        body = Fields.object(any, "content")
         parts = [] of Part
-        body.try(&.["parts"]?).try(&.as_a?).try &.each do |entry|
+        Fields.array(body, "parts").try &.each do |entry|
           part(entry).try { |value| parts << value }
         end
 
         Candidate.new(
-          any["index"]?.try(&.as_i?) || position,
+          Fields.int(any, "index") || position,
           # `model`, not `assistant`.
-          Content.new(body.try(&.["role"]?).try(&.as_s?) || "model", parts),
-          any["finishReason"]?.try(&.as_s?))
+          Content.new(Fields.string(body, "role") || "model", parts),
+          Fields.string(any, "finishReason"))
       end
 
       # Identified by key, with the thought flag checked first, since a
       # thought part also carries `text`.
       private def self.part(any : JSON::Any) : Part?
-        return thought(any) if any["thought"]?.try(&.as_bool?)
+        return thought(any) if Fields.bool(any, "thought")
 
-        if call = any["functionCall"]?
-          return function_call(call, any["thoughtSignature"]?.try(&.as_s?))
+        if call = Fields.object(any, "functionCall")
+          return function_call(call, Fields.string(any, "thoughtSignature"))
         end
 
         # The REST API sends camelCase; some compatible servers send the
         # snake_case the request side writes.
-        if data = any["inlineData"]? || any["inline_data"]?
+        if data = Fields.object(any, "inlineData") || Fields.object(any, "inline_data")
           return inline_data(data)
         end
 
-        any["text"]?.try(&.as_s?).try { |text| TextPart.new(text) }
+        Fields.string(any, "text").try { |text| TextPart.new(text) }
       end
 
       private def self.function_call(any : JSON::Any, thought_signature : String?) : Part?
-        name = any["name"]?.try(&.as_s?)
+        name = Fields.string(any, "name")
         return unless name
 
         # `args` is structured; re-serialized to raw JSON text and parsed once,
@@ -132,21 +127,21 @@ module Liaison::Protocol::Gemini
         # because it sits beside `functionCall` on the enclosing part, not
         # inside it.
         FunctionCallPart.new(name,
-          (any["args"]? || JSON::Any.new({} of String => JSON::Any)).to_json,
+          (Fields.at(any, "args") || JSON::Any.new({} of String => JSON::Any)).to_json,
           thought_signature)
       end
 
       private def self.inline_data(any : JSON::Any) : Part?
-        mime = any["mimeType"]?.try(&.as_s?) || any["mime_type"]?.try(&.as_s?)
-        data = any["data"]?.try(&.as_s?)
+        mime = Fields.string(any, "mimeType") || Fields.string(any, "mime_type")
+        data = Fields.string(any, "data")
         return unless mime && data
 
         InlineDataPart.new(mime, data)
       end
 
       private def self.thought(any : JSON::Any) : Part
-        text = any["text"]?.try(&.as_s?)
-        ThoughtPart.new(text, any["thoughtSignature"]?.try(&.as_s?))
+        text = Fields.string(any, "text")
+        ThoughtPart.new(text, Fields.string(any, "thoughtSignature"))
       end
     end
   end

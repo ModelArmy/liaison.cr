@@ -2,6 +2,7 @@ require "json"
 require "./request"
 require "../capabilities"
 require "../../errors"
+require "../../fields"
 require "../../../mpsh/meta"
 
 module Liaison::Protocol::ChatCompletions
@@ -19,15 +20,13 @@ module Liaison::Protocol::ChatCompletions
       end
 
       def self.parse(any : JSON::Any?) : Usage?
-        # `as_h?` rather than a nil check: a streamed chunk carries
-        # `"usage": null` until the last one, and an explicit JSON `null` must
-        # read as absent instead of being indexed as a hash.
-        fields = any.try(&.as_h?)
-        return unless fields
+        # An explicit JSON `null`, which a streamed chunk sends until the last,
+        # reads as absent.
+        return unless any.try(&.as_h?)
 
-        new(fields["prompt_tokens"]?.try(&.as_i?),
-          fields["completion_tokens"]?.try(&.as_i?),
-          fields["total_tokens"]?.try(&.as_i?))
+        new(Fields.int(any, "prompt_tokens"),
+          Fields.int(any, "completion_tokens"),
+          Fields.int(any, "total_tokens"))
       end
 
       def to_metadata : MPSH::Object
@@ -64,13 +63,9 @@ module Liaison::Protocol::ChatCompletions
       end
 
       def self.from_json(body : String) : Response
-        parsed = begin
-          JSON.parse(body)
-        rescue error : JSON::ParseException
-          raise MalformedResponseError.new(NAME, "response body is not JSON: #{error.message}")
-        end
+        parsed = Fields.parse_object(body, NAME)
 
-        raw = parsed["choices"]?.try(&.as_a?)
+        raw = Fields.array(parsed, "choices")
         unless raw
           raise MalformedResponseError.new(NAME, "response has no `choices` array")
         end
@@ -78,9 +73,9 @@ module Liaison::Protocol::ChatCompletions
         choices = raw.map_with_index { |entry, index| choice(entry, index) }
 
         new(choices,
-          id: parsed["id"]?.try(&.as_s?),
-          model: parsed["model"]?.try(&.as_s?),
-          usage: Usage.parse(parsed["usage"]?))
+          id: Fields.string(parsed, "id"),
+          model: Fields.string(parsed, "model"),
+          usage: Usage.parse(Fields.at(parsed, "usage")))
       end
 
       # One assistant message, from an object someone else assembled. The
@@ -91,29 +86,29 @@ module Liaison::Protocol::ChatCompletions
       end
 
       private def self.choice(any : JSON::Any, position : Int32) : Choice
-        body = any["message"]?
+        body = Fields.object(any, "message")
         unless body
           raise MalformedResponseError.new(NAME, "choice #{position} has no `message`")
         end
 
-        Choice.new(any["index"]?.try(&.as_i?) || position,
+        Choice.new(Fields.int(any, "index") || position,
           message(body),
-          any["finish_reason"]?.try(&.as_s?))
+          Fields.string(any, "finish_reason"))
       end
 
       # Reuses the request-side `Message`, which has every field a reply
       # carries.
       private def self.message(any : JSON::Any) : Message
         Message.new(
-          role: any["role"]?.try(&.as_s?) || "assistant",
-          content: any["content"]?.try(&.as_s?),
-          tool_calls: tool_calls(any["tool_calls"]?),
-          refusal: any["refusal"]?.try(&.as_s?),
+          role: Fields.string(any, "role") || "assistant",
+          content: Fields.string(any, "content"),
+          tool_calls: tool_calls(Fields.at(any, "tool_calls")),
+          refusal: Fields.string(any, "refusal"),
           # Not in OpenAI's specification, and spelled two ways: vLLM and
           # DeepSeek send `reasoning_content`, Ollama sends `reasoning`. Both
           # are read; insisting on one would silently drop the other's trace.
-          reasoning_content: any["reasoning_content"]?.try(&.as_s?) ||
-                             any["reasoning"]?.try(&.as_s?))
+          reasoning_content: Fields.string(any, "reasoning_content") ||
+                             Fields.string(any, "reasoning"))
       end
 
       private def self.tool_calls(any : JSON::Any?) : Array(ToolCall)?
@@ -121,19 +116,19 @@ module Liaison::Protocol::ChatCompletions
         return if entries.nil? || entries.empty?
 
         entries.compact_map do |entry|
-          function = entry["function"]?
+          function = Fields.object(entry, "function")
           next unless function
 
-          name = function["name"]?.try(&.as_s?)
+          name = Fields.string(function, "name")
           next unless name
 
           ToolCall.new(
-            entry["id"]?.try(&.as_s?) || "",
+            Fields.string(entry, "id") || "",
             name,
             # A JSON string on this protocol; kept as text and parsed at
             # export. Any other value is kept as its JSON text, so export
             # judges it rather than this reading it as empty.
-            function["arguments"]?.try { |value| value.as_s? || value.to_json } || "{}")
+            Fields.at(function, "arguments").try { |value| value.as_s? || value.to_json } || "{}")
         end
       end
     end

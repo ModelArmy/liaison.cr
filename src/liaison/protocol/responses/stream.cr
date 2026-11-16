@@ -3,6 +3,7 @@ require "./export"
 require "./wire/response"
 require "../../streaming/assembler"
 require "../errors"
+require "../fields"
 
 module Liaison::Protocol::Responses
   # Frames from the Responses protocol, assembled into a `Wire::Response`.
@@ -22,12 +23,12 @@ module Liaison::Protocol::Responses
     end
 
     def absorb(frame : Streaming::Sse::Frame, & : Streaming::Event ->) : Nil
-      payload = decode(frame.data)
+      payload = Fields.parse_object?(frame.data)
       return unless payload
 
       # Prefers the `event:` line and falls back to the payload's `type`, for
       # servers that send unnamed frames.
-      kind = frame.name || payload["type"]?.try(&.as_s?)
+      kind = frame.name || Fields.string(payload, "type")
 
       # What a watcher sees is handled here and what the reply is made of in
       # `record`; nothing is in both.
@@ -53,11 +54,11 @@ module Liaison::Protocol::Responses
     private def record(kind : String?, payload : JSON::Any) : Nil
       case kind
       when "response.output_item.done"
-        payload["item"]?.try { |item| @items << item }
+        Fields.object(payload, "item").try { |item| @items << item }
       when "response.completed", "response.incomplete"
         # `incomplete` is terminal too: the model hit a limit, and its
         # `status` reaches the reply's metadata.
-        @completed = payload["response"]?
+        @completed = Fields.object(payload, "response")
       when "response.failed"
         raise failure(payload)
       when "error"
@@ -91,35 +92,29 @@ module Liaison::Protocol::Responses
     # A frame that does not parse is skipped. A lost delta was never
     # authoritative; a lost terminal frame leaves `complete?` false, so
     # `Client#send` marks the reply `Interrupted`.
-    private def decode(data : String) : JSON::Any?
-      JSON.parse(data)
-    rescue JSON::ParseException
-      nil
-    end
-
     private def delta(payload : JSON::Any) : String?
-      payload["delta"]?.try(&.as_s?)
+      Fields.string(payload, "delta")
     end
 
     # The name, and deliberately nothing else — see `Streaming::ToolCallStarted`.
     private def tool_name(payload : JSON::Any) : String?
-      item = payload["item"]?
+      item = Fields.object(payload, "item")
       return unless item
-      return unless item["type"]?.try(&.as_s?) == "function_call"
-      item["name"]?.try(&.as_s?)
+      return unless Fields.string(item, "type") == "function_call"
+      Fields.string(item, "name")
     end
 
     private def failure(payload : JSON::Any) : StreamError
-      error = payload["response"]?.try(&.["error"]?)
+      error = Fields.at(payload, "response", "error")
       StreamError.new(NAME,
-        error.try(&.["message"]?).try(&.as_s?) || "the provider reported a failed response",
-        error.try(&.["code"]?).try(&.as_s?))
+        Fields.string(error, "message") || "the provider reported a failed response",
+        Fields.string(error, "code"))
     end
 
     private def mid_stream(payload : JSON::Any) : StreamError
       StreamError.new(NAME,
-        payload["message"]?.try(&.as_s?) || "the provider sent an error frame",
-        payload["code"]?.try(&.as_s?))
+        Fields.string(payload, "message") || "the provider sent an error frame",
+        Fields.string(payload, "code"))
     end
   end
 end
