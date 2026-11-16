@@ -24,6 +24,9 @@ module Liaison
   # session, decide when a conversation ends, or loop: the turn loop stays the
   # caller's.
   class Toolbox
+    # What the model is told when a tool raises anything but `Function::Failure`.
+    UNPLANNED_FAILURE = "the tool failed unexpectedly"
+
     getter functions : Array(Function)
 
     # Raises `ArgumentError` if two functions share a name, since a call names
@@ -73,8 +76,9 @@ module Liaison
     rescue error : Exception
       # Sets `is_error` as well as `exception`: no mapper sends `exception`, so
       # `is_error` is what the model sees and `exception` what an archive
-      # keeps.
-      failed(call, "the tool raised: #{error.message}", exception: error.inspect)
+      # keeps. The model gets fixed text, since an exception's message can hold
+      # paths, queries or credentials.
+      failed(call, UNPLANNED_FAILURE, exception: error.inspect)
     end
 
     private def failed(call : MPSH::ToolCallBlock, text : String,

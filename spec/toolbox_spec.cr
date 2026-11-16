@@ -196,6 +196,18 @@ describe Liaison::Toolbox do
       block.exception.not_nil!.should contain "KeyError"
     end
 
+    it "keeps an unplanned raise's message from the model" do
+      # The message may hold paths, queries or credentials; only the archive
+      # keeps it.
+      results = toolbox.dispatch(calling("raise_anything")).should_not be_nil
+      block = results.content.select(M::ToolResultBlock).first
+      text = block.content.select(M::TextBlock).map(&.text).join
+
+      text.should eq Liaison::Toolbox::UNPLANNED_FAILURE
+      text.should_not contain "region"
+      block.exception.not_nil!.should contain "no such key: region"
+    end
+
     it "answers a call naming a tool it does not hold" do
       results = toolbox.dispatch(calling("get_weather", "summon_kraken")).should_not be_nil
       blocks = results.content.select(M::ToolResultBlock)
