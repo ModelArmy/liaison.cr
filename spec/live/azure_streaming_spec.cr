@@ -69,7 +69,7 @@ describe "Azure OpenAI streaming" do
         reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
-        key = Liaison::Protocol::ChatCompletions::METADATA_KEY
+        key = azure.name
         usage = reply.meta?(key, "usage").should_not be_nil
         usage.as(M::Object).has_key?("total_tokens").should be_true
       end
@@ -80,7 +80,7 @@ describe "Azure OpenAI streaming" do
         reply, _ = client(Liaison::ProtocolKind::ChatCompletions)
           .send(asked, DEPLOYMENT, options: CAP) { |_, _| }
 
-        key = Liaison::Protocol::ChatCompletions::METADATA_KEY
+        key = azure.name
         reply.meta?(key, "finish_reason").should_not be_nil
       end
     end

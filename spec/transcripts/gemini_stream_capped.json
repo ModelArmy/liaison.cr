@@ -5,17 +5,16 @@
     {
       "request": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?alt=sse",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse",
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "205",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in one short sentence.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]}],\"generationConfig\":{\"maxOutputTokens\":16}}",
-        "body_digest": "b0dfb9ba701301436d349dcbf1f29c3c9fe21b33277c0d4c4ecfe5abb8b8c98c"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Answer in one short sentence.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the tallest mountain on Earth?\"}]}],\"generationConfig\":{\"maxOutputTokens\":16,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "95715b4437d6da1324deee4ffae327eeb86fed8ff993c3d14356647cdbd27eeb"
       },
       "response": {
         "status": 200,
@@ -24,17 +23,17 @@
           "Content-Disposition": "attachment",
           "Vary": "Origin, X-Origin, Referer",
           "Transfer-Encoding": "chunked",
-          "Date": "Mon, 07 Sep 2026 00:08:36 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:34 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=716",
+          "Server-Timing": "gfet4t7; dur=1527",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
         },
-        "body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"\",\"thoughtSignature\": \"EqwBCqkBARFNMg9gEt610MlTnxdFndjTk8YiQ8uCM5BGLZVOIM7i/bFBRwUtJikta2S6gojQ/N7AMaNYP6vFSl7uxuegSG+qm7+oCpXRSQDGxB9SOvYiWrtMVIj1SjbDPDNG04a6KHEjgS1MhCnRfQbzn42oGsWni4dgb9I1T6b5No+nOp0ETv0qkEWFTq0f7Soo2Ne2jG0pAIXZJ67GfxSJuzd0rpgSpE/YpEqcKA==\"}],\"role\": \"model\"},\"finishReason\": \"MAX_TOKENS\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 15,\"totalTokenCount\": 27,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 15}],\"thoughtsTokenCount\": 12,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.5-flash\",\"responseId\": \"hACeapykFMTC-sAPjMrRuQ8\"}\r\n\r\n"
+        "body": "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"**Defining the Key Question**\\n\\nI'm focusing now on pinpointing the central issue at hand. My aim is to define the precise question that needs addressing. I believe clarifying this is the critical first step. I'm carefully sifting through the details to ensure I identify the most relevant question.\\n\\n\\n\",\"thought\": true}],\"role\": \"model\"},\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 15,\"totalTokenCount\": 28,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 15}],\"thoughtsTokenCount\": 13,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.6-flash\",\"responseId\": \"oUzmapjuHvy7xdIPmJ-toQM\"}\r\n\r\ndata: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"\",\"thoughtSignature\": \"ErEBCq4BAWkUfROCDV089UIpjCCYN54yJuqTptNefCMGN5ALrzibtvjc8xVoFEe1ypUjhXmhq1k5fI7jW3gwHJgyCMUwhyGFFcmJyTLqEj/PsnFo//14zwrSDLPEBhn9bfCChyBpAJv9GErfSBFW6SQobqO/uDaedCa6ij7mr+IlYuauLqU+F7n5nGDB+YLlSQFeA0mxMCGVI0ZrI0plkezwkeOkYgedYX/25v46g636wHQs\"}],\"role\": \"model\"},\"finishReason\": \"MAX_TOKENS\",\"index\": 0}],\"usageMetadata\": {\"promptTokenCount\": 15,\"totalTokenCount\": 28,\"promptTokensDetails\": [{\"modality\": \"TEXT\",\"tokenCount\": 15}],\"thoughtsTokenCount\": 13,\"serviceTier\": \"standard\"},\"modelVersion\": \"gemini-3.6-flash\",\"responseId\": \"oUzmapjuHvy7xdIPmJ-toQM\"}\r\n\r\n"
       },
-      "recorded_at": "2026-09-07T00:08:36Z"
+      "recorded_at": "2026-10-31T20:16:34Z"
     }
   ]
 }

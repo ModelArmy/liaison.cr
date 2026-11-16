@@ -160,6 +160,53 @@ describe "Anthropic round trip" do
   # tool-specific result — rather than a flag on an ordinary call. That
   # agreement with MPSH's own categorisation is why the flag survives here and
   # degrades on every other protocol.
+  describe "model-bound reasoning" do
+    fable = M::Provenance.new("anthropic", "claude-fable-5-1")
+
+    session = ->(provenance : M::Provenance?) do
+      reasoning = M::ReasoningBlock.new("Option B needs a replica; choose C.")
+      reasoning.put_meta("anthropic", "signature", "EqQBCkYIARgCIkB")
+      M::Session.new
+        .<<(M::Message.new(M::Role::User, [M::TextBlock.new("Plan the migration.").as(M::Block)]))
+        .<<(M::Message.new(M::Role::Assistant,
+          [reasoning.as(M::Block), M::TextBlock.new("Use logical replication.").as(M::Block)],
+          provenance))
+        .<<(M::Message.new(M::Role::User, [M::TextBlock.new("And without a replica?").as(M::Block)]))
+    end
+
+    # The wire is unchanged: the target ignores the block rather than
+    # rejecting it. Only the report changes, so the loss is not silent.
+    it "sends it to another model as before, and notes that it will be ignored" do
+      request, report = Liaison::Protocol::Anthropic::Mapper.new
+        .map(session.call(fable), "claude-opus-5-5", C::Policy::Strict)
+
+      request.to_json.should contain(%("signature":"EqQBCkYIARgCIkB"))
+      note = report.annotations.find! { |a| a.block_kind == M::BlockKind::Reasoning }
+      note.outcome.should eq(M::Outcome::Restructured)
+      note.message_index.should eq(1)
+      note.detail.should contain("claude-opus-5-5")
+    end
+
+    it "notes nothing on the model that produced it, or without provenance" do
+      {session.call(fable), session.call(nil)}.each do |history|
+        _, report = Liaison::Protocol::Anthropic::Mapper.new
+          .map(history, "claude-fable-5-1", C::Policy::Strict)
+        report.annotations.should be_empty
+      end
+    end
+
+    # Per request: the reasoning is usable again once the session returns to
+    # its producer, so the note is not kept with the session.
+    it "keeps the note out of the session's annotations" do
+      history = session.call(fable)
+      _, report = Liaison::Protocol::Anthropic::Mapper.new
+        .map(history, "claude-opus-5-5", C::Policy::Strict)
+
+      report.annotate(history)
+      history.annotations.should be_empty
+    end
+  end
+
   describe "server-executed tools" do
     it "keeps the server_executed flag across a round trip" do
       session = Liaison::Fixtures.server_executed_tool

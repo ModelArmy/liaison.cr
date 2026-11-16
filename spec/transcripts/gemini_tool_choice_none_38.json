@@ -1,5 +1,5 @@
 {
-  "name": "gemini_tool_choice_none_current",
+  "name": "gemini_tool_choice_none_38",
   "recorded_with": "wiretap/0.4.2",
   "interactions": [
     {
@@ -9,13 +9,12 @@
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "464",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512}}",
-        "body_digest": "af1d2010a4ccbe0237d03d300d369cbefdc2f78831152c878b824ab257826bb4"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "2bfa0b90efc5ac0be611067f0d4bc1aef256e0e1012a205fa290d757895932e4"
       },
       "response": {
         "status": 200,
@@ -23,18 +22,18 @@
           "X-Gemini-Service-Tier": "standard",
           "Content-Type": "application/json; charset=UTF-8",
           "Vary": "Origin, X-Origin, Referer",
-          "Date": "Tue, 15 Sep 2026 18:46:53 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:05 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=963",
+          "Server-Timing": "gfet4t7; dur=3009",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "Transfer-Encoding": "chunked"
         },
-        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Paris\"\n              },\n              \"id\": \"call_15097\"\n            },\n            \"thoughtSignature\": \"EoECCv4BARFNMg86D0SoB9/l5U02Mt9ol4fvn9y7/iHK2J9BhR/17Cci4q0QL8GMVTH++ycve1G0gP6YrLAIdBzp1DkW5vvFe2qGyWury4Ids5meB1ln+wyGqROB3Jh59fE9JPN4SIyQkF5zrFQrBFOFfLouwkeggwMgbRE39fpXjqwfZLtDWLzpKYx2PXq1Kmfr+nWVGo5iByGE7NNCp8vrsTag4VCtV6ORuX7QPSq8/tgUL+MNLtTsBchzBH9w/hl9lNPYiePQIW/lLW8f1uHW3ZohzOIFcwBhNT5qd1G0IAFaHRcQgw/sI32C/2izC40zONO+vGoaJ24KrNRffTpg7q4=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 129,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"thoughtsTokenCount\": 38,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"nJKpasSVC7C0_uMPn7P_uAU\"\n}\n"
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Okay, here's my thought process laid out, as if I were considering this myself:\\n\\n**Weather Check for Paris**\\n\\nAlright, the user's requesting the weather in Paris. Pretty straightforward. My first instinct, and the correct approach, is to utilize the `get_weather` tool. I need to make a specific call to that tool, and the user provided exactly the crucial information – the city they're interested in. So, I need to use `get_weather` with the parameter `city=\\\"Paris\\\"`. No ambiguity, no guesswork required. That should provide the user with the weather data they're looking for.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Paris\"\n              },\n              \"id\": \"call_490266\"\n            },\n            \"thoughtSignature\": \"Eu4BCusBAWkUfROG9FMTCplX5zOq6SehQuHPKk+mO6D3g9f5jp68THDn9VPyDTuDnnHfWzo1V67vHm4mL7TnjujKO9D9LF3MVsQIRxKknPGYOCzQjceUnSAV20S2atxlFTs6iAxcyiCNRcqw2PbgO0VclAF8cRaxjgFi7jPDPxgHniiOJIJFJA9fBm/if3PDGvyYk6uc/RBMEXYylkkpexgb9zx9mFkg0W2HYLdGn3dmadquhbOQYu5CL4VQCFZXKCfAuMXU2rd3h6c1N01iLhlbbRnrx6ZzBYoWLgvyFOQWofpYEi/trgZUDsz8BQaMmA==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 125,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"thoughtsTokenCount\": 34,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"gkzmav6_Lr_HiLMP09uYoAc\"\n}\n"
       },
-      "recorded_at": "2026-09-15T18:46:52Z"
+      "recorded_at": "2026-10-31T20:16:05Z"
     },
     {
       "request": {
@@ -43,13 +42,12 @@
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "1142",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}},\"thoughtSignature\":\"EoECCv4BARFNMg86D0SoB9/l5U02Mt9ol4fvn9y7/iHK2J9BhR/17Cci4q0QL8GMVTH++ycve1G0gP6YrLAIdBzp1DkW5vvFe2qGyWury4Ids5meB1ln+wyGqROB3Jh59fE9JPN4SIyQkF5zrFQrBFOFfLouwkeggwMgbRE39fpXjqwfZLtDWLzpKYx2PXq1Kmfr+nWVGo5iByGE7NNCp8vrsTag4VCtV6ORuX7QPSq8/tgUL+MNLtTsBchzBH9w/hl9lNPYiePQIW/lLW8f1uHW3ZohzOIFcwBhNT5qd1G0IAFaHRcQgw/sI32C/2izC40zONO+vGoaJ24KrNRffTpg7q4=\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512}}",
-        "body_digest": "416f6678684bca0ad77b74d2b3924f3472d56eed9096b7928b47cb88052f445f"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"model\",\"parts\":[{\"thought\":true,\"text\":\"Okay, here's my thought process laid out, as if I were considering this myself:\\n\\n**Weather Check for Paris**\\n\\nAlright, the user's requesting the weather in Paris. Pretty straightforward. My first instinct, and the correct approach, is to utilize the `get_weather` tool. I need to make a specific call to that tool, and the user provided exactly the crucial information – the city they're interested in. So, I need to use `get_weather` with the parameter `city=\\\"Paris\\\"`. No ambiguity, no guesswork required. That should provide the user with the weather data they're looking for.\\n\\n\\n\"},{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}},\"thoughtSignature\":\"Eu4BCusBAWkUfROG9FMTCplX5zOq6SehQuHPKk+mO6D3g9f5jp68THDn9VPyDTuDnnHfWzo1V67vHm4mL7TnjujKO9D9LF3MVsQIRxKknPGYOCzQjceUnSAV20S2atxlFTs6iAxcyiCNRcqw2PbgO0VclAF8cRaxjgFi7jPDPxgHniiOJIJFJA9fBm/if3PDGvyYk6uc/RBMEXYylkkpexgb9zx9mFkg0W2HYLdGn3dmadquhbOQYu5CL4VQCFZXKCfAuMXU2rd3h6c1N01iLhlbbRnrx6ZzBYoWLgvyFOQWofpYEi/trgZUDsz8BQaMmA==\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}}]},{\"role\":\"user\",\"parts\":[{\"text\":\"And in Berlin?\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "dce165a9978b762f8aa30dd312ecfe3197ea422aba588b72449e7cc5e977bc06"
       },
       "response": {
         "status": 200,
@@ -57,18 +55,18 @@
           "X-Gemini-Service-Tier": "standard",
           "Content-Type": "application/json; charset=UTF-8",
           "Vary": "Origin, X-Origin, Referer",
-          "Date": "Tue, 15 Sep 2026 18:46:54 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:08 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=1040",
+          "Server-Timing": "gfet4t7; dur=2417",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "Transfer-Encoding": "chunked"
         },
-        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Berlin\"\n              },\n              \"id\": \"call_54451\"\n            },\n            \"thoughtSignature\": \"EsoBCscBARFNMg81dekYcSkVpdfXbWydoMHoMNnsD5PKqBOwHVkPUvj84ARWzB8wlCEQRx7+UKj7AgtONy1j+UQgXfGkrZ/rQeU85fQyabwZvNropCWIX4i5cV2LnHutk8Oe/yQwThm23q7qndWD/aKTYo0Y4k/f3mod8KdIiQp+OL8ac05MtRlPL81nOQfhryBtexsq7CYBUltR3WhMcXlr78NmdRSnyvhpu/6NTeuA9R0mV7EcEZAbi1cFyNaCk2aQ9KGhjf0/zXs4qA==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 153,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 196,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 153\n      }\n    ],\n    \"thoughtsTokenCount\": 27,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"nZKpat_2Etau1MkP8dzp6QM\"\n}\n"
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Okay, here's my interpretation of that thought process.\\n\\n**Berlin Weather Request Processing**\\n\\nAlright, so the user just asked \\\"And in Berlin?\\\". It's pretty clear they're asking for the weather conditions specifically in Berlin, Germany. They've used this same pattern before. I need to retrieve this data for them to satisfy the request. Looks like the best way to handle this is to utilize my `get_weather` tool. I'll need to call that tool, making sure to specify `city=\\\"Berlin\\\"` as the parameter. That should give the user the information they are after.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"functionCall\": {\n              \"name\": \"get_weather\",\n              \"args\": {\n                \"city\": \"Berlin\"\n              },\n              \"id\": \"call_387052\"\n            },\n            \"thoughtSignature\": \"EoYCCoMCAWkUfRODHZ1Guij69/lcxcoR3WfTmbKkT76dDnBxK/HeCrDhqc7WSHiqozWVXQM8oX/oLAJoaxChZnmf9f7FBRshsMqCt91RGOKIVIbOVXLrcDGe/wq/nZsKM5nXL9X+rNgWDv7sPaYwsXD0xCukklQ3h7oWfAzj5+8AsuACILjpCLOpQwWybPiMr7BgbLlAkMsRzVU/siZo/twTQQVlmJPSTZsnUaDTS5wx2C5qgAfA3lbYUWXP07hmKQIQnbhJ+gM0t7lb6SrTNZl0MaiubKYu3NE1YdKV9yO5bBIxyPU7jp8vjAxh48tYEBM5aRSlv7lf1liuMETy/uiD9VeebaER6g==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0,\n      \"finishMessage\": \"Model generated function call(s).\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 282,\n    \"candidatesTokenCount\": 16,\n    \"totalTokenCount\": 338,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 282\n      }\n    ],\n    \"thoughtsTokenCount\": 40,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"hUzmapXKOvy7xdIPmJ-toQM\"\n}\n"
       },
-      "recorded_at": "2026-09-15T18:46:54Z"
+      "recorded_at": "2026-10-31T20:16:08Z"
     }
   ]
 }

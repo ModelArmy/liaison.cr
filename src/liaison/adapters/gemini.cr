@@ -24,7 +24,7 @@ module Liaison
     end
 
     # The envelope the other protocols use. Gemini may also return a bare
-    # array of them, which `nested_error` does not handle.
+    # array of them, for which this returns `nil`.
     def error_detail(body : String) : String?
       nested_error(body)
     end
@@ -58,7 +58,7 @@ module Liaison
                       options : Options)
       mapper = Protocol::Gemini::Mapper.new(narrowed(model))
       request, report = mapper.map(session, model, policy, retention, options)
-      {request, report, Protocol::Gemini::Exporter.new(mapper.calls)}
+      {request, report, Protocol::Gemini::Exporter.new(mapper.calls, mapper.profile.metadata_key)}
     end
   end
 end

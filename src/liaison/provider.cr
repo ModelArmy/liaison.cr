@@ -53,22 +53,15 @@ module Liaison
                 in ProtocolKind::Gemini    then GeminiAdapter.new(resolved, reasoning_unit)
                 end
 
-      if unit = reasoning_unit
-        declared = adapter.profile.reasoning_unit
-        unless declared.either? || declared == unit
-          raise ArgumentError.new(
-            "#{declared} is the reasoning unit #{adapter.profile.provider} spells; " \
-            "#{unit} cannot be requested of it")
-        end
-      end
-
+      check_reasoning_unit(adapter, reasoning_unit)
       new(server, adapter, default_max_tokens)
     end
 
     # Azure OpenAI's Chat Completions or Responses surface: OpenAI's wire shape
     # and `Profile`, with Azure's path and `api-key` header. Raises
-    # `ArgumentError` for Anthropic or Gemini, which Azure does not serve, or
-    # for `max_tokens_field` on Responses. `api_version` has no default, since
+    # `ArgumentError` for Anthropic or Gemini, which Azure does not serve, for
+    # `max_tokens_field` on Responses, or for a `reasoning_unit` other than
+    # `Effort`. `api_version` has no default, since
     # Azure's dated versions drift.
     def self.for_azure(server : Server, protocol : ProtocolKind, api_version : String,
                        vendor : String? = nil,
@@ -97,7 +90,20 @@ module Liaison
                   raise ArgumentError.new("Azure OpenAI does not serve #{protocol} — only ChatCompletions and Responses")
                 end
 
+      check_reasoning_unit(adapter, reasoning_unit)
       new(server, adapter, default_max_tokens)
+    end
+
+    # Raises `ArgumentError` when `unit` is one the adapter's protocol cannot
+    # spell. `Adapter#narrowed` ignores such an override, so accepting it
+    # would hide the mistake.
+    private def self.check_reasoning_unit(adapter : Adapter, unit : Capability::ReasoningUnit?) : Nil
+      return unless unit
+      declared = adapter.profile.reasoning_unit
+      return if declared.either? || declared == unit
+      raise ArgumentError.new(
+        "#{declared} is the reasoning unit #{adapter.profile.provider} spells; " \
+        "#{unit} cannot be requested of it")
     end
 
     def initialize(@server : Server, @adapter : Adapter,

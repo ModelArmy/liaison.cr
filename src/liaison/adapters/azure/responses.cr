@@ -13,7 +13,7 @@ module Liaison
     # the body as `model`. Confirmed against a live deployment, since Azure's
     # docs disagree with themselves.
     def path(model : String) : String
-      "/openai/responses?api-version=#{@api_version}"
+      "/openai/responses?api-version=#{URI.encode_www_form(@api_version)}"
     end
 
     def headers(credential : String?) : HTTP::Headers

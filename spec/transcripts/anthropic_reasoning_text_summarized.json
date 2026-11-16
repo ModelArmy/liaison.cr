@@ -1,0 +1,57 @@
+{
+  "name": "anthropic_reasoning_text_summarized",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-fable-5-1\",\"max_tokens\":4096,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"List every pair of positive integers (x, y) with x < 1000 and x^2 - 7y^2 = 1. Give only the pairs.\"}]}],\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"},\"output_config\":{\"effort\":\"high\"}}",
+        "body_digest": "14d075ce1874094669a74e2ee081bcde6d97161c757ebd6c8fbf112aec6b41d0"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Date": "Sat, 31 Oct 2026 19:54:01 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "anthropic-ratelimit-input-tokens-limit": "100000",
+          "anthropic-ratelimit-input-tokens-remaining": "100000",
+          "anthropic-ratelimit-input-tokens-reset": "2026-10-31T19:53:58Z",
+          "anthropic-ratelimit-output-tokens-limit": "20000",
+          "anthropic-ratelimit-output-tokens-remaining": "20000",
+          "anthropic-ratelimit-output-tokens-reset": "2026-10-31T19:54:02Z",
+          "anthropic-ratelimit-requests-limit": "50",
+          "anthropic-ratelimit-requests-remaining": "49",
+          "anthropic-ratelimit-requests-reset": "2026-10-31T19:53:59Z",
+          "anthropic-ratelimit-tokens-limit": "120000",
+          "anthropic-ratelimit-tokens-remaining": "120000",
+          "anthropic-ratelimit-tokens-reset": "2026-10-31T19:53:58Z",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "request-id": "req_011CgauCN2snr3SGfEtU1uee",
+          "traceresponse": "00-ed52be20d8f6c034bcb231cea6970ff1-bcd09f2f543fbba6-01",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "vary": "Accept-Encoding",
+          "Server": "cloudflare",
+          "server-timing": "x-originResponse;dur=3303",
+          "X-Robots-Tag": "none",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "cf-cache-status": "DYNAMIC",
+          "CF-RAY": "a535357b3dd1de04-YYZ"
+        },
+        "body": "{\"model\":\"claude-fable-5-1\",\"id\":\"msg_011CgauCNVQcEpqEFvfVhnoh\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"I'm checking the fundamental solution (8, 3) for x² − 7y² = 1: squaring 8 + 3√7 gives 127 + 48√7, and that checks out since 127² = 16129 and 7·48² = 16128. Now I'm multiplying 127 + 48√7 by 8 + 3√7 to get the next solution, and the rational part works out to 1016 + 1008 = 2024.\\n\\nSo y comes out to 765, which is past the 1000 bound on x, which means the only pairs under 1000 are (8, 3) and (127, 48).\\n\\n\",\"signature\":\"CAQShQcKEAgTGAI4AUIIdGhpbmtpbmcSDHDkTXBD9tR879pDaRoM6cZwSJfHaCBnB06FIjAUpqfDyfom8GAK4BNq1pzJNNfT0zlQr4bBnSuUgQMhu1lVGzAJAA98be7DFUL5Rj0qogY08nVnmKVeb1Twvp99w294DYpyCpVAcKe+T3v1g1M4i4MzhAhNgVhRkxTYsdJ01pHltZ+JZrpre5lDcVybRUR0l8Cv+NP1dDec88NHtCaHM7k0fVkfUEh5i9LmggC1AV0jTJ+B+Zk4tjA8/WJ38qZLknUin6BB/gj2QenMYeUW1SVj0Yv8Eh0MC7qFaG4KNLPSTJyljNpego56O2Gg2pVuT6dWPaJYS1Y3q4mDdJvmt2WBn6rpHKGbHPLCmJcAzU0X5bEiskrKKal7tbiqHdBhGCObBiO9nPs1EgGTAeYhV/fjnEju9l92TD5XF7Zi56DA4kcg8LYmHVwCcw6/uh77sIuK4z2NEnOE4XzpMOY7wMno2+l8Z9ZeT+ymFkFsTAHvQsKhi4VKx4JUZP2KxHEje8bd3TaNSnVF/eVBk69QjPPXZX31Sn+CjpdBGGXYVzOgfU0MP1uIBwCwADvJfY3mDyAG5whWXtPFBXdBGafjwkV1MGRJauULIE734QE79zTrdLM6CtR+Y9+gdKMb8fDPmFv6+RMo0udbHFd2wvSVH+tbyurJTN/uzmTWzSUr9ltkRnnXHkSqhYebmnUTHAEt+2d1HWq5i/IcfOEGXULKXo5u8fQiDnDpXbtvikXSI7mNfLClXlWiCGntZ8jsSIpTz99Pwi4HiOvJc/v/c3kuXMIbVnmNWSOm76MMYj7cqyOmACzC+i9SoHFeWMGlx9QszumEX6xdjj/xhCFHHcpKVbD+mCxoq0MyQEiQFPM8550nbb1GHvkKGxASFQBdEGj12n3mKdJ8LLyVb1OjIcqJZn0F2+JPb36sTdo0ijFW3628gn6ae6o1IF9A2MF/Kb9s0sgrtkvgEaBQlgnScKYhC6Hd3b5MF+25LqjvLiZZ+kMWPcwEXWwwQSm6xH7u9weiChLvh+1OkNNjVQ76G4EFoxsv6WADdtzLNFQYfSRp+ApTZv26B9uvWO7c1juIPmxKQhJ1ewCn25ea8y0fNdKNXOl5DlVJy+XgmfH642vWLV/th1vhTqgtn2005bDf5xWKW7uTdBMxQi6CCpx+PHjydUu5GAE=\"},{\"type\":\"text\",\"text\":\"(8, 3), (127, 48)\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":53,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":206,\"output_tokens_details\":{\"thinking_tokens\":192},\"service_tier\":\"standard\",\"inference_geo\":\"global\",\"speed\":\"standard\"},\"diagnostics\":null}"
+      },
+      "recorded_at": "2026-10-31T19:54:01Z"
+    }
+  ]
+}

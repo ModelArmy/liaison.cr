@@ -1,0 +1,39 @@
+{
+  "name": "gemini_foreign_tool_call_36",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}}]},{\"role\":\"user\",\"parts\":[{\"text\":\"Given that, what should I wear?\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "41ee3cca466c7e3440c59d039e36662ab24342baa969b98aaab5f0c4a50f2a2d"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Sat, 31 Oct 2026 20:15:55 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=3496",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**My Parisian Weather Wisdom**\\n\\nOkay, so the user's asking about what to wear in Paris today. Light rain and 18°C? Right, let's break this down. That's a classic mild-to-cool day, not freezing, but definitely not sunshine and sandals weather. We need to focus on protection from the light rain without overheating.\\n\\nMy go-to recommendations are as follows: a light jacket, a raincoat, or even a classic trench coat would be perfect. Always recommend an umbrella as backup, or even better, waterproof outerwear. And for footwear, comfort is key, especially if you're exploring the city. I'd definitely lean towards something water-resistant; no one wants soggy shoes.\\n\\nFinally, layers are always the answer! Suggest a t-shirt or light sweater *under* the jacket, so they can adjust to the changing conditions throughout the day. No need for any fancy tools or external processes here; it's basic climate understanding and practical advice. Simple as that!\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"Based on the current weather in Paris (18°C / 64°F with light rain), here is what you should consider wearing:\\n\\n* **Outerwear:** A lightweight waterproof jacket, rain coat, or trench coat to stay dry without getting too warm.\\n* **Layers:** A short-sleeve shirt or a light long-sleeve top/sweater under your jacket, as 18°C is quite mild.\\n* **Bottoms:** Pants or jeans.\\n* **Footwear:** Comfortable, closed-toe shoes that are water-resistant.\\n* **Accessories:** Don't forget to bring an umbrella!\",\n            \"thoughtSignature\": \"EqUECqIEAWkUfRPCHyWkEYUWPtfZFYJaCkOyz3rJNUlwxPhfdzOE1g3MUuASELcYXJL6DiFuj+ex47OSNm5m6aeWGHknQbswNqCqoqtYIR4GPfOE1EF+VqgCkQjNgFABDwF6acxOSecBAMm/ezRwVOA7SwR/w2HPl2SbSxomL17si4Gt0qLip2CdYalaGLXNPZEM3c2It/qjBg/MaRc5Krza8fyTq3n/oQdA8J5PQWB8Gr+CzPgk4lfqqLa5f0gZUiAxOuMSFm8jeXaQC9XPiXb8C83gUYT8J54SGYkZRMRcqd8EaBQkGR0JJH9tcnLxnzpZWw1T2Pzl834RGI+M9Aays3XU6l7Y0zarXjFsDHp+bnsn/SF7eYJaoKnZI5XpCCVE6FRXmRaoGLXlprcwcJcinYfdDe5p3ycUTsuD0+dwTVpi6iyyUa9fO3KFQMT3qiggBWXHRA1u1lbvtDUy6DknX4VTDzganxGGfFuI2EQvKeKeZNxicRYZnwEM7DuG2fWN0Zj1+o9SOSztsInMtmVnokSbgx31GYtHVutrLFiDqBfZ7SqMjE8m0c1qZeWOk1sUgiiQNjIAUo45Kn1dZfJ4Lj2jSAEHPfCx0ZXSMO1JQOkz0IWv7mMHO0FO9SsB4i4MZVRadX36XmBGDK36WkBrZl2g6WPQ80RfQQS9880FcgWQzznvi1IbnJRVRX0pTdeSRNzmYSgbH1vWO35sePESXqO8f7A/\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 104,\n    \"candidatesTokenCount\": 132,\n    \"totalTokenCount\": 342,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 104\n      }\n    ],\n    \"thoughtsTokenCount\": 106,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"eEzmaqOZC8eruMYPwozs-Qw\"\n}\n"
+      },
+      "recorded_at": "2026-10-31T20:15:55Z"
+    }
+  ]
+}

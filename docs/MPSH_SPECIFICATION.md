@@ -350,6 +350,8 @@ No `provider_metadata` at all       |Portable by construction; belongs to no one
 Carries the target's vendor key     |The target issued it and can read it back  |Exact                                               
 Carries only some other vendor's key|Opaque to the target                       |Restructured (reasoning), Degraded (server-executed)
 
+The vendor key is necessary for reasoning to be the target's own, not always sufficient. Some vendors bind reasoning to the model that produced it: Anthropic documents that thinking from its Fable and Mythos models is ignored, not rejected, by any other model. A reasoning block whose message's `provenance.model` is such a model, sent to a different model, is therefore **Restructured** rather than Exact. It is still sent, and not Refused mid-tool-call, since the target accepts it. Unlike other rearrangements it is always annotated: the target discards it, a loss that is real for that request only. A message without `provenance` is taken as unbound. The producer is already in the envelope (§2), so this needs no new field.
+
 A protocol-level declaration remains necessary but not sufficient: a protocol that has no notion of server-executed tools degrades them regardless of who ran them.
 
 The matrix below therefore reads its `server_executed` and `reasoning` rows as *rules parameterized by ownership*, not as per-protocol constants.
@@ -566,9 +568,11 @@ All structural. No API key, no model, no network.
 
 ---
 
-**Document Version**: 1.7
+**Document Version**: 1.8
 
-**Last Updated**: 2026-09-08
+**Last Updated**: 2026-10-31
+
+**Changes from 1.7**: §7's ownership rule gains a condition: reasoning from a model that binds it to itself is Restructured, and annotated, on any other model, read from the message's existing `provenance.model`. The format is unchanged.
 
 **Changes from 1.6**: Adds `ending` to the message envelope — the first concern
 to come back through the door §3a leaves open, and the section argues why it is

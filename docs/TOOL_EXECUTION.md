@@ -141,7 +141,9 @@ either drop them on save — worse — or stop being portable.
 
 `Function::Failure` is raised by a tool that ran and could not do the job; its
 message reaches the model. Anything else a tool raises is caught and recorded as
-a dispatch that blew up.
+a dispatch that blew up: the model is told only that the tool failed, since an
+exception's message can hold paths, queries or credentials, and the detail goes
+in `exception`.
 
 Two pulls conflict here and both are real. Every tool failing in one shape is
 what stops a model learning a different error dialect per tool. But no single

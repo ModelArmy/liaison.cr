@@ -152,7 +152,7 @@ describe "Ollama" do
     it "keeps usage out of the conversation" do
       Wiretap.intercept(TEXT_ANTHROPIC) do
         reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: CAP)
-        key = Liaison::Protocol::Anthropic::METADATA_KEY
+        key = ollama.name
 
         reply.meta?(key, "usage").should_not be_nil
         reply.meta?(key, "stop_reason").should_not be_nil
@@ -212,7 +212,7 @@ describe "Ollama" do
     it "reads a reasoning item, with its opaque payload, from the Responses API" do
       Wiretap.intercept(TEXT_RESPONSES) do
         reply, _ = client(Liaison::ProtocolKind::Responses).send(asked, MODEL, options: CAP)
-        key = Liaison::Protocol::Responses::METADATA_KEY
+        key = ollama.name
 
         blocks = reply.content.select(M::ReasoningBlock)
         blocks.should_not be_empty
@@ -512,7 +512,7 @@ describe "Ollama" do
     it "reports a turn cut short by the cap" do
       Wiretap.intercept("ollama_truncated_anthropic") do
         reply, _ = client(Liaison::ProtocolKind::Anthropic).send(asked, MODEL, options: TINY)
-        key = Liaison::Protocol::Anthropic::METADATA_KEY
+        key = ollama.name
 
         # The turn is honest about being incomplete: the stop reason says so,
         # and repair is the caller's business, not the exporter's.

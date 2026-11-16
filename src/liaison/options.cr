@@ -13,7 +13,9 @@ module Liaison
   #   GetWeatherParams.json_schema.to_json)
   # ```
   #
-  # Raises `ArgumentError` for an empty name.
+  # Raises `ArgumentError` for an empty name, and for `parameters` that is not
+  # a single JSON object. The text is written into the request as it is, so
+  # anything else could add keys of its own to the request.
   #
   # Tools are what the caller offers on one call, not session history, so they
   # live in `Options` rather than `Session`.
@@ -27,6 +29,13 @@ module Liaison
     def initialize(@name : String, @description : String? = nil,
                    @parameters : String = EMPTY_SCHEMA)
       raise ArgumentError.new("tool name cannot be empty") if @name.empty?
+      raise ArgumentError.new("parameters for tool `#{@name}` must be a JSON object") unless object?(@parameters)
+    end
+
+    private def object?(text : String) : Bool
+      !JSON.parse(text).as_h?.nil?
+    rescue JSON::ParseException
+      false
     end
   end
 
@@ -77,13 +86,18 @@ module Liaison
     # protocols take a rung; Anthropic and Gemini take either, depending on the
     # model, and reject being given both.
     #
-    # `nil` emits nothing on any protocol, leaving the provider's default.
-    # Keep it that way: emitting a default would change every request body
-    # that does not ask for reasoning, and invalidate their transcripts.
+    # `nil` leaves how hard to think to the provider. It is not the same as
+    # sending nothing: where a model thinks by default, `reasoning_text` still
+    # asks for its reasoning as text.
     getter reasoning : Reasoning::Request?
 
+    # Whether reasoning comes back as text where the API withholds it by
+    # default. Honoured on Anthropic and Gemini, and on Responses wherever a
+    # reasoning rung is requested.
+    getter reasoning_text : Reasoning::Text
+
     # How the offered tools may be used; the tools are still declared. `nil`
-    # emits nothing, for the same reason as `reasoning`.
+    # emits nothing, leaving the provider's default.
     getter tool_choice : ToolChoice?
 
     # Raises `ArgumentError` if `tool_choice` is set with no tools, which the
@@ -91,7 +105,8 @@ module Liaison
     def initialize(@tools : Array(Tool) = [] of Tool,
                    @max_output_tokens : Int32? = nil,
                    @reasoning : Reasoning::Request? = nil,
-                   @tool_choice : ToolChoice? = nil)
+                   @tool_choice : ToolChoice? = nil,
+                   @reasoning_text : Reasoning::Text = Reasoning::Text::Summarized)
       if @tool_choice && @tools.empty?
         raise ArgumentError.new("tool_choice needs tools to choose from")
       end

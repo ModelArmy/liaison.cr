@@ -101,7 +101,7 @@ describe "Ollama streaming over the Anthropic Messages API" do
       Wiretap.intercept(STREAM_TEXT) do
         reply, _ = messages.send(asked, MODEL, options: CAP) { |_, _| }
 
-        key = Liaison::Protocol::Anthropic::METADATA_KEY
+        key = ollama.name
         reply.meta?(key, "stop_reason").should_not be_nil
       end
     end
@@ -190,7 +190,7 @@ describe "Ollama streaming over the Anthropic Messages API" do
 
         # No stop reason, because `message_delta` never arrived — which is how
         # a stopped turn stays distinguishable from a finished one downstream.
-        key = Liaison::Protocol::Anthropic::METADATA_KEY
+        key = ollama.name
         reply.meta?(key, "stop_reason").should be_nil
         reply.ending.should eq M::Ending::Stopped
       end

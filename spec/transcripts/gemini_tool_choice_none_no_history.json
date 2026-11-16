@@ -9,13 +9,12 @@
         "headers": {
           "content-type": "application/json",
           "x-goog-api-key": "[FILTERED]",
-          "Content-Length": "519",
           "Host": "generativelanguage.googleapis.com",
           "User-Agent": "Crystal",
           "Accept-Encoding": "gzip, deflate"
         },
-        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512}}",
-        "body_digest": "a90318601da79ea496e28ffe0799116b9bf9a31e74d5132b831cbf1fb6acea34"
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"toolConfig\":{\"functionCallingConfig\":{\"mode\":\"NONE\"}},\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "091bf478f94ea6a472d41582846d50416771d02053eef0b0351a2c58f15b8911"
       },
       "response": {
         "status": 200,
@@ -23,18 +22,18 @@
           "X-Gemini-Service-Tier": "standard",
           "Content-Type": "application/json; charset=UTF-8",
           "Vary": "Origin, X-Origin, Referer",
-          "Date": "Tue, 15 Sep 2026 18:55:02 GMT",
+          "Date": "Sat, 31 Oct 2026 20:16:12 GMT",
           "Server": "scaffolding on HTTPServer2",
           "X-XSS-Protection": "0",
           "X-Frame-Options": "SAMEORIGIN",
           "X-Content-Type-Options": "nosniff",
-          "Server-Timing": "gfet4t7; dur=922",
+          "Server-Timing": "gfet4t7; dur=4457",
           "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
           "Transfer-Encoding": "chunked"
         },
-        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"I'm sorry, but I do not have access to a `get_weather` tool or real-time weather data. Please check a live weather service or app for the current weather in Paris.\",\n            \"thoughtSignature\": \"EqEECp4EARFNMg/GxqyMQi/bfZ9L43RhCQ3796GSuxHh1xkGFz+xgQPQdSi3yCip5Z/P+pNKPLHIjKTVZSSFXLn8VXPKBzdama3Y5F7uKstsfSnkOE6FYS7dx/o6QOmJXeQDJlrVy39e0IxM5DPfJrFAXSSg1vNzt+yyH0UWex+azYiSwI8ZZr+hJPZbxdA1JfYGMR7F0lFW5Wm9XMQp33P4mhcod7HvH5SRX7rIFs3ymBhumnTAJ8DGaUzpwSXVS4CccfkqiRE0YFd2OJ0IH56UmQLcVjPOsVElxINmOAH/mq9SZJq43n+FPT/wGS3Pdtgt2FXl8+VzM8QeWjSsIi/cyqyx94Y+oHNL1u5ZEDpIOHBOqDxbNcAzMLGSGVvCU1jc7hbmrkBZmsGCGWzXofwmR1HrB0TkiERXsOlEsfiGEaOVI+y/hBNN7IcT2TUV2UAgqW31CxMjkQziWU0rBM5SNxMK5rnuNJunVkAygCVz6NZEFJS07BT+2cBhvQBgd0A48C6K/J0soz5MXV+usHGDj+SGKNJs9kGPpx1FIw5C4ExfzExfqyNNlszej73wef64c4oycXjBux94iWM0PKbfjL166iDmQYKnBsxFGpwLFyI8SOY6yb4skhqIx+hJ/dwvoQQS143x3Q6Hm3Mu5rMM3qbSujPAS/upguUdEcCfFBdBc7Vj+/ETdxxqj2A2wt+xv2Z+UuDE+Xo+I9VD0t45o/4=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"candidatesTokenCount\": 41,\n    \"totalTokenCount\": 220,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"thoughtsTokenCount\": 104,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"hZSpar3FIrCb_uMP8eP00As\"\n}\n"
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"**Checking the Weather in Paris**\\n\\nOkay, so I need to find the weather in Paris. My instinct is to use the `get_weather` tool – let's see if that's available. Alright, scanning the tool declaration... yep, `get_weather(location: string)` looks like exactly what I need. It takes a location string and returns the current weather. Excellent. So, let's call `get_weather(location=\\\"Paris\\\")` and get those results.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"\",\n            \"thoughtSignature\": \"EqADCp0DAWkUfRPCObzv9Oei2uTRJ/HmnXxaAMwsNUzIBmC3xqvfmT4IqfVpTZMel0qUaBo5lTa7g8Xhu1XNoAOH4Lxhl3ysz099jYCJooq6Q/nediWHdS9G7fLJwSLJRUdc+T8dnaOrQWZFdTKgQ6BNzYmJYS1jhOLVBQ4E3Q0+xVcac9m+ypdfvWEFp1wA6O2qliHQH6DDyNSrjwjTnFUFVqSqJLVZtrx3H5V1cswFwJpRrbOkXHZWCBYUp3u6QUh7/BX0yam2fUU2xTbcW5wQ246kE5rZZq/QM0GO1P2RGyAMMfl05snCAnzuznAMjwGN+G6ytlccIhwKAvo/76G9a+S1lHqRgk9JA35KH8tPenmBEpckI46uMkkcKCti371vydXUp6et3EQYggOhpC8PAi4mJAjnabSBNGOUXlVHEZqtrr85D//72f8OQwW0KxM2RMTBZyYckV6Z37FdC7Xx3wjCYIkDa/oQJT5s7Cb3zlp2SOvDywF9ZMHPkvZ5xxKJEAFvHwWhUPK7fzB4PA5KyYIk8PD+O66+TEyLnzalkK8=\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"MALFORMED_FUNCTION_CALL\",\n      \"index\": 0,\n      \"finishMessage\": \"Malformed function call: call:get_weather{location:Paris}\"\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 75,\n    \"totalTokenCount\": 75,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 75\n      }\n    ],\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.8-flash\",\n  \"responseId\": \"iEzmaqi3JuDmytMPocrLqAw\"\n}\n"
       },
-      "recorded_at": "2026-09-15T18:55:02Z"
+      "recorded_at": "2026-10-31T20:16:12Z"
     }
   ]
 }

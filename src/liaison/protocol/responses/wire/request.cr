@@ -229,6 +229,13 @@ module Liaison::Protocol::Responses
       getter max_output_tokens : Int32?
       # Sent nested under a `reasoning` object.
       getter reasoning_effort : String?
+      # Beside the effort: asks for a readable summary of the reasoning, which
+      # is otherwise withheld.
+      getter reasoning_summary : String?
+      # Asks for each reasoning item's encrypted payload, which a stateless
+      # caller replays to continue on the same model. Azure has returned it
+      # unasked; OpenAI documents it as opt-in.
+      getter? include_encrypted_reasoning : Bool
       # A bare string at the top level, as on Chat Completions.
       getter tool_choice : String?
       # Asks for a frame stream. Set by the adapter through `with_stream`, not
@@ -240,14 +247,17 @@ module Liaison::Protocol::Responses
                      @max_output_tokens : Int32? = nil,
                      @reasoning_effort : String? = nil,
                      @tool_choice : String? = nil,
-                     @stream : Bool = false)
+                     @stream : Bool = false,
+                     @reasoning_summary : String? = nil,
+                     @include_encrypted_reasoning : Bool = false)
       end
 
       # The same request, streamed. A copy rather than a setter, since a setter
       # on a struct edits whichever copy the caller holds.
       def with_stream(value : Bool) : Request
         Request.new(@model, @input, @instructions, @tools,
-          @max_output_tokens, @reasoning_effort, @tool_choice, value)
+          @max_output_tokens, @reasoning_effort, @tool_choice, value,
+          @reasoning_summary, @include_encrypted_reasoning)
       end
 
       def to_json(json : JSON::Builder)
@@ -263,7 +273,15 @@ module Liaison::Protocol::Responses
           @tool_choice.try { |value| json.field "tool_choice", value }
           @max_output_tokens.try { |value| json.field "max_output_tokens", value }
           @reasoning_effort.try do |value|
-            json.field("reasoning") { json.object { json.field "effort", value } }
+            json.field("reasoning") do
+              json.object do
+                json.field "effort", value
+                @reasoning_summary.try { |summary| json.field "summary", summary }
+              end
+            end
+          end
+          if @include_encrypted_reasoning
+            json.field("include") { json.array { json.string "reasoning.encrypted_content" } }
           end
           # Emitted only when true, so unstreamed bodies match their recorded
           # transcripts.

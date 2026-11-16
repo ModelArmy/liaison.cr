@@ -37,7 +37,8 @@ module Liaison::Capability
   end
 
   # What one mapping cost: every lossy or synthesized outcome as an
-  # annotation, and the worst outcome seen. Synthesized content itself exists
+  # annotation, plus any other a mapper asks to note, and the worst outcome
+  # seen. Synthesized content itself exists
   # only in the outgoing request.
   #
   # Only content losses outlive the call, through `annotate`. Compensations,
@@ -84,17 +85,20 @@ module Liaison::Capability
     end
 
     # Records an outcome: raises `RefusedError` if the policy does not permit
-    # it, and annotates it if lossy or synthesized. Every mapper reports every
-    # outcome here.
+    # it, and annotates it if lossy or synthesized, or if `note` is set. Every
+    # mapper reports every outcome here. `note` is for a rearrangement the
+    # target turns into a loss of its own: reasoning a model-bound producer
+    # wrote, sent to a model that ignores it.
     def record(outcome : MPSH::Outcome, detail : String,
-               message_index : Int32? = nil, block_kind : MPSH::BlockKind? = nil) : MPSH::Outcome
+               message_index : Int32? = nil, block_kind : MPSH::BlockKind? = nil,
+               note : Bool = false) : MPSH::Outcome
       @worst = outcome if outcome > @worst
 
       unless policy.permits?(outcome)
         raise RefusedError.new(provider, "#{detail} (#{outcome} exceeds policy #{policy})", block_kind, outcome)
       end
 
-      if outcome.lossy? || outcome.synthesizes?
+      if outcome.lossy? || outcome.synthesizes? || note
         @annotations << MPSH::Annotation.new(outcome, provider, detail, message_index, block_kind)
       end
       outcome

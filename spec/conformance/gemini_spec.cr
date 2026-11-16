@@ -179,6 +179,35 @@ describe "Gemini round trip" do
       request.to_json.should_not contain("functionCall")
     end
 
+    # The result is kept by design (`Resolver#tool_call_outcome`); it should
+    # at least name the function the model is being told about.
+    it "names a dropped call's result after the call" do
+      session = Liaison::Fixtures.tool_call_text_result
+      name = session.messages[1].content.first.as(M::ToolCallBlock).name
+      mapper = Liaison::Protocol::Gemini::Mapper.new(signed)
+      request, _ = mapper.map(session, "gemini-3.5-flash", C::Policy::Lenient)
+
+      body = request.to_json
+      body.should contain(%("functionResponse":{"name":"#{name}"))
+      body.should_not contain("unknown_function")
+    end
+
+    # Export pairs calls by counting them over the wire, so a call that never
+    # reached it must not use up an ordinal.
+    it "leaves a later sent call at the ordinal export will count" do
+      session = Liaison::Fixtures.tool_call_text_result
+      name = session.messages[1].content.first.as(M::ToolCallBlock).name
+
+      signed_call = M::ToolCallBlock.new("call_own_1", name, M::Object.new)
+      signed_call.put_meta("gemini", "thought_signature", "CtEHAdHtim9Cn1t7A0hSFtT8yTWM0")
+      session << M::Message.new(M::Role::Assistant, [signed_call.as(M::Block)])
+
+      mapper = Liaison::Protocol::Gemini::Mapper.new(signed)
+      mapper.map(session, "gemini-3.5-flash", C::Policy::Lenient)
+
+      mapper.calls.provider_id("call_own_1").should eq "#{name}#0"
+    end
+
     it "refuses rather than degrading under a strict policy" do
       session = Liaison::Fixtures.tool_call_text_result
       mapper = Liaison::Protocol::Gemini::Mapper.new(signed)

@@ -333,5 +333,38 @@ describe "response export" do
         gemini_reply(%({"error": {"code": 429, "message": "quota exceeded"}}))
       end
     end
+
+    # A body of the wrong shape raises the shard's own error, never the
+    # stdlib's untyped one from indexing a non-object.
+    it "raises on a body that is JSON but not an object" do
+      ["[1, 2]", %("text"), "42", "null"].each do |body|
+        expect_raises(Liaison::Protocol::MalformedResponseError, /not a JSON object/) { chat_reply(body) }
+        expect_raises(Liaison::Protocol::MalformedResponseError, /not a JSON object/) { responses_reply(body) }
+        expect_raises(Liaison::Protocol::MalformedResponseError, /not a JSON object/) { anthropic_reply(body) }
+        expect_raises(Liaison::Protocol::MalformedResponseError, /not a JSON object/) { gemini_reply(body) }
+      end
+    end
+
+    # A required object of the wrong shape is a missing one, not an empty one.
+    it "raises on a choice whose message is not an object" do
+      expect_raises(Liaison::Protocol::MalformedResponseError, /no `message`/) do
+        chat_reply(%({"choices": [{"message": "hello"}]}))
+      end
+      expect_raises(Liaison::Protocol::MalformedResponseError, /no `message`/) do
+        chat_reply(%({"choices": ["hello"]}))
+      end
+    end
+
+    # An optional entry of the wrong shape is skipped, as an absent one is.
+    it "skips entries of the wrong shape" do
+      chat_reply(%({"choices": [{"message": {"content": "hi", "tool_calls": ["x", {"function": "y"}]}}]}))
+        .text.should eq "hi"
+      anthropic_reply(%({"content": ["x", {"type": "text", "text": "hi"}, {"type": "image", "source": "z"}]}))
+        .text.should eq "hi"
+      gemini_reply(%({"candidates": [{"content": {"parts": ["x", {"text": "hi"}, {"functionCall": "y"}]}}]}))
+        .text.should eq "hi"
+      responses_reply(%({"output": ["x", {"type": "message", "content": ["y", {"type": "output_text", "text": "hi"}]}]}))
+        .text.should eq "hi"
+    end
   end
 end

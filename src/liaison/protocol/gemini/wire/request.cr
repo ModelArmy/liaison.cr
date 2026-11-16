@@ -158,6 +158,9 @@ module Liaison::Protocol::Gemini
       # of 0 disables thinking; -1 asks for dynamic thinking.
       getter thinking_budget : Int32?
       getter thinking_level : String?
+      # Asks for thought summaries. Without it the model still thinks, and
+      # still returns thought signatures, but no thought text.
+      getter? include_thoughts : Bool
       # Sent as `toolConfig.functionCallingConfig.mode`, top-level beside
       # `tools`.
       getter tool_mode : String?
@@ -168,7 +171,8 @@ module Liaison::Protocol::Gemini
                      @max_output_tokens : Int32? = nil,
                      @thinking_budget : Int32? = nil,
                      @thinking_level : String? = nil,
-                     @tool_mode : String? = nil)
+                     @tool_mode : String? = nil,
+                     @include_thoughts : Bool = false)
       end
 
       def path : String
@@ -211,19 +215,16 @@ module Liaison::Protocol::Gemini
           cap = @max_output_tokens
           budget = @thinking_budget
           level = @thinking_level
-          if cap || budget || level
+          if cap || budget || level || @include_thoughts
             json.field("generationConfig") do
               json.object do
                 cap.try { |value| json.field "maxOutputTokens", value }
-                if budget || level
+                if budget || level || @include_thoughts
                   json.field("thinkingConfig") do
                     json.object do
                       budget.try { |value| json.field "thinkingBudget", value }
                       level.try { |value| json.field "thinkingLevel", value }
-                      # Without it, thinking happens and is billed, but neither
-                      # thought text nor the signatures a later turn replays
-                      # come back. Sent whenever thinking is configured.
-                      json.field "includeThoughts", true
+                      json.field "includeThoughts", true if @include_thoughts
                     end
                   end
                 end

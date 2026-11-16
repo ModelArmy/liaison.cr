@@ -16,12 +16,50 @@ require "../spec_helper"
 
 private def frames(raw : String) : Array(S::Sse::Frame)
   collected = [] of S::Sse::Frame
-  S::Sse.each_frame(IO::Memory.new(raw)) { |frame| collected << frame }
+  S::Sse.each_frame(IO::Memory.new(raw), 1_000_000) { |frame| collected << frame }
+  collected
+end
+
+private def frames_within(raw : String, limit : Int32) : Array(S::Sse::Frame)
+  collected = [] of S::Sse::Frame
+  S::Sse.each_frame(IO::Memory.new(raw), limit) { |frame| collected << frame }
   collected
 end
 
 describe Liaison::Streaming::Sse do
   describe ".each_frame" do
+    describe "with a frame limit" do
+      it "accepts a line of exactly the limit, with either line ending" do
+        {"data: 12345\n\n", "data: 12345\r\n\r\n"}.each do |raw|
+          frames_within(raw, 11).map(&.data).should eq(["12345"])
+        end
+      end
+
+      it "raises for a line over the limit" do
+        expect_raises(S::Sse::FrameTooLargeError, /line/) { frames_within("data: 123456\n\n", 11) }
+      end
+
+      it "raises for a comment line over the limit" do
+        expect_raises(S::Sse::FrameTooLargeError, /line/) { frames_within(": #{"x" * 20}\n\n", 11) }
+      end
+
+      it "raises for joined data over the limit, though every line is within it" do
+        expect_raises(S::Sse::FrameTooLargeError, /frame data/) do
+          frames_within("data: 123456\ndata: 123456\n\n", 12)
+        end
+      end
+
+      it "counts each frame's data on its own" do
+        frames_within("data: 123456\n\ndata: 123456\n\n", 12).size.should eq(2)
+      end
+
+      it "does not read an endless line past the limit" do
+        io = IO::Memory.new("data: " + "x" * 100_000)
+        expect_raises(S::Sse::FrameTooLargeError) { S::Sse.each_frame(io, 100) { } }
+        io.pos.should be < 1000
+      end
+    end
+
     it "reads a lone data frame" do
       read = frames("data: hello\n\n")
 

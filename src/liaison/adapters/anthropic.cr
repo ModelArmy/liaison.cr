@@ -52,7 +52,7 @@ module Liaison
                       options : Options)
       mapper = Protocol::Anthropic::Mapper.new(narrowed(model))
       request, report = mapper.map(session, model, policy, retention, max_tokens, options)
-      {request, report, Protocol::Anthropic::Exporter.new(mapper.calls)}
+      {request, report, Protocol::Anthropic::Exporter.new(mapper.calls, mapper.profile.metadata_key)}
     end
   end
 end

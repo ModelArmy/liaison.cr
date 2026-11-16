@@ -1,5 +1,6 @@
 require "../spec_helper"
 require "../fixtures/response_fixtures"
+require "../support/loopback"
 
 # The live layer, tested without a network.
 #
@@ -60,6 +61,36 @@ describe "the live layer" do
       # Narrowing touches only the vendor axis. The protocol is unchanged.
       provider.profile.provider.should eq "anthropic"
       provider.profile.reasoning.should eq C::ReasoningForm::Block
+    end
+
+    # The reading direction. A narrowed provider files what it reads under its
+    # own key, so Ollama's opaque reasoning payload is never mistaken for
+    # OpenAI's and sent to OpenAI.
+    it "files a narrowed reply's metadata under the deployment's key" do
+      ollama = Liaison::Provider.for(
+        Liaison::Server.new("ollama", "http://localhost:11434"),
+        Liaison::ProtocolKind::Responses)
+      session = M::Session.new
+      session << M::Message.user("Hi")
+
+      reply = ollama.adapter.prepare(session, "gpt-oss:20b",
+        C::Policy::Strict, C::ReasoningRetention::All, 1024)
+        .read(Loopback.recorded_body("ollama_responses_text"))
+
+      reasoning = reply.content.select(M::ReasoningBlock).first
+      reasoning.meta?("ollama", "encrypted_content").should_not be_nil
+      reasoning.meta_for("openai").should be_nil
+      reply.meta?("ollama", "status").should_not be_nil
+
+      session << reply
+      session << M::Message.user("Again")
+      openai = Liaison::Provider.for(
+        Liaison::Server.new("openai", "https://api.openai.com"),
+        Liaison::ProtocolKind::Responses)
+      exchange = openai.adapter.prepare(session, "gpt-5",
+        C::Policy::Lenient, C::ReasoningRetention::All, 1024)
+
+      exchange.body.should_not contain "encrypted_content"
     end
 
     # The consequence, and the reason the default is pessimistic. Replaying a
@@ -244,6 +275,17 @@ describe "the live layer" do
       adapter.error_detail("<html>502 Bad Gateway</html>").should be_nil
       adapter.error_detail("").should be_nil
       adapter.error_detail(%({"unexpected": true})).should be_nil
+    end
+
+    # Valid JSON in the wrong shape must not raise either: a string `error`,
+    # as some OpenAI-compatible servers send, or a top-level array.
+    it "gives up quietly on a JSON error body that is not the envelope" do
+      adapter = Liaison::ChatCompletionsAdapter.new
+
+      adapter.error_detail(%({"error": "model not found"})).should be_nil
+      adapter.error_detail(%([{"error": {"message": "quota exceeded"}}])).should be_nil
+      adapter.error_detail(%("bad gateway")).should be_nil
+      adapter.error_detail(%({"error": {"message": 42}})).should be_nil
     end
   end
 

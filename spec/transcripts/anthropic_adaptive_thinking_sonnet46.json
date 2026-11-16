@@ -1,0 +1,108 @@
+{
+  "name": "anthropic_adaptive_thinking_sonnet46",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":2048,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"List every pair of positive integers (x, y) with x < 1000 and x^2 - 7y^2 = 1. Give only the pairs.\"}]}],\"output_config\":{\"effort\":\"high\"}}",
+        "body_digest": "c80a7a2aa991a7ec1b4d39b07216b60ea4c1d0a2eb6d0351b6fa4d2e67e7b439"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Date": "Sat, 31 Oct 2026 19:53:40 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "anthropic-ratelimit-input-tokens-limit": "500000",
+          "anthropic-ratelimit-input-tokens-remaining": "500000",
+          "anthropic-ratelimit-input-tokens-reset": "2026-10-31T19:53:34Z",
+          "anthropic-ratelimit-output-tokens-limit": "80000",
+          "anthropic-ratelimit-output-tokens-remaining": "79000",
+          "anthropic-ratelimit-output-tokens-reset": "2026-10-31T19:53:41Z",
+          "anthropic-ratelimit-requests-limit": "1000",
+          "anthropic-ratelimit-requests-remaining": "999",
+          "anthropic-ratelimit-requests-reset": "2026-10-31T19:53:33Z",
+          "anthropic-ratelimit-tokens-limit": "580000",
+          "anthropic-ratelimit-tokens-remaining": "579000",
+          "anthropic-ratelimit-tokens-reset": "2026-10-31T19:53:34Z",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "request-id": "req_011CgauAZ9oYc5FSChSkuQCm",
+          "traceresponse": "00-920ec892e64483204e69fe043d30edb1-35c352f657181b28-01",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "vary": "Accept-Encoding",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "Server": "cloudflare",
+          "server-timing": "x-originResponse;dur=6899",
+          "cf-cache-status": "DYNAMIC",
+          "X-Robots-Tag": "none",
+          "CF-RAY": "a53534e1bdb9a1ec-YYZ"
+        },
+        "body": "{\"model\":\"claude-sonnet-4-6\",\"id\":\"msg_011CgauAZPgvqG5Kg5AC8QEs\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"I need to find all positive integer solutions to x² - 7y² = 1 with x < 1000.\\n\\nThis is a Pell equation x² - 7y² = 1.\\n\\nThe fundamental solution is found by looking at the continued fraction of √7.\\n\\n√7 = [2; 1, 1, 1, 4, 1, 1, 1, 4, ...]\\n\\nComputing convergents:\\n- 2/1: 4 - 7 = -3\\n- 3/1: 9 - 7 = 2\\n- 5/2: 25 - 28 = -3\\n- 8/3: 64 - 63 = 1 ✓\\n\\nFundamental solution: (8, 3)\\n\\nThe recurrence for Pell equations: if (x_n, y_n) is a solution, the next solution is:\\n- x_{n+1} = x₁·x_n + 7·y₁·y_n = 8x_n + 21y_n\\n- y_{n+1} = x₁·y_n + y₁·x_n = 8y_n + 3x_n\\n\\nStarting with (x₁, y₁) = (8, 3):\\n\\n**n=1:** (8, 3)\\nCheck: 64 - 63 = 1 ✓\\n\\n**n=2:** x = 8·8 + 21·3 = 64 + 63 = 127, y = 8·3 + 3·8 = 24 + 24 = 48\\nCheck: 16129 - 7·2304 = 16129 - 16128 = 1 ✓\\n\\n**n=3:** x = 8·127 + 21·48 = 1016 + 1008 = 2024, y = 8·48 + 3·127 = 384 + 381 = 765\\nx = 2024 > 1000, so this exceeds the limit.\\n\\nThe pairs are:\\n\\n**(8, 3)**\\n**(127, 48)**\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":523,\"service_tier\":\"standard\",\"inference_geo\":\"global\",\"speed\":\"standard\"},\"diagnostics\":null}"
+      },
+      "recorded_at": "2026-10-31T19:53:40Z"
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "headers": {
+          "content-type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "[FILTERED]",
+          "Host": "api.anthropic.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"model\":\"claude-sonnet-4-6\",\"max_tokens\":2048,\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"List every pair of positive integers (x, y) with x < 1000 and x^2 - 7y^2 = 1. Give only the pairs.\"}]}],\"output_config\":{\"effort\":\"high\"},\"thinking\":{\"type\":\"adaptive\"}}",
+        "body_digest": "b6edf759cdeeab5edc4ff26eafd06bc4d08d8ec398ff9e566f620d15d6b7ab7a"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Date": "Sat, 31 Oct 2026 19:53:58 GMT",
+          "Content-Type": "application/json",
+          "Transfer-Encoding": "chunked",
+          "Connection": "keep-alive",
+          "anthropic-ratelimit-input-tokens-limit": "500000",
+          "anthropic-ratelimit-input-tokens-remaining": "500000",
+          "anthropic-ratelimit-input-tokens-reset": "2026-10-31T19:53:41Z",
+          "anthropic-ratelimit-output-tokens-limit": "80000",
+          "anthropic-ratelimit-output-tokens-remaining": "79000",
+          "anthropic-ratelimit-output-tokens-reset": "2026-10-31T19:53:58Z",
+          "anthropic-ratelimit-requests-limit": "1000",
+          "anthropic-ratelimit-requests-remaining": "999",
+          "anthropic-ratelimit-requests-reset": "2026-10-31T19:53:41Z",
+          "anthropic-ratelimit-tokens-limit": "580000",
+          "anthropic-ratelimit-tokens-remaining": "579000",
+          "anthropic-ratelimit-tokens-reset": "2026-10-31T19:53:41Z",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "request-id": "req_011CgauB5hqB9oBaD15Mg9y4",
+          "traceresponse": "00-dcb6c053cf6e8c570128fa67ece6ba32-0443c3d7b2d2c443-01",
+          "anthropic-organization-id": "73a57cec-8684-4a17-8a8a-236663eb1dd3",
+          "anthropic-workspace-id": "wrkspc_01TZaSJ9Q4GT9s3KXaMsNH6P",
+          "vary": "Accept-Encoding",
+          "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+          "Server": "cloudflare",
+          "server-timing": "x-originResponse;dur=17153",
+          "cf-cache-status": "DYNAMIC",
+          "X-Robots-Tag": "none",
+          "CF-RAY": "a535350e9c90a241-YYZ"
+        },
+        "body": "{\"model\":\"claude-sonnet-4-6\",\"id\":\"msg_011CgauB5tEZjpFHduKBfMh4\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"thinking\",\"thinking\":\"I need to find all positive integer solutions to x² - 7y² = 1 with x < 1000.\\n\\nThis is a Pell equation: x² - 7y² = 1.\\n\\nThe fundamental solution is found by looking at the continued fraction expansion of √7.\\n\\n√7 = 2 + (√7 - 2)\\n1/(√7-2) = (√7+2)/3\\n1/((√7+2)/3 - 1) = 3/(√7-1) = 3(√7+1)/6 = (√7+1)/2\\nI'm working through the continued fraction steps, and the expansion of √7 starts repeating with a period of 4 after the leading 2. Next I need to pin down which convergent marks the end of that first period, since that's where the fundamental solution comes from.\\n\\nI'm checking the first convergents of √7, and the 8/3 convergent gives 8² − 7·3² = 1, so (8, 3) is the fundamental solution. Next I'm starting to build the general solutions from (8 + 3√7)ⁿ.\\n\\nNext I'm squaring the fundamental solution to get the second solution, 127 + 48√7, and checking it against the equation. Then I'm cubing it to get the third candidate, 2024 + 765√7.\\n\\nChecking the bound now: 2024 is over 1000, so that solution is out. That leaves (8, 3) and (127, 48), and (127, 48) checks out since 127² − 7·48² = 1. Both are positive, so they're the answer.\\n\\n\",\"signature\":\"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\"},{\"type\":\"text\",\"text\":\"## Setting Up the Pell Equation\\n\\nI need to solve x² − 7y² = 1, a classic **Pell equation**.\\n\\n**Finding the fundamental solution** via the continued fraction of √7:\\n\\n$$\\\\sqrt{7} = [2;\\\\overline{1,1,1,4}]$$\\n\\nComputing convergents:\\n| n | aₙ | pₙ | qₙ |\\n|---|----|----|-----|\\n| 0 | 2  | 2  | 1  |\\n| 1 | 1  | 3  | 1  |\\n| 2 | 1  | 5  | 2  |\\n| 3 | 1  | **8** | **3** |\\n\\nCheck: 8² − 7(3²) = 64 − 63 = **1** ✓\\n\\nThe **fundamental solution** is (x₁, y₁) = (8, 3).\\n\\n## Generating All Solutions\\n\\nAll solutions are generated by:\\n$$x_n + y_n\\\\sqrt{7} = (8 + 3\\\\sqrt{7})^n$$\\n\\n**n = 1:**\\n$$(8 + 3\\\\sqrt{7})^1 \\\\Rightarrow (x, y) = (8,\\\\ 3)$$\\nCheck: 64 − 63 = 1 ✓\\n\\n**n = 2:**\\n$$(8 + 3\\\\sqrt{7})^2 = 127 + 48\\\\sqrt{7} \\\\Rightarrow (x, y) = (127,\\\\ 48)$$\\nCheck: 16129 − 16128 = 1 ✓\\n\\n**n = 3:**\\n$$(8 + 3\\\\sqrt{7})^3 = 2024 + 765\\\\sqrt{7} \\\\Rightarrow x = 2024 > 1000 \\\\text{ (excluded)}$$\\n\\n## Answer\\n\\n$$\\\\boxed{(8,\\\\ 3) \\\\quad \\\\text{and} \\\\quad (127,\\\\ 48)}$$\"}],\"container\":null,\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":1385,\"output_tokens_details\":{\"thinking_tokens\":887},\"service_tier\":\"standard\",\"inference_geo\":\"global\",\"speed\":\"standard\"},\"diagnostics\":null}"
+      },
+      "recorded_at": "2026-10-31T19:53:58Z"
+    }
+  ]
+}

@@ -54,7 +54,7 @@ module Liaison
                       options : Options)
       mapper = Protocol::ChatCompletions::Mapper.new(narrowed(model), max_tokens_field: @max_tokens_field)
       request, report = mapper.map(session, model, policy, retention, options)
-      {request, report, Protocol::ChatCompletions::Exporter.new(mapper.calls)}
+      {request, report, Protocol::ChatCompletions::Exporter.new(mapper.calls, mapper.profile.metadata_key)}
     end
   end
 end

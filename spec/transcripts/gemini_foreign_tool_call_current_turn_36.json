@@ -1,0 +1,39 @@
+{
+  "name": "gemini_foreign_tool_call_current_turn_36",
+  "recorded_with": "wiretap/0.4.2",
+  "interactions": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+        "headers": {
+          "content-type": "application/json",
+          "x-goog-api-key": "[FILTERED]",
+          "Host": "generativelanguage.googleapis.com",
+          "User-Agent": "Crystal",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        "body": "{\"systemInstruction\":{\"parts\":[{\"text\":\"Use the supplied tools when they apply.\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"What is the weather in Paris? Use the get_weather tool.\"}]},{\"role\":\"user\",\"parts\":[{\"functionResponse\":{\"name\":\"get_weather\",\"response\":{\"output\":\"18C, light rain\"}}}]}],\"tools\":[{\"functionDeclarations\":[{\"name\":\"get_weather\",\"description\":\"Look up the current weather in a city\",\"parameters\":{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\",\"description\":\"City name\"}},\"required\":[\"city\"]}}]}],\"generationConfig\":{\"maxOutputTokens\":512,\"thinkingConfig\":{\"includeThoughts\":true}}}",
+        "body_digest": "378659bff16a5c9714aedfa55ad1313642ca83eb36d5f43a62f0becb59af9980"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "X-Gemini-Service-Tier": "standard",
+          "Content-Type": "application/json; charset=UTF-8",
+          "Vary": "Origin, X-Origin, Referer",
+          "Date": "Sat, 31 Oct 2026 20:15:58 GMT",
+          "Server": "scaffolding on HTTPServer2",
+          "X-XSS-Protection": "0",
+          "X-Frame-Options": "SAMEORIGIN",
+          "X-Content-Type-Options": "nosniff",
+          "Server-Timing": "gfet4t7; dur=2286",
+          "Alt-Svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000",
+          "Transfer-Encoding": "chunked"
+        },
+        "body": "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\": [\n          {\n            \"text\": \"Here's my thought process, expert:\\n\\n**Presenting Weather Data: Paris**\\n\\nOkay, the tool just spat back \\\"18C, light rain\\\" for Paris. Now, I need to craft a response. My priority is clear communication, so the user can quickly grasp the weather conditions. \\\"18C, light rain\\\" is concise, but I can add some context for a better presentation. I might consider clarifying that \\\"18C\\\" is Celsius, assuming this is an international context. Should I assume this? Probably. I will add it anyway. I'll also present it as a short sentence. It’s also good to format it nicely.\\n\\n\\n\",\n            \"thought\": true\n          },\n          {\n            \"text\": \"The weather in Paris is currently 18°C with light rain.\",\n            \"thoughtSignature\": \"EugBCuUBAWkUfRPI676RgrS1yTPSiNzvYXIZO2udb5+7QXDXi8fBWXQRa3vaf64WNKi9uObfGvXLJ0fCT+K9eIJW+XvjP5lymMJfSaz7KK6Oiqmn3ypjvERRkFVui4+n+gl/XHGP/9z0vVsfKkrnEb8L/Oww6/TjjXaewwu0mw25A8X1V/2j9HkXzdauzTyM7TLoW1WeyM7b7fiYSBG7uaobVyYd2KKRg4iIoUsGud7NvRE95Npit0lq/wj6y4xxjkjyOaoEJ7LqYs8wFSIGJA59ygNp7GNfA/S4jWNbKRxrswktLsVHydgTPw==\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n      \"finishReason\": \"STOP\",\n      \"index\": 0\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 95,\n    \"candidatesTokenCount\": 15,\n    \"totalTokenCount\": 138,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": \"TEXT\",\n        \"tokenCount\": 95\n      }\n    ],\n    \"thoughtsTokenCount\": 28,\n    \"serviceTier\": \"standard\"\n  },\n  \"modelVersion\": \"gemini-3.6-flash\",\n  \"responseId\": \"e0zmasWmOteLytMPrKKJmAw\"\n}\n"
+      },
+      "recorded_at": "2026-10-31T20:15:58Z"
+    }
+  ]
+}

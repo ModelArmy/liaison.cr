@@ -3,6 +3,7 @@ require "./export"
 require "./wire/response"
 require "../../streaming/assembler"
 require "../errors"
+require "../fields"
 require "../arguments"
 
 module Liaison::Protocol::Anthropic
@@ -37,7 +38,7 @@ module Liaison::Protocol::Anthropic
       end
 
       def kind : String?
-        @skeleton["type"]?.try(&.as_s?)
+        Fields.string(@skeleton, "type")
       end
     end
 
@@ -53,36 +54,36 @@ module Liaison::Protocol::Anthropic
     end
 
     def absorb(frame : Streaming::Sse::Frame, & : Streaming::Event ->) : Nil
-      payload = decode(frame.data)
+      payload = Fields.parse_object?(frame.data)
       return unless payload
 
-      case frame.name || payload["type"]?.try(&.as_s?)
+      case frame.name || Fields.string(payload, "type")
       when "content_block_delta"
         index = index_of(payload)
         return unless index
         pending = @blocks[index]?
         return unless pending
 
-        delta = payload["delta"]?
+        delta = Fields.object(payload, "delta")
         return unless delta
 
-        case delta["type"]?.try(&.as_s?)
+        case Fields.string(delta, "type")
         when "text_delta"
-          delta["text"]?.try(&.as_s?).try do |text|
+          Fields.string(delta, "text").try do |text|
             pending.text += text
             yield Streaming::TextDelta.new(text)
           end
         when "thinking_delta"
-          delta["thinking"]?.try(&.as_s?).try do |text|
+          Fields.string(delta, "thinking").try do |text|
             pending.text += text
             yield Streaming::ReasoningDelta.new(text)
           end
         when "input_json_delta"
           # No event: argument fragments are not for watching.
-          delta["partial_json"]?.try(&.as_s?).try { |chunk| pending.json += chunk }
+          Fields.string(delta, "partial_json").try { |chunk| pending.json += chunk }
         when "signature_delta"
           # Replayed unmodified later; no event.
-          delta["signature"]?.try(&.as_s?).try { |value| pending.signature = value }
+          Fields.string(delta, "signature").try { |value| pending.signature = value }
         end
       else
         record(frame, payload) { |event| yield event }
@@ -106,8 +107,8 @@ module Liaison::Protocol::Anthropic
     # Frames that open, close or describe rather than fill.
     private def record(frame : Streaming::Sse::Frame, payload : JSON::Any,
                        & : Streaming::Event ->) : Nil
-      case frame.name || payload["type"]?.try(&.as_s?)
-      when "message_start"       then payload["message"]?.try { |message| began(message) }
+      case frame.name || Fields.string(payload, "type")
+      when "message_start"       then Fields.object(payload, "message").try { |message| began(message) }
       when "content_block_start" then opened(payload) { |event| yield event }
       when "content_block_stop"  then closed(payload)
       when "message_delta"       then advanced(payload)
@@ -118,24 +119,24 @@ module Liaison::Protocol::Anthropic
 
     # Identity and the input side of the token count.
     private def began(message : JSON::Any) : Nil
-      @id = message["id"]?.try(&.as_s?)
-      @model = message["model"]?.try(&.as_s?)
-      @role = message["role"]?.try(&.as_s?) || "assistant"
-      Wire::Usage.parse(message["usage"]?).try { |value| @usage = value }
+      @id = Fields.string(message, "id")
+      @model = Fields.string(message, "model")
+      @role = Fields.string(message, "role") || "assistant"
+      Wire::Usage.parse(Fields.at(message, "usage")).try { |value| @usage = value }
     end
 
     # A block's skeleton, which every later delta for that index fills in.
     private def opened(payload : JSON::Any, & : Streaming::Event ->) : Nil
       index = index_of(payload)
-      skeleton = payload["content_block"]?
+      skeleton = Fields.object(payload, "content_block")
       return unless index && skeleton
 
       @blocks[index] = Pending.new(skeleton)
-      return unless skeleton["type"]?.try(&.as_s?) == "tool_use"
+      return unless Fields.string(skeleton, "type") == "tool_use"
 
       # Announced the moment the block opens, because the name is here and
       # nowhere later — the deltas that follow carry only argument fragments.
-      skeleton["name"]?.try(&.as_s?).try { |name| yield Streaming::ToolCallStarted.new(name) }
+      Fields.string(skeleton, "name").try { |name| yield Streaming::ToolCallStarted.new(name) }
     end
 
     private def closed(payload : JSON::Any) : Nil
@@ -145,11 +146,11 @@ module Liaison::Protocol::Anthropic
     # The stop reason, and the final output-token count; `message_start`
     # carried the input side only.
     private def advanced(payload : JSON::Any) : Nil
-      payload["delta"]?.try do |delta|
-        delta["stop_reason"]?.try(&.as_s?).try { |value| @stop_reason = value }
-        delta["stop_sequence"]?.try(&.as_s?).try { |value| @stop_sequence = value }
+      Fields.object(payload, "delta").try do |delta|
+        Fields.string(delta, "stop_reason").try { |value| @stop_reason = value }
+        Fields.string(delta, "stop_sequence").try { |value| @stop_sequence = value }
       end
-      Wire::Usage.parse(payload["usage"]?).try { |value| @usage = merged(value) }
+      Wire::Usage.parse(Fields.at(payload, "usage")).try { |value| @usage = merged(value) }
     end
 
     # Closed blocks are materialised whatever they are. An open block is kept
@@ -182,7 +183,7 @@ module Liaison::Protocol::Anthropic
         fields["thinking"] = JSON::Any.new(pending.text)
         pending.signature.try { |value| fields["signature"] = JSON::Any.new(value) }
       when "tool_use", "server_tool_use"
-        name = pending.skeleton["name"]?.try(&.as_s?) || ""
+        name = Fields.string(pending.skeleton, "name") || ""
         fields["input"] = JSON::Any.new(Arguments.object(pending.json, NAME, name))
       end
 
@@ -201,20 +202,14 @@ module Liaison::Protocol::Anthropic
     end
 
     private def index_of(payload : JSON::Any) : Int32?
-      payload["index"]?.try(&.as_i?)
-    end
-
-    private def decode(data : String) : JSON::Any?
-      JSON.parse(data)
-    rescue JSON::ParseException
-      nil
+      Fields.int(payload, "index")
     end
 
     private def mid_stream(payload : JSON::Any) : StreamError
-      error = payload["error"]?
+      error = Fields.at(payload, "error")
       StreamError.new(NAME,
-        error.try(&.["message"]?).try(&.as_s?) || "the provider sent an error frame",
-        error.try(&.["type"]?).try(&.as_s?))
+        Fields.string(error, "message") || "the provider sent an error frame",
+        Fields.string(error, "type"))
     end
   end
 end

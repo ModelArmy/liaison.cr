@@ -17,10 +17,12 @@ module Liaison::Capability
   module Catalog
     extend self
 
-    # Models that take a thinking budget and no named rung: Claude 3.7 Sonnet,
-    # the Claude 4 models up to Sonnet and Haiku 4.5, and the Gemini 2.5
-    # series. Claude Opus 4.5 takes both and is left to the default. A list of
-    # the past, so it only shrinks; confirm against current vendor docs.
+    # Models that think only on a budget: Claude 3.7 Sonnet, the Claude 4
+    # models up to 4.5, and the Gemini 2.5 series. Claude Opus 4.5 also takes
+    # an effort rung, but thinks only with `type: enabled` and a budget and
+    # rejects `adaptive`, so it is here: a requested rung becomes a budget. A
+    # list of the past, so it only shrinks; confirm against current vendor
+    # docs.
     BUDGET_ONLY = Set{
       "claude-3-7-sonnet",
       "claude-3-7-sonnet-latest",
@@ -35,6 +37,8 @@ module Liaison::Capability
       "claude-opus-4-20250514",
       "claude-opus-4-1",
       "claude-opus-4-1-20250805",
+      "claude-opus-4-5",
+      "claude-opus-4-5-20251101",
       "claude-haiku-4-5",
       "claude-haiku-4-5-20251001",
       "gemini-2.5-pro",
@@ -67,6 +71,17 @@ module Liaison::Capability
       "gemini-4-argon",
     }
 
+    # Models whose reasoning only they can use: Anthropic documents that their
+    # thinking blocks are tied to the producing model and silently ignored by
+    # any other. Keyed on the producer, unlike the lists above, which are keyed
+    # on the target. Exact names; a point release is a different model.
+    MODEL_BOUND_REASONING = Set{
+      "claude-fable-5",
+      "claude-fable-5-1",
+      "claude-mythos-5",
+      "claude-mythos-5-1",
+    }
+
     # The unit this model needs, or `nil` where the catalog has no opinion,
     # leaving the default.
     def reasoning_unit?(model : String) : ReasoningUnit?
@@ -76,6 +91,11 @@ module Liaison::Capability
     # Whether this model requires signed tool calls.
     def tool_call_signature_required?(model : String) : Bool
       SIGNED_TOOL_CALLS.includes?(model.downcase)
+    end
+
+    # Whether reasoning this model produced is usable only by this model.
+    def reasoning_model_bound?(model : String) : Bool
+      MODEL_BOUND_REASONING.includes?(model.downcase)
     end
 
     # Narrows a profile for one model, one independent axis at a time. A no-op

@@ -59,5 +59,17 @@ module Liaison
     end
 
     alias Request = Effort | Budget | Off
+
+    # Whether a reply's reasoning should come back as text, where an API would
+    # otherwise withhold it. `Summarized`, the default, asks for it: a session
+    # can only be resumed with what was captured, and reasoning text is all of
+    # it that crosses vendors (`DEVELOPMENT.md`, *What this shard is for*). The
+    # text is a summary, never the raw reasoning. `Omitted` declines it, which
+    # shortens the wait for the first streamed token at the cost of fidelity
+    # when the session is continued, on another vendor most of all.
+    enum Text
+      Summarized
+      Omitted
+    end
   end
 end
