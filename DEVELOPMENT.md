@@ -842,6 +842,12 @@ real server and writes `spec/transcripts/<name>.json`, every run after replays
 from disk. Transcripts are committed. They are the evidence, and they are what
 makes the suite offline for everyone who did not record them.
 
+Credentials are filtered from them; identifiers are not. Response headers keep
+the Anthropic organization id, Azure's resource hostname and region, and
+request ids. These name an account and a deployment without granting access to
+either, so they stay: scrubbing them would cost a filter to maintain, and the
+hostname is in the request URL, where scrubbing it would break replay.
+
 **Green is not the same as replayed.** Under `:once` a missing transcript is
 recorded rather than failed, so a suite can pass while asserting against a
 recording made seconds earlier by the code under test. Two guards, both in

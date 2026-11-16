@@ -17,47 +17,6 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 Vulnerabilities (V) first, then correctness (C). Labels are stable: a fixed
 item is deleted, and the rest keep their numbers.
 
-### V3. Readers index JSON without checking it is an object
-
-`JSON::Any#[]?(String)` raises a plain `Exception` on anything but a hash.
-Every reader indexes first and asks later, so a body or frame of the wrong
-shape escapes as an untyped exception instead of `MalformedResponseError` or
-`StreamError`. Reproduced: each protocol's `export_reply` on a non-object
-body; a Chat Completions choice or `tool_calls` entry that is not an object;
-a Chat Completions or Anthropic stream frame that is an array or number. The
-same holds for nested fields read as objects, such as `function`, `delta`,
-`source` and `error`: about 160 reads across the readers and assemblers.
-
-Where: `Wire::Response.from_json` and its helpers in all four protocols; the
-assemblers' `absorb`. `Adapter#nested_error` is already fixed, by checking
-`as_h?` at each step.
-
-**Open: the shape of the fix.** Three candidates:
-
-1. Check at each reader's entry and each array element only. Small, but a
-   nested field of the wrong type still escapes.
-2. A safe accessor (`Json.at(any, "key")`) at every read, as `nested_error`
-   does inline. Complete, and every changed line is plain; a mechanical edit
-   to about 160 lines.
-3. Rescue the stdlib's exception once per reader and re-raise it typed. Small,
-   but it must tell that exception apart by its class (plain `Exception`),
-   which is exact today and tied to how the stdlib raises.
-
-The lean is the second. Reproduced by a scratch spec; no spec covers it.
-
-### V5. Committed transcripts hold account and deployment identifiers
-
-Credentials are filtered. Response headers are not: the Anthropic
-organization id (17 transcripts), the Azure resource hostname and region
-(7), and request ids (24) (`request-id`, `x-request-id`, `apim-request-id`). The
-repository is public.
-
-**Open: whether this is acceptable.** If not, a Wiretap filter for these
-headers on recording, and a scrub of the committed files. Response headers
-play no part in matching, so scrubbing them is free. The Azure hostname is
-also in the request URL, so scrubbing it means the Azure specs replay against
-a placeholder server name. Checked by grep.
-
 ### V6. Unbounded and unchecked inputs, each minor
 
 - **Azure `api_version`** goes into the query string unencoded

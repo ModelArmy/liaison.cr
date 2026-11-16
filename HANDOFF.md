@@ -277,7 +277,24 @@ days, now in `SCOPE.md`.
 `Archive.read` raises `FormatError` for any structural fault, with the
 underlying exception as its `cause`.
 
-Next in `WILL FIX`: **Responses requests are stored at the provider**.
+**A review for maintainability and vulnerabilities refilled `MUST FIX`**,
+labelled V (vulnerabilities) and C (correctness). Done so far:
+
+- **V1.** `Tool.new` refuses `parameters` that is not one JSON object, so a
+  schema cannot add keys of its own to the request it is written into.
+- **V2.** Exporters file `provider_metadata` under the narrowed vendor's key,
+  so an emulator's opaque payload is never replayed to the vendor it imitates.
+- **V3.** Every reader goes through `Protocol::Fields`, where a field of the
+  wrong shape reads as absent: a required one raises
+  `MalformedResponseError`, an optional one is skipped, and a frame that is
+  not an object is skipped like a keep-alive.
+- **V4.** A tool that raises unexpectedly is reported to the model in fixed
+  text; the exception goes to the archive only.
+- **V5**, identifiers in transcripts, was accepted rather than fixed;
+  `DEVELOPMENT.md`, *Live specs*, says why.
+
+Next: **the rest of `MUST FIX`**, V6 and then C1 to C7, before `WILL FIX`,
+which `SCOPE.md` now orders by urgency.
 
 **Waiting on a recording: Azure GPT-5.6 Luna and GPT-6 Luna.** Nothing to
 catalogue, since Azure deployment names carry no model identity, but one claim
