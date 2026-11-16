@@ -15,7 +15,7 @@ module Liaison
     # `model` is the deployment name. It is also written into the body, where
     # Azure ignores it.
     def path(model : String) : String
-      "/openai/deployments/#{URI.encode_path_segment(model)}/chat/completions?api-version=#{@api_version}"
+      "/openai/deployments/#{URI.encode_path_segment(model)}/chat/completions?api-version=#{URI.encode_www_form(@api_version)}"
     end
 
     def headers(credential : String?) : HTTP::Headers

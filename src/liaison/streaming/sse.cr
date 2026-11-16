@@ -14,7 +14,14 @@ module Liaison::Streaming
       end
     end
 
-    # Reads frames until the stream ends.
+    # A line, or one frame's joined data, longer than the limit given to
+    # `each_frame`.
+    class FrameTooLargeError < Exception
+    end
+
+    # Reads frames until the stream ends. A line, or one frame's joined data,
+    # of more than `max_frame_bytes` raises `FrameTooLargeError`; a line is
+    # never read past the limit, so an endless one is not buffered.
     #
     # A trailing partial frame is discarded, as the SSE specification says.
     # That keeps a cut stream detectable: a half-written terminal frame never
@@ -22,15 +29,17 @@ module Liaison::Streaming
     # that a server omitting the final blank line loses its last event.
     #
     # Handles `\n` and `\r\n` line endings, not a lone `\r`.
-    def self.each_frame(io : IO, & : Frame ->) : Nil
+    def self.each_frame(io : IO, max_frame_bytes : Int32, & : Frame ->) : Nil
       name = nil.as(String?)
       data = [] of String
+      data_bytes = 0
 
-      while line = io.gets(chomp: true)
+      while line = read_line(io, max_frame_bytes)
         if line.empty?
           yield Frame.new(data.join('\n'), name) unless data.empty?
           name = nil
           data.clear
+          data_bytes = 0
           next
         end
 
@@ -46,9 +55,22 @@ module Liaison::Streaming
         # so they are dropped.
         case field
         when "event" then name = value
-        when "data"  then data << value
+        when "data"
+          data_bytes += value.bytesize + (data.empty? ? 0 : 1)
+          raise FrameTooLargeError.new("SSE frame data exceeds #{max_frame_bytes} bytes") if data_bytes > max_frame_bytes
+          data << value
         end
       end
+    end
+
+    # One line without its terminator. The read stops two bytes past the limit,
+    # room for a `\r\n` after a line of exactly the limit.
+    private def self.read_line(io : IO, max_frame_bytes : Int32) : String?
+      line = io.gets(max_frame_bytes.to_i64 + 2, chomp: true)
+      if line && line.bytesize > max_frame_bytes
+        raise FrameTooLargeError.new("SSE line exceeds #{max_frame_bytes} bytes")
+      end
+      line
     end
   end
 end

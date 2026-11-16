@@ -17,21 +17,6 @@ outstanding belongs here, because nobody greps a codebase for open questions.
 Vulnerabilities (V) first, then correctness (C). Labels are stable: a fixed
 item is deleted, and the rest keep their numbers.
 
-### V6. Unbounded and unchecked inputs, each minor
-
-- **Azure `api_version`** goes into the query string unencoded
-  (`adapters/azure/*.cr`, `path`). Caller-supplied, so low risk; encode it.
-- **No size limits.** `Server` reads an error body whole, and `Sse.each_frame`
-  reads a line with no bound, so a hostile or broken endpoint can exhaust
-  memory. A cap on both, raising `TransportError`, is cheap.
-- **`Server` holds one `HTTP::Client`**, which is unsafe for two fibers. Either
-  document it as one-fiber-at-a-time or guard it.
-- **`Archive.read` reads any role but `"user"` as assistant**, so a corrupt or
-  hand-edited archive silently changes speaker. Raise `FormatError` for a role
-  other than `user` or `assistant`, as for an unrecognised block kind.
-
-Predicted by reading; the archive role reproduced by a scratch spec.
-
 ### C1. The mid-tool-call rule is never applied
 
 `Resolver` refuses foreign reasoning between a tool call and its result

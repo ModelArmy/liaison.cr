@@ -32,8 +32,8 @@ module Liaison::MPSH
     end
 
     # Raises `FormatError` for anything that is not a well-formed archive: a
-    # missing or unrecognised format, an unrecognised block kind, ending or
-    # outcome, and any structural fault — unparseable text, a missing field, a
+    # missing or unrecognised format, an unrecognised role, block kind, ending
+    # or outcome, and any structural fault — unparseable text, a missing field, a
     # field of the wrong type — with the underlying exception as `cause`.
     def read(source : String) : Session
       root = JSON.parse(source)
@@ -68,7 +68,7 @@ module Liaison::MPSH
     end
 
     private def read_message(node : JSON::Any) : Message
-      role = node["role"].as_s == "user" ? Role::User : Role::Assistant
+      role = parse_role(node["role"].as_s)
       content = node["content"].as_a.map { |block| read_block(block) }
       provenance = node["provenance"]?.try do |provenance_node|
         Provenance.new(provenance_node["provider"].as_s, provenance_node["model"].as_s,
@@ -78,6 +78,14 @@ module Liaison::MPSH
       message.ending = node["ending"]?.try(&.as_s?).try { |name| parse_ending(name) } || Ending::Complete
       message.provider_metadata = read_metadata(node)
       message
+    end
+
+    private def parse_role(name : String) : Role
+      case name
+      when "user"      then Role::User
+      when "assistant" then Role::Assistant
+      else                  raise FormatError.new("unrecognised role #{name.inspect}")
+      end
     end
 
     # Written only when not `Complete`, and read as `Complete` when absent, so

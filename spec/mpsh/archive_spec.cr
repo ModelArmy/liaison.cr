@@ -76,6 +76,12 @@ describe "MPSH::Archive" do
     expect_raises(M::Archive::FormatError, /abandoned/) { M::Archive.read(written) }
   end
 
+  it "rejects an unrecognised role rather than reading it as the assistant" do
+    written = M::Archive.write(Liaison::Fixtures.single_user_turn).sub(%("role":"user"), %("role":"system"))
+
+    expect_raises(M::Archive::FormatError, /unrecognised role "system"/) { M::Archive.read(written) }
+  end
+
   it "rejects a source that isn't an MPSH archive" do
     expect_raises(M::Archive::FormatError) { M::Archive.read(%({"hello": "world"})) }
   end

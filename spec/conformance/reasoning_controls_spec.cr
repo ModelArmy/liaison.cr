@@ -475,6 +475,12 @@ describe "reasoning controls" do
       end
     end
 
+    it "encodes the api version in the path" do
+      {Liaison::AzureChatCompletionsAdapter, Liaison::AzureResponsesAdapter}.each do |adapter_class|
+        adapter_class.new("2025 04&x=1").path("deployment").should end_with("?api-version=2025+04%26x%3D1")
+      end
+    end
+
     it "accepts the unit an Azure protocol already spells" do
       server = Liaison::Server.new("azure", "https://example.openai.azure.com")
       provider = Liaison::Provider.for_azure(server, Liaison::ProtocolKind::Responses,

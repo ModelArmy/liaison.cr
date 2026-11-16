@@ -19,6 +19,14 @@ private def answer(context : HTTP::Server::Context) : Nil
       context.response.print "data: #{word}\n\n"
       context.response.flush
     end
+  when "/big"
+    context.response.print "x" * 5000
+  when "/endless-frame"
+    context.response.content_type = "text/event-stream"
+    context.response.print "data: #{"x" * 5000}\n\n"
+  when "/fail-big"
+    context.response.status_code = 500
+    context.response.print "y" * 200_000
   when "/fail"
     context.response.status_code = 503
     context.response.print %({"error":{"message":"overloaded"}})
@@ -27,9 +35,9 @@ private def answer(context : HTTP::Server::Context) : Nil
   end
 end
 
-private def with_loopback(&)
+private def with_loopback(max_body_bytes : Int32 = 1024, max_frame_bytes : Int32 = 1024, &)
   Loopback.serve(->answer(HTTP::Server::Context)) do |url|
-    server = Liaison::Server.new("loopback", url)
+    server = Liaison::Server.new("loopback", url, max_body_bytes: max_body_bytes, max_frame_bytes: max_frame_bytes)
     begin
       yield server
     ensure
@@ -43,6 +51,35 @@ private def ping(server : Liaison::Server) : String
 end
 
 describe Liaison::Server do
+  describe "#post" do
+    it "returns a body within the limit" do
+      with_loopback(max_body_bytes: 5000) do |server|
+        server.post("/big", HTTP::Headers.new, "").size.should eq(5000)
+      end
+    end
+
+    it "raises for a body over the limit, and leaves the connection usable" do
+      with_loopback(max_body_bytes: 4999) do |server|
+        expect_raises(Liaison::ResponseTooLargeError, /loopback.*4999/) do
+          server.post("/big", HTTP::Headers.new, "")
+        end
+        ping(server).should eq("pong")
+      end
+    end
+
+    it "reads only the start of an error body for its detail, and leaves the connection usable" do
+      with_loopback do |server|
+        detail = nil.as(String?)
+        decoder = ->(text : String) { detail = text; nil.as(String?) }
+
+        expect_raises(Liaison::OverloadedError) { server.post("/fail-big", HTTP::Headers.new, "", decoder) }
+
+        detail.try(&.size).should eq(Liaison::Server::ERROR_BODY_LIMIT)
+        ping(server).should eq("pong")
+      end
+    end
+  end
+
   describe "#stream" do
     it "reads every frame, and leaves the connection usable" do
       with_loopback do |server|
@@ -67,6 +104,24 @@ describe Liaison::Server do
         expect_raises(Exception, "handler failed") do
           server.stream("/stream", HTTP::Headers.new, "") { raise "handler failed" }
         end
+
+        ping(server).should eq("pong")
+      end
+    end
+
+    it "raises for a frame over the limit, and leaves the connection usable" do
+      with_loopback do |server|
+        expect_raises(Liaison::Streaming::Sse::FrameTooLargeError) do
+          server.stream("/endless-frame", HTTP::Headers.new, "") { true }
+        end
+
+        ping(server).should eq("pong")
+      end
+    end
+
+    it "reads only the start of an error body, and leaves the connection usable" do
+      with_loopback do |server|
+        expect_raises(Liaison::OverloadedError) { server.stream("/fail-big", HTTP::Headers.new, "") { true } }
 
         ping(server).should eq("pong")
       end
