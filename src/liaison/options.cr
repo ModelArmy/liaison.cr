@@ -13,7 +13,9 @@ module Liaison
   #   GetWeatherParams.json_schema.to_json)
   # ```
   #
-  # Raises `ArgumentError` for an empty name.
+  # Raises `ArgumentError` for an empty name, and for `parameters` that is not
+  # a single JSON object. The text is written into the request as it is, so
+  # anything else could add keys of its own to the request.
   #
   # Tools are what the caller offers on one call, not session history, so they
   # live in `Options` rather than `Session`.
@@ -27,6 +29,13 @@ module Liaison
     def initialize(@name : String, @description : String? = nil,
                    @parameters : String = EMPTY_SCHEMA)
       raise ArgumentError.new("tool name cannot be empty") if @name.empty?
+      raise ArgumentError.new("parameters for tool `#{@name}` must be a JSON object") unless object?(@parameters)
+    end
+
+    private def object?(text : String) : Bool
+      !JSON.parse(text).as_h?.nil?
+    rescue JSON::ParseException
+      false
     end
   end
 
